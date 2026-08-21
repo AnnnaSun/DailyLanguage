@@ -155,7 +155,7 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 - 一个 slice 默认控制在主要 production files `≤ 5`、production changed LOC `≤ 250`；
 - 如果实现无法在认知预算内完成，继续拆分，不自动扩大范围；
 - 新 dependency、public contract、schema 或核心 abstraction 仍需先经过 Architecture Decision；
-- M0-S1 尚未进入 implementation，当前停在 Phase Plan Review。
+- M0-S1 application skeleton、Java 25 原生环境验证、Diff Review 与 Human Ownership Check 已完成。
 
 ## 4. Later-phase Planning Rule
 
@@ -167,8 +167,9 @@ M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 i
 
 ```text
 Design: APPROVED
-Scope: DOCUMENTED — PENDING HUMAN REVIEW
-Implementation: NOT STARTED
+M0-S1 Scope: APPROVED
+M0-S1: COMPLETE
+M0-S2 Implementation: NOT STARTED
 ```
 
-Scope Review 通过后的下一动作仅是：定义并确认 `M0-S1` 的具体 file scope、dependency choice 与 verification plan。
+`M0-S1` 完成后停止。只有经过新的明确指令与 Scope 确认，才进入 `M0-S2`。

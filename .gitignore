@@ -34,3 +34,13 @@ docs/**/*.pdf
 .env
 .env.local
 .idea
+
+# macOS
+.DS_Store
+
+# Backend
+server/target/
+
+# Frontend
+client/node_modules/
+client/dist/
