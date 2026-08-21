@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.languageprofile.LanguageProfileMapper">
+
+    <resultMap id="languageProfileIdentityResult"
+               type="com.dailylanguage.languageprofile.LanguageProfileIdentity">
+        <constructor>
+            <idArg column="id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="user_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="language_code" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="insertReturning"
+            resultMap="languageProfileIdentityResult"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO language_profile (user_id, language_code)
+        VALUES (#{userId, jdbcType=OTHER}, #{languageCode, jdbcType=VARCHAR})
+        RETURNING id, user_id, language_code
+    </select>
+
+    <select id="findByIdAndUserId" resultMap="languageProfileIdentityResult">
+        SELECT id, user_id, language_code
+        FROM language_profile
+        WHERE id = #{languageProfileId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+    </select>
+</mapper>

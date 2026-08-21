@@ -734,6 +734,20 @@ Hosted Mode：
 - 前端自报 userId；
 - LLM Tool 参数中的 userId。
 
+### Persistence Query Safety
+
+Persistence access 使用 MyBatis-Plus starter + MyBatis Mapper XML：
+
+- runtime query / DML statement 集中在 Mapper XML，不写入 Java code 或 SQL annotation；
+- schema DDL 继续由 Flyway migration 管理；
+- 所有变量值使用 `#{}` 生成 `PreparedStatement` parameter；
+- 禁止 `${}` raw substitution；
+- 禁止把客户端输入直接作为 column、order、table 或任意 SQL fragment；
+- dynamic identifier 如果未来确有需求，必须由 backend enum / allowlist 映射；
+- 默认不开放 `last`、`apply`、`SqlRunner` 等可接收 SQL fragment 的入口。
+
+SQL injection checker 只能作为附加防线，不能代替 parameter binding 与 allowlist。
+
 ### Retrieval
 
 权限过滤必须发生在 Retrieval / Database 层。
