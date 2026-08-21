@@ -1,6 +1,7 @@
 # DailyLanguage
 
-AI Language Tutor 的 V1 工程目前处于 `M0-S2` 本地基础设施基线阶段。
+AI Language Tutor 的 V1 工程目前处于 `M0-S3` User / Language Profile
+persistence identity 阶段。
 
 ## 环境要求
 
@@ -49,8 +50,17 @@ FROM pg_available_extensions
 WHERE name = 'vector';
 ```
 
-`M0-S2` 只验证 pgvector 扩展可用，不启用该扩展。从 `M0-S3` 开始，
-`CREATE EXTENSION` 和数据库结构迁移统一由 Flyway 管理。
+`M0-S3` 开始由 Flyway 统一管理 `CREATE EXTENSION` 和数据库结构迁移。
+应用连接 PostgreSQL 后会自动执行 `server/src/main/resources/db/migration` 下
+尚未应用的 migration。当前初始 migration 会启用 pgvector，并创建
+`app_user` 与 `language_profile` identity tables。
+
+Persistence access 使用 MyBatis-Plus starter 与 MyBatis Mapper XML。Runtime query /
+DML statement 集中在 `server/src/main/resources/mapper`，schema DDL 仍由 Flyway
+migration 管理；所有变量值必须通过 `#{}` 绑定为 `PreparedStatement` 参数。禁止
+`${}` raw substitution、Java SQL annotation / SQL 字符串，以及直接接收客户端提供的
+column、order 或其他 SQL fragment。未来确有 dynamic identifier 需求时，必须先转换为
+backend-defined allowlist value。
 
 无需安装 GUI 或本地 CLI，可直接进入容器查询 Redis：
 
@@ -74,6 +84,16 @@ cd server
 ./mvnw spring-boot:run
 ```
 
+默认 test suite 不要求本地基础设施。需要验证 Flyway、Repository 与真实
+PostgreSQL constraints 时，先启动 PostgreSQL，再显式启用 database tests：
+
+```bash
+cd server
+RUN_DATABASE_TESTS=true ./mvnw test
+```
+
+如果 PostgreSQL 使用了非默认端口，应同时传入相同的 `DATABASE_PORT`。
+
 基础设施启动后，通过以下健康检查接口验证两个连接：
 
 ```bash
@@ -95,5 +115,6 @@ npm run dev
 docker compose down
 ```
 
-`M0-S2` 只提供基础设施和连接边界，不包含 Domain table（领域数据表）、
-Repository、cache behavior（缓存行为）、Security 或 AI behavior。
+`M0-S3` 只提供 User / Language Profile persistence identity、Repository 与
+ownership-scoped query boundary，不包含 Authentication / UserContext、完整
+Language Profile、cache behavior、REST API 或 AI behavior。

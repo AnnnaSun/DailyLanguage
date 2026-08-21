@@ -2084,8 +2084,8 @@ RAG Result 返回 Context。
 | Logical Module | Source Path | Main Entry | Core Classes | Tests | Implementation |
 |---|---|---|---|---|---|
 | Client / UX | `client/src` | `client/src/main.ts` | `App.vue` application shell | Build verification only | PARTIAL |
-| Language Management | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Language Profile | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Language Management | `server/src/main/java/com/dailylanguage/user` | `UserRepository` | `UserRepository`, `UserMapper` | `PersistenceIdentityIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — persistence identity only |
+| Language Profile | `server/src/main/java/com/dailylanguage/languageprofile` | `LanguageProfileRepository` | `LanguageProfileIdentity`, `LanguageProfileRepository`, `LanguageProfileMapper` | `PersistenceIdentityIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity and ownership query only |
 | Planner | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Practice Runtime | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Conversation | TBD | TBD | TBD | TBD | NOT_STARTED |
@@ -2103,6 +2103,7 @@ RAG Result 返回 Context。
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Security | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements | `PersistenceIdentityIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity foundation only |
 | Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL |
 
 `NOT_STARTED` 只是当前文档初始化默认值。

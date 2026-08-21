@@ -53,3 +53,56 @@ V1 完成后，根据真实运行数据和瓶颈重新评估：
 ### Follow-up
 
 在出现非 localhost Redis hostname、真实 DNS resolution 问题或建立跨平台 integration test 时，评估是否按 platform classifier 增加 `netty-resolver-dns-native-macos` runtime dependency。不要仅为消除 warning 无条件增加所有平台的 production dependency。
+
+## IDEA-004 — Define LanguageProfile lifecycle and deletion semantics
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: M0-S5_SCOPE_REVIEW
+- Type: PRODUCT_ARCHITECTURE_DECISION
+
+### Context
+
+Language Management 的正式 V1 设计包含 Pause / Resume、Set Primary、Delete 与 Reassess，但当前 `M0-S5` minimum use case 只明确安排 create / list / switch。`LanguageProfile` 的删除方式及其与暂停、归档、恢复的关系尚未形成正式决定。
+
+`M0-S3` 只建立 persistence identity、ownership 与 foreign-key boundary，不提前增加 `deleted_at`、lifecycle status 或 delete use case。User → LanguageProfile 的 foreign key 暂按 `ON DELETE RESTRICT` 设计，避免父记录误删时自动清除高价值学习数据；这不代表未来禁止通过受控 workflow 删除。
+
+### Follow-up
+
+在 `M0-S5` Scope Review 时决定：
+
+- Pause、Archive 与 Delete 是否是不同 lifecycle state；
+- Delete 是可恢复的 logical deletion、立即 physical deletion，还是分阶段执行；
+- 是否提供恢复窗口，以及由谁触发最终 purge；
+- 同一 User 删除某语言后能否重新创建该语言的 `LanguageProfile`；
+- `(user_id, language_code)` uniqueness 如何处理已删除记录；
+- Profile 下的 Practice、Evidence、Memory 与其他语言专属状态如何清理；
+- 哪些 child relationship 可以使用 `ON DELETE CASCADE`，哪些高价值边界必须保持 explicit deletion / `RESTRICT`。
+
+本条目只要求在 `M0-S5` 实现前完成 Product / Architecture Decision，不代表上述 lifecycle 能力已经全部批准进入该 slice。
+
+## IDEA-005 — Define User account deletion, retention, and purge workflow
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: SECURITY_DATA_LIFECYCLE
+
+### Context
+
+当前正式文档尚未定义 User account deletion。User 删除与单个 `LanguageProfile` 删除不是同一能力，它可能影响 Authentication identity、多个语言 workspace、Practice、Evidence、Learning Memory、Trace，以及 Hosted / Self-hosted 下的数据保留与隐私边界。
+
+`M0-S3` 不实现 User 的 physical deletion、soft deletion、`deleted_at` 或 deletion state machine。高层 foreign key 默认阻止意外级联删除，直到受控删除流程经过独立 Scope / Architecture Review。
+
+### Follow-up
+
+后续根据正式 Product / Security Scope 决定：
+
+- account deletion 是否采用 request、disable、recovery window、purge 的分阶段流程；
+- 用户可见删除语义与最终 physical deletion 的时间边界；
+- retention、backup、Trace 与审计数据的保留规则；
+- purge 的 transaction / background job、retry、idempotency 与 failure recovery；
+- Hosted / Self-hosted 是否共用同一核心 deletion workflow；
+- 如何验证所有 language-specific state 均被完整且不可跨用户地清理。
+
+本条目只保存待决策的数据生命周期问题，不代表已进入 V1 或任何当前 Phase。
