@@ -1,3 +1,21 @@
 spring:
   application:
     name: daily-language-server
+  datasource:
+    url: jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:daily_language}
+    username: ${DATABASE_USER:daily_language}
+    password: ${DATABASE_PASSWORD:daily_language_local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: always
+      show-details: never

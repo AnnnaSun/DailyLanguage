@@ -169,7 +169,11 @@ M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 i
 Design: APPROVED
 M0-S1 Scope: APPROVED
 M0-S1: COMPLETE
-M0-S2 Implementation: NOT STARTED
+M0-S2 Scope: APPROVED
+M0-S2 Implementation: COMPLETE
+M0-S2 Review: COMPLETE
+M0-S2 Ownership Check: COMPLETE
+M0-S2: READY_TO_COMMIT
 ```
 
-`M0-S1` 完成后停止。只有经过新的明确指令与 Scope 确认，才进入 `M0-S2`。
+`M0-S2` 已完成实现、Review 与 Human Ownership Check。当前停在人工 Commit Checkpoint；只有完成 commit 并经过新的 Scope 确认，才进入 `M0-S3`。

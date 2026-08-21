@@ -387,7 +387,7 @@ I understand Planner.
 | UserContext                          | A                 | UNASSESSED        | L4        | L5               |          |
 | Security / Permission                | A                 | UNASSESSED        | L3        | L5               |          |
 | Multi-language Isolation             | A                 | UNASSESSED        | L4        | L5               |          |
-| Docker Compose                       | B                 | UNASSESSED        | L3        | L4               |          |
+| Docker Compose                       | B                 | L3                | L3        | L4               | M0-S2 source review and explain-back: service purpose, PostgreSQL 18 volume layout, loopback exposure, host/container port mapping |
 | Hosted / Self-hosted Config          | A                 | UNASSESSED        | L3        | L4               |          |
 | Health Check                         | C/B               | UNASSESSED        | L2        | L2               |          |
 
@@ -646,7 +646,7 @@ Human Touch 的目的：
 
 | Module / Feature | Questions | Result  | Missing Area | Date |
 | ---------------- | --------: | ------- | ------------ | ---- |
-| TBD              |         3 | PARTIAL | TBD          | TBD  |
+| M0-S2 Local Infrastructure | 4 | UNDERSTOOD | None for current slice | 2026-08-21 |
 
 Result：
 

@@ -1,0 +1,39 @@
+#本地基础设施的启动清单
+name: daily-language
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg18-bookworm
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-daily_language}
+      POSTGRES_USER: ${DATABASE_USER:-daily_language}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-daily_language_local}
+    ports:
+      - "127.0.0.1:${DATABASE_PORT:-5432}:5432"
+    volumes:
+#   Docker volume 定义持久化的大目录；必须让挂载目录覆盖 PostgreSQL 实际写入路径。
+#   pg18的挂载目录：/var/lib/postgresql/18/docker， pg17的挂载目录:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.2.15-alpine3.21
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres-data:
+  redis-data:
