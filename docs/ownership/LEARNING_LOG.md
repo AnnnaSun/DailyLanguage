@@ -518,7 +518,23 @@ TBD
 >
 > 正式开发开始后逐步追加。
 
-暂无正式 Learning Entry。
+## LEARN-001 — Docker volume mount 必须覆盖应用的真实数据目录
+
+**Category:** Infrastructure / PostgreSQL
+**Source:** IMPLEMENTATION + DEBUG + CODE_REVIEW
+**Confidence:** CONFIRMED
+
+**Learning:**
+
+Docker volume 只覆盖指定 mount target，不会自动改变应用的 `PGDATA`。PostgreSQL 18 使用 `/var/lib/postgresql/18/docker`，因此应挂载共同父目录 `/var/lib/postgresql`；继续挂载旧路径 `/var/lib/postgresql/data` 会让真实数据目录落到 volume 外，官方 entrypoint 因此 fail fast。
+
+**Evidence:**
+
+`compose.yaml` 的 PostgreSQL volume 配置；首次 runtime startup 的 PostgreSQL 18 entrypoint error；修正后 PostgreSQL、pgvector availability 与 backend database health verification 均通过。
+
+**Reusable Rule:**
+
+配置 container persistence 时，必须核对当前 image 的真实 data directory；不能只复制旧版本常见的 volume path。
 
 ---
 

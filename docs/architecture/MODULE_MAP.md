@@ -2103,7 +2103,7 @@ RAG Result 返回 Context。
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Security | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Infrastructure | `server/src/main` | `DailyLanguageApplication` | Application skeleton only | `DailyLanguageApplicationTests` | PARTIAL |
+| Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL |
 
 `NOT_STARTED` 只是当前文档初始化默认值。
 
