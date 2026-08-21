@@ -2083,6 +2083,7 @@ RAG Result 返回 Context。
 
 | Logical Module | Source Path | Main Entry | Core Classes | Tests | Implementation |
 |---|---|---|---|---|---|
+| Client / UX | `client/src` | `client/src/main.ts` | `App.vue` application shell | Build verification only | PARTIAL |
 | Language Management | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Language Profile | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Planner | TBD | TBD | TBD | TBD | NOT_STARTED |
@@ -2102,7 +2103,7 @@ RAG Result 返回 Context。
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Security | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Infrastructure | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Infrastructure | `server/src/main` | `DailyLanguageApplication` | Application skeleton only | `DailyLanguageApplicationTests` | PARTIAL |
 
 `NOT_STARTED` 只是当前文档初始化默认值。
 
