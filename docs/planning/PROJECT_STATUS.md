@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-22
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4A / READY TO IMPLEMENT
-> Production implementation: M0-S3 COMPLETE
+> Current Gate: M0-S4A / REVIEW
+> Production implementation: M0-S4A IMPLEMENTED — REVIEW PENDING
 
 ## Approved Decisions
 
@@ -37,16 +37,16 @@
 
 ```text
 Selected slice: M0-S4A
-Gate: READY TO IMPLEMENT
+Gate: REVIEW
 Scope: Spring Security + trusted UserContext walking skeleton
-Verification: unauthenticated rejection, owner access, cross-user not found, request / LLM userId has no authority
-Production baseline: M0-S3 COMPLETE; no M0-S4 production change yet
+Verification: PASSED — unauthenticated rejection, owner access, cross-user not found, request userId has no authority
+Production baseline: M0-S4A IMPLEMENTED — REVIEW PENDING
 Later slices: auth identity persistence → local registration / Argon2id → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-只实现 `M0-S4A`：Spring Security 与 trusted `UserContext` walking skeleton。完成 focused verification、Diff Review 与 Human Ownership Check 后停止，不自动进入 `M0-S4B1`。
+Review `M0-S4A` 的 Security boundary、trusted `UserContext` 调用链与 focused tests；完成 Human Ownership Check 后再决定是否进入 `M0-S4B1`。
 
 ## Blockers
 

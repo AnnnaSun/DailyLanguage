@@ -239,9 +239,11 @@ M0-S3 Ownership Check: COMPLETE
 M0-S3: COMPLETE
 M0-S4 Architecture Decision: ACCEPTED (ADR-0002)
 M0-S4 Scope: APPROVED
-M0-S4A: READY TO IMPLEMENT
+M0-S4A Implementation: COMPLETE
+M0-S4A Verification: COMPLETE
+M0-S4A: REVIEW
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
-`M0-S4` 已完成 Architecture / Scope Decision，并拆为 S4A–S4D 的受控 slices。下一动作只进入
-`M0-S4A` implementation，不自动推进 S4B 或后续 slice。
+`M0-S4` 已完成 Architecture / Scope Decision，并拆为 S4A–S4D 的受控 slices。`M0-S4A`
+implementation 与 focused verification 已完成，当前停在 Review Gate，不自动推进 S4B 或后续 slice。

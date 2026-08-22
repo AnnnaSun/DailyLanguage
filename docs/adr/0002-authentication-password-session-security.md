@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: NOT STARTED
+- Implementation: S4A IMPLEMENTED — REVIEW PENDING; S4B–S4D NOT STARTED
 
 ## Context
 
