@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: S4A IMPLEMENTED — REVIEW PENDING; S4B–S4D NOT STARTED
+- Implementation: S4A COMPLETE; S4B1 IMPLEMENTED — REVIEW PENDING; S4B2–S4D NOT STARTED
 
 ## Context
 
@@ -75,6 +75,45 @@ languageProfileId + userId scoped query
 禁止使用 `X-User-Id`、request body `userId` 或 LLM / Tool-provided `userId` 作为可信身份。
 访问不存在或不属于当前用户的 Language Profile 统一表现为 not found，避免 resource
 enumeration。
+
+### S4B1 Approved Persistence Design
+
+Local email identity 使用确定性 V1 normalization：去除首尾空格、限制为 ASCII email、
+最长 254 characters，并以 `Locale.ROOT` 转为小写；不执行 Gmail-specific dot / plus
+canonicalization。Internationalized Email 不进入 M0-S4。
+
+`auth_identity` 保存：
+
+- UUIDv7 `id`；
+- `user_id`，引用稳定的 `app_user.id`；
+- `provider`，M0-S4 database constraint 只允许 `LOCAL_EMAIL`；
+- normalized `provider_subject`；
+- `created_at`；
+- `(provider, provider_subject)` unique constraint。
+
+不增加 `(user_id, provider)` uniqueness，以保留一个 User 关联多个 authentication identities
+的长期模型。`auth_identity.user_id` 使用 `ON DELETE RESTRICT`。
+
+`local_password_credential` 保存：
+
+- `auth_identity_id`，同时作为 primary key 与 foreign key；
+- `password_verifier VARCHAR(512)`；
+- `created_at` 与 `updated_at`。
+
+Credential 对 identity 使用 `ON DELETE CASCADE`，因为 verifier 没有脱离 identity 独立存在的
+语义。Algorithm version 不另设 column，而是由 self-describing verifier prefix（例如
+`{argon2id-v1}`）承载，避免 version column 与 encoded verifier 不一致。
+
+S4B1 只接收 encoded verifier，不接收 raw password，并保证 identity + credential persistence
+自身原子化。S4B2 registration service 再以外层 `@Transactional` boundary 覆盖：
+
+```text
+create app_user
+    +
+create auth_identity
+    +
+create local_password_credential
+```
 
 ## Password Storage
 

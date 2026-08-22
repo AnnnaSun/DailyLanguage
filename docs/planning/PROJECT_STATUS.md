@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-22
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4A / REVIEW
-> Production implementation: M0-S4A IMPLEMENTED — REVIEW PENDING
+> Current Gate: M0-S4B1 / REVIEW
+> Production implementation: M0-S4B1 IMPLEMENTED — REVIEW PENDING
 
 ## Approved Decisions
 
@@ -32,21 +32,24 @@
 5. M0-S2 pgvector availability 与 Flyway-owned installation boundary。
 6. M0-S3 UUIDv7 identity schema、Language Profile ownership boundary 与 deletion constraints；
 7. M0-S3 MyBatis Mapper XML persistence path、UUID TypeHandler 与 SQL injection safety boundary。
+8. M0-S4A Spring Security boundary、trusted `UserContext` 调用链与 ownership-scoped access；
+9. M0-S4A unauthenticated、owner、cross-user 与 request `userId` spoofing verification。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4A
+Selected slice: M0-S4B1
 Gate: REVIEW
-Scope: Spring Security + trusted UserContext walking skeleton
-Verification: PASSED — unauthenticated rejection, owner access, cross-user not found, request userId has no authority
-Production baseline: M0-S4A IMPLEMENTED — REVIEW PENDING
-Later slices: auth identity persistence → local registration / Argon2id → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
+Scope: five production files for auth_identity + local credential migration / persistence
+Verification: PASSED — ASCII-before-lowercase regression, normalization, encoded-verifier boundary, uniqueness, transaction rollback, FK / deletion and prepared binding
+Production baseline: M0-S4B1 IMPLEMENTED — REVIEW PENDING
+Review finding: RESOLVED — compatibility characters are rejected before Unicode lowercase
+Later slices: local registration / Argon2id → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-Review `M0-S4A` 的 Security boundary、trusted `UserContext` 调用链与 focused tests；完成 Human Ownership Check 后再决定是否进入 `M0-S4B1`。
+继续 S4B1 Review 与 Human Ownership Check；完成前不进入 `M0-S4B2`。
 
 ## Blockers
 

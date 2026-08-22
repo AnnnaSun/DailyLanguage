@@ -29,14 +29,21 @@ class MapperSqlSafetyTests {
 
     @Test
     void allVariableValuesUsePreparedStatementParameters() throws IOException {
-        Resource resource = new PathMatchingResourcePatternResolver()
+        Resource languageProfileMapper = new PathMatchingResourcePatternResolver()
                 .getResource("classpath:/mapper/LanguageProfileMapper.xml");
-        String mapperXml = readResource(resource);
+        Resource localAuthenticationMapper = new PathMatchingResourcePatternResolver()
+                .getResource("classpath:/mapper/LocalAuthenticationMapper.xml");
 
-        assertThat(mapperXml)
+        assertThat(readResource(languageProfileMapper))
                 .contains("#{userId, jdbcType=OTHER}")
                 .contains("#{languageCode, jdbcType=VARCHAR}")
                 .contains("#{languageProfileId, jdbcType=OTHER}");
+        assertThat(readResource(localAuthenticationMapper))
+                .contains("#{userId, jdbcType=OTHER}")
+                .contains("#{provider, jdbcType=VARCHAR}")
+                .contains("#{providerSubject, jdbcType=VARCHAR}")
+                .contains("#{authIdentityId, jdbcType=OTHER}")
+                .contains("#{passwordVerifier, jdbcType=VARCHAR}");
     }
 
     private static String readResource(Resource resource) throws IOException {

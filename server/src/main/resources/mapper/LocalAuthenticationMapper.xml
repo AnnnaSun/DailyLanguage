@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.authentication.LocalAuthenticationMapper">
+
+    <resultMap id="localAuthenticationCredentialResult"
+               type="com.dailylanguage.authentication.LocalAuthenticationCredential">
+        <constructor>
+            <idArg column="auth_identity_id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="user_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="normalized_email" javaType="java.lang.String"/>
+            <arg column="password_verifier" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="insertIdentityReturningId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO auth_identity (user_id, provider, provider_subject)
+        VALUES (
+            #{userId, jdbcType=OTHER},
+            #{provider, jdbcType=VARCHAR},
+            #{providerSubject, jdbcType=VARCHAR}
+        )
+        RETURNING id
+    </select>
+
+    <insert id="insertCredential">
+        INSERT INTO local_password_credential (auth_identity_id, password_verifier)
+        VALUES (
+            #{authIdentityId, jdbcType=OTHER},
+            #{passwordVerifier, jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <select id="findCredential" resultMap="localAuthenticationCredentialResult">
+        SELECT auth.id AS auth_identity_id,
+               auth.user_id,
+               auth.provider_subject AS normalized_email,
+               credential.password_verifier
+        FROM auth_identity auth
+        JOIN local_password_credential credential
+          ON credential.auth_identity_id = auth.id
+        WHERE auth.provider = #{provider, jdbcType=VARCHAR}
+          AND auth.provider_subject = #{providerSubject, jdbcType=VARCHAR}
+    </select>
+</mapper>

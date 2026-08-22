@@ -188,6 +188,33 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 - pepper 不在 M0-S4 自行实现，由 M6 Hosted Security Gate 在具备 managed secret lifecycle
   后重新评估。
 
+#### M0-S4B1 Scope
+
+Production files 限定为：
+
+1. `server/src/main/resources/db/migration/V2__add_local_authentication_identity.sql`；
+2. `server/src/main/java/com/dailylanguage/authentication/LocalEmailNormalizer.java`；
+3. `server/src/main/java/com/dailylanguage/authentication/LocalAuthenticationMapper.java`；
+4. `server/src/main/java/com/dailylanguage/authentication/LocalAuthenticationRepository.java`；
+5. `server/src/main/resources/mapper/LocalAuthenticationMapper.xml`。
+
+Repository 只暴露 encoded-verifier persistence 与 local credential lookup；identity + credential
+使用内部 transaction，未来可加入 S4B2 registration 的外层 transaction。Sensitive lookup
+record 保持在 authentication package，不进入 Controller DTO、Log、Trace 或 Domain Event。
+
+Focused verification 限定为：
+
+- normalized email identity 与 UUIDv7；
+- `(provider, provider_subject)` uniqueness；
+- missing `app_user` foreign key rejection；
+- one credential per identity；
+- credential insert 失败时 identity rollback；
+- `app_user → auth_identity` RESTRICT 与 `auth_identity → credential` CASCADE；
+- Mapper 继续只使用 prepared parameter binding。
+
+明确不进入本 slice：public Register/Login API、raw password、Argon2id dependency / hashing、
+password policy / compromised-password check、Session、CSRF、Rate Limit 与外部 Provider。
+
 #### M0-S4 Capacity Decision
 
 Argon2id security parameters 现在确定；password-hash concurrency 由 hardware capacity 决定：
@@ -241,9 +268,18 @@ M0-S4 Architecture Decision: ACCEPTED (ADR-0002)
 M0-S4 Scope: APPROVED
 M0-S4A Implementation: COMPLETE
 M0-S4A Verification: COMPLETE
-M0-S4A: REVIEW
+M0-S4A Review: COMPLETE
+M0-S4A Ownership Check: COMPLETE
+M0-S4A: COMPLETE
+M0-S4B1 Design: APPROVED
+M0-S4B1 Scope: APPROVED
+M0-S4B1 Implementation: COMPLETE
+M0-S4B1 Verification: COMPLETE
+M0-S4B1: REVIEW
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
-`M0-S4` 已完成 Architecture / Scope Decision，并拆为 S4A–S4D 的受控 slices。`M0-S4A`
-implementation 与 focused verification 已完成，当前停在 Review Gate，不自动推进 S4B 或后续 slice。
+`M0-S4A` 已完成 implementation、focused verification、Review 与 Human Ownership Check。
+`M0-S4B1` persistence design、Scope、implementation 与 focused verification 已完成。Review
+发现的 ASCII validation order 问题已修正并增加 regression test，当前恢复 Review Gate；完成
+Human Ownership Check 前不进入 S4B2。

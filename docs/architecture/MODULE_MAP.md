@@ -2102,8 +2102,8 @@ RAG Result 返回 Context。
 | Model Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Security | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements | `PersistenceIdentityIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity foundation only |
+| Security | `server/src/main/java/com/dailylanguage/security`, `server/src/main/java/com/dailylanguage/authentication` | `SecurityConfiguration`, `LocalAuthenticationRepository` | `UserContext`, ownership access boundary, local email normalization and encoded-verifier persistence | `LanguageProfileSecurityTests`, `LocalAuthenticationRepositoryTests`, `LocalAuthenticationPersistenceIntegrationTests` | PARTIAL — no registration, login, Argon2id encoder or Session yet |
+| Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements, auth identity and credential schema | `PersistenceIdentityIntegrationTests`, `LocalAuthenticationPersistenceIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity and local credential foundation |
 | Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL |
 
 `NOT_STARTED` 只是当前文档初始化默认值。
