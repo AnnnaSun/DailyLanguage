@@ -2,7 +2,7 @@
 
 > Last updated: 2026-08-22
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S3 / COMPLETE
+> Current Gate: M0-S4A / READY TO IMPLEMENT
 > Production implementation: M0-S3 COMPLETE
 
 ## Approved Decisions
@@ -18,6 +18,10 @@
 - User → LanguageProfile foreign key 使用 `ON DELETE RESTRICT`；M0-S3 不实现 physical / logical deletion，lifecycle decision 已记录到 Backlog。
 - Language Profile 读取通过 `languageProfileId + userId` scoped query 建立 persistence ownership boundary；可信 `UserContext` 留到 M0-S4。
 - SQL variables 只通过 `#{}` parameter binding；禁止 `${}`、Java SQL annotation / string、客户端 SQL fragment 与 `last` / `apply` / `SqlRunner` 等拼接入口。
+- M0-S4 采用 `ADR-0002`：Hosted V1 使用 Spring Security、Argon2id local credential、Redis-backed server-side Session、CSRF 与 authenticated `UserContext`；不使用 browser-stored JWT。
+- `app_user` 保持稳定 internal identity，login channel 通过 `auth_identity` 分离；multi-channel authentication 与 Account Linking 记录为 `IDEA-006`，不进入当前 M0-S4 implementation。
+- Argon2id security parameters 以 `argon2id-v1` 在 code 中版本化；password-hash concurrency 是 hardware-dependent capacity parameter，DEV / TEST 与 Self-hosted safe default 为 1，Hosted 必须显式配置。
+- M0-S4C2 必须实现 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 到 M6 在目标硬件确认。
 
 ## Completed Review
 
@@ -32,25 +36,17 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S3
-Implementation changes: Flyway identity migration, UUIDv7 User / Language Profile persistence, MyBatis Mapper XML and ownership-scoped query
-Verification:
-  - Java 25 default test suite without Docker dependency: PASS
-  - Mapper XML raw substitution / plain statement safety checks: PASS
-  - Flyway migration against PostgreSQL 18.6: PASS
-  - pgvector extension installation through Flyway: PASS
-  - PostgreSQL-generated UUIDv7 for User and Language Profile: PASS
-  - BCP 47 language code validation, normalization and per-user uniqueness: PASS
-  - missing User foreign-key rejection: PASS
-  - User deletion RESTRICT with existing Profile: PASS
-  - languageProfileId + userId ownership-scoped lookup: PASS
-  - SQL injection payload rejection followed by successful repository operation: PASS
-  - External PostgreSQL port 15432 integration run: PASS
+Selected slice: M0-S4A
+Gate: READY TO IMPLEMENT
+Scope: Spring Security + trusted UserContext walking skeleton
+Verification: unauthenticated rejection, owner access, cross-user not found, request / LLM userId has no authority
+Production baseline: M0-S3 COMPLETE; no M0-S4 production change yet
+Later slices: auth identity persistence → local registration / Argon2id → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-M0-S3 implementation、verification、Diff Review 与 Human Ownership Check 已完成。本次 commit 后停在 M0-S3；进入 `M0-S4` 前需要新的 Scope Review。
+只实现 `M0-S4A`：Spring Security 与 trusted `UserContext` walking skeleton。完成 focused verification、Diff Review 与 Human Ownership Check 后停止，不自动进入 `M0-S4B1`。
 
 ## Blockers
 

@@ -1,8 +1,9 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.0  
+> Version: 1.1
 > Approved: 2026-08-20  
+> Last updated: 2026-08-22
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -144,7 +145,7 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 | M0-S1 | Build 与 application skeleton | backend/frontend 能启动；无 Domain 行为 |
 | M0-S2 | Local infrastructure baseline | PostgreSQL、pgvector、Redis 与配置边界可启动 |
 | M0-S3 | User / Language Profile persistence identity | migration、repository boundary、`languageProfileId` 归属 |
-| M0-S4 | Authentication / UserContext boundary | request identity 不可越权访问其他 profile |
+| M0-S4 | Authentication / UserContext umbrella | trusted identity、local credential、Session、resource protection 与 deployment mode |
 | M0-S5 | Language workspace minimum use case | create/list/switch profile；语言状态硬隔离 |
 | M0-S6 | Model Gateway contract | 业务代码不依赖 concrete provider；timeout/error contract 明确 |
 | M0-S7 | BYOK transient credential path | Credential 不持久化、不进入 logs/traces/exceptions |
@@ -156,6 +157,62 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 - 如果实现无法在认知预算内完成，继续拆分，不自动扩大范围；
 - 新 dependency、public contract、schema 或核心 abstraction 仍需先经过 Architecture Decision；
 - M0-S1 application skeleton、Java 25 原生环境验证、Diff Review 与 Human Ownership Check 已完成。
+
+### M0-S4 Detailed Slices
+
+`M0-S4` 是 Architecture-sensitive Security umbrella，采用 `ADR-0002`。它不能作为一个
+大 implementation slice 一次完成，必须按以下认知边界依次推进；每个 slice 完成后停止并
+进入独立 Review。
+
+| Slice | Scope | Verification focus |
+| --- | --- | --- |
+| M0-S4A | Spring Security 与 trusted `UserContext` walking skeleton | unauthenticated request 被拒绝；owner 可访问；cross-user profile 返回 not found；request / LLM `userId` 无 authority |
+| M0-S4B1 | `auth_identity` 与 local credential schema / persistence | internal User 与 login channel 分离；identity uniqueness；transaction / FK boundary；不实现外部 Provider |
+| M0-S4B2 | Local registration 与 versioned Argon2id verifier | registration atomicity；password policy；hash uniqueness / match / malformed fail-closed / upgrade；raw password 不进入 persistence、Redis、Log 或 Trace |
+| M0-S4C1 | Login / Logout / Current User 与 Redis-backed Session | Spring Security lifecycle；Session creation / rotation / expiry / invalidation；cookie boundary；generic authentication failure |
+| M0-S4C2 | SPA CSRF、authentication throttling、global hash concurrency gate 与 provisional resource verification | Rate Limit 先于 Argon2；active hash 有硬上限；capacity fail fast；无 unbounded queue / permit leak；restricted-Container mixed workload / recovery evidence |
+| M0-S4D | Self-hosted `SINGLE_USER` bootstrap 与 deployment-mode isolation | public registration boundary；server-side identity；Hosted / Self-hosted 产生相同 `UserContext`；misconfiguration fail-closed |
+
+#### M0-S4 Fixed Security Decisions
+
+- Hosted V1 使用 Spring Security + Redis-backed server-side HTTP Session，不使用
+  browser-stored JWT；
+- local password verifier 使用 code-versioned `argon2id-v1`；algorithm parameters 不是可随意
+  调低的 runtime configuration；
+- PostgreSQL 只保存 encoded verifier，不保存 plaintext 或 reversible encrypted password；
+- Session cookie、CSRF、session fixation protection、logout invalidation 与 same-site deployment
+  boundary 必须在 M0-S4 内验证；
+- `app_user` 是内部稳定 identity，login channel 通过 `auth_identity` 分离；
+- Sign in with Apple、phone OTP、Passkey、其他 OIDC Provider 与 Account Linking 保留在
+  `IDEA-006`；
+- pepper 不在 M0-S4 自行实现，由 M6 Hosted Security Gate 在具备 managed secret lifecycle
+  后重新评估。
+
+#### M0-S4 Capacity Decision
+
+Argon2id security parameters 现在确定；password-hash concurrency 由 hardware capacity 决定：
+
+```text
+DEV / TEST default:       1
+Self-hosted safe default: 1
+Hosted:                   explicit configuration required
+```
+
+M0-S4C2 只在受限 Container profile 上形成 `PROVISIONAL` evidence。Hosted 未显式配置
+`maxConcurrentHashes` 时 startup fail。M6 在真实或等价 Hosted hardware 上完成 benchmark、
+open-model login load、mixed workload、soak 与 recovery test 后，才能把 capacity 标记为
+`CONFIRMED`。
+
+#### M0-S4 Exit Criteria
+
+- request identity 只能来自 authenticated `UserContext`；
+- cross-user Language Profile access 在 HTTP → Service → Repository 全链被阻止；
+- local registration、login、logout 与 current-user request 可验证；
+- password storage、Session、CSRF 与 authentication failure path 满足 ADR-0002；
+- Rate Limit 与 global password-hash concurrency gate 阻止 Argon2 resource exhaustion；
+- raw password / verifier / Session secret 不进入禁止的 persistence、Log 或 Trace boundary；
+- Hosted / Self-hosted 共用 Domain / authorization path；
+- 每个子 slice 完成 focused verification、Diff Review 与 Human Ownership Check。
 
 ## 4. Later-phase Planning Rule
 
@@ -180,6 +237,11 @@ M0-S3 Verification: COMPLETE
 M0-S3 Review: COMPLETE
 M0-S3 Ownership Check: COMPLETE
 M0-S3: COMPLETE
+M0-S4 Architecture Decision: ACCEPTED (ADR-0002)
+M0-S4 Scope: APPROVED
+M0-S4A: READY TO IMPLEMENT
 ```
 
-`M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。本次 commit 后停在 `M0-S3`；只有经过新的 Scope Review 才进入 `M0-S4`。
+`M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
+`M0-S4` 已完成 Architecture / Scope Decision，并拆为 S4A–S4D 的受控 slices。下一动作只进入
+`M0-S4A` implementation，不自动推进 S4B 或后续 slice。

@@ -106,3 +106,30 @@ Language Management 的正式 V1 设计包含 Pause / Resume、Set Primary、Del
 - 如何验证所有 language-specific state 均被完整且不可跨用户地清理。
 
 本条目只保存待决策的数据生命周期问题，不代表已进入 V1 或任何当前 Phase。
+
+## IDEA-006 — Multi-channel authentication and account linking
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: PRODUCT_SECURITY
+
+### Context
+
+Hosted Account 未来可能支持多个登录渠道，例如 Sign in with Apple、手机号 OTP 与其他 OIDC Provider。登录渠道不是 `User` Domain identity：一个 `app_user` 可能绑定多个经过验证的 authentication identity，而 `LanguageProfile` 与所有长期学习状态必须继续归属于稳定的内部 `userId`。
+
+`M0-S4` 不自动实现多个外部 Provider。当前 Account schema / `UserContext` boundary 应避免把 `app_user` 永久等同于 email、手机号或 Apple 返回的 email，也不得仅根据相同 email 自动合并账号。
+
+### Follow-up
+
+在进入正式 Scope 前决定并验证：
+
+- Sign in with Apple 的 token verification、issuer / audience / nonce / state、key rotation、Private Relay 与 disconnect notification；
+- 手机号的 E.164 normalization、OTP provider、expiry、attempt limit、rate limit、防短信轰炸、号码回收与 account recovery；
+- 多个 authentication identity 与一个 `app_user` 的绑定模型；
+- link / unlink 前的 re-authentication、冲突处理与 last-login-method protection；
+- duplicate account resolution、显式 merge consent 与可审计的安全流程；
+- Hosted / Self-hosted authentication mode 是否共享同一个 `UserContext` contract；
+- Provider credential、token 与验证材料的 persistence、encryption、rotation、redaction 和 retention boundary。
+
+本条目只保留多渠道认证与 Account Linking 的后续 Product / Security Decision，不代表已进入 V1、`M0-S4` 或已经批准具体 Provider integration。
