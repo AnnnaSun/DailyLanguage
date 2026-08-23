@@ -275,11 +275,22 @@ M0-S4B1 Design: APPROVED
 M0-S4B1 Scope: APPROVED
 M0-S4B1 Implementation: COMPLETE
 M0-S4B1 Verification: COMPLETE
-M0-S4B1: REVIEW
+M0-S4B1 Review: COMPLETE
+M0-S4B1 Ownership Check: COMPLETE
+M0-S4B1: COMPLETE
+M0-S4B2 Design: APPROVED
+M0-S4B2a Scope: APPROVED
+M0-S4B2a Implementation: COMPLETE
+M0-S4B2a Verification: COMPLETE
+M0-S4B2a Review: COMPLETE
+M0-S4B2a Ownership Check: COMPLETE
+M0-S4B2a: READY_TO_COMMIT
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
 `M0-S4A` 已完成 implementation、focused verification、Review 与 Human Ownership Check。
-`M0-S4B1` persistence design、Scope、implementation 与 focused verification 已完成。Review
-发现的 ASCII validation order 问题已修正并增加 regression test，当前恢复 Review Gate；完成
-Human Ownership Check 前不进入 S4B2。
+`M0-S4B1` persistence design、Scope、implementation、focused verification、Review 与 Human
+Ownership Check 已完成。ASCII validation order 问题已经修正并由 regression test 覆盖。
+`M0-S4B2` Design 与 `M0-S4B2a` Scope 已批准。Versioned Argon2id hasher 已完成
+implementation、focused verification、Review 与 Human Ownership Check，当前等待人工 Commit
+Decision。

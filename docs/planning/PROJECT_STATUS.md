@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-22
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4B1 / REVIEW
-> Production implementation: M0-S4B1 IMPLEMENTED — REVIEW PENDING
+> Current Gate: M0-S4B2a / READY_TO_COMMIT
+> Production implementation: M0-S4B2a IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
 
 ## Approved Decisions
 
@@ -34,22 +34,22 @@
 7. M0-S3 MyBatis Mapper XML persistence path、UUID TypeHandler 与 SQL injection safety boundary。
 8. M0-S4A Spring Security boundary、trusted `UserContext` 调用链与 ownership-scoped access；
 9. M0-S4A unauthenticated、owner、cross-user 与 request `userId` spoofing verification。
+10. M0-S4B1 authentication identity / credential persistence、transaction / foreign key boundary、Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4B1
-Gate: REVIEW
-Scope: five production files for auth_identity + local credential migration / persistence
-Verification: PASSED — ASCII-before-lowercase regression, normalization, encoded-verifier boundary, uniqueness, transaction rollback, FK / deletion and prepared binding
-Production baseline: M0-S4B1 IMPLEMENTED — REVIEW PENDING
-Review finding: RESOLVED — compatibility characters are rejected before Unicode lowercase
-Later slices: local registration / Argon2id → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
+Selected slice: M0-S4B2a
+Gate: READY_TO_COMMIT
+Scope: versioned Argon2id hasher and Bouncy Castle cryptography dependency
+Verification: PASSED — fixed parameters, random salt, match / mismatch, malformed and unknown verifier fail-closed, current-version upgrade state
+Production baseline: M0-S4B2a IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
+Later slices: password policy / blocklist → atomic registration → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-继续 S4B1 Review 与 Human Ownership Check；完成前不进入 `M0-S4B2`。
+等待人工 Commit Decision；commit 前不进入 password policy / blocklist slice。
 
 ## Blockers
 

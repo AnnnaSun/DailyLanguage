@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>25</java.version>
+        <bouncycastle.version>1.85.2</bouncycastle.version>
     </properties>
 
     <dependencies>
@@ -29,6 +30,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
         </dependency>
         <dependency>
             <groupId>com.baomidou</groupId>
