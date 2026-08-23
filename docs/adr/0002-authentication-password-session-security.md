@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: S4A–S4B2b READY_TO_COMMIT; S4B2c–S4D NOT STARTED
+- Implementation: S4A–S4B2b COMPLETE; S4B2c READY_TO_COMMIT; S4C–S4D NOT STARTED
 
 ## Context
 
@@ -115,6 +115,39 @@ create auth_identity
 create local_password_credential
 ```
 
+### Atomic Local Registration
+
+S4B2c 使用以下固定调用顺序：
+
+```text
+normalize email
+    ↓
+password policy / blocklist validation
+    ↓
+Argon2id hash
+    ↓
+transaction: create app_user + auth_identity + local_password_credential
+    ↓
+return userId
+```
+
+Validation 与 Argon2id 在 database transaction 外完成，避免 password hashing 期间占用数据库
+connection。`LocalRegistrationPersistence` 作为独立 Spring bean 提供 public
+`@Transactional` method，确保调用经过 Spring transaction proxy；它依次调用现有
+`UserRepository` 与 `LocalAuthenticationRepository`。内部 repository transaction 使用默认
+`REQUIRED` propagation，参与外层 transaction。任一 insert 失败时整体 rollback，不执行手工
+delete 或补偿。
+
+Database `(provider, provider_subject)` unique constraint 是 duplicate identity 的最终并发
+authority；不使用“先查询、再插入”作为正确性判断。重复 identity 统一返回
+`IDENTITY_UNAVAILABLE`，并回滚该请求已创建的 `app_user`。其他已确认的 expected rejection
+包括 `INVALID_EMAIL`、`INVALID_PASSWORD_LENGTH`、`INVALID_PASSWORD_CHARACTER` 与
+`COMMON_OR_COMPROMISED_PASSWORD`。Unexpected hash / persistence failure 只暴露固定的 generic
+registration failure，不携带可能泄露敏感值的原始 database cause chain。
+
+Raw password 只进入 `LocalRegistrationService` 的 normalize-independent policy / hash 调用链；
+`LocalRegistrationPersistence` 与 repository 只接收 normalized email 和 encoded verifier。
+
 ## Password Storage
 
 PostgreSQL 只保存 versioned encoded password verifier，不保存 plaintext password 或
@@ -198,6 +231,23 @@ Hosted V1 使用 Redis-backed server-side HTTP Session：
 
 Authentication 使用 Spring Security filter / provider lifecycle，不在 Controller 手工比较
 password 并自行拼装 SecurityContext。
+
+## Registration Safe Logging
+
+`LocalRegistrationService` 是 registration failure 的唯一 logging boundary；Policy、Hasher 与
+Repository 不重复记录同一次失败。Expected password-policy rejection、blocklist hit 与
+duplicate identity 不写 ERROR log，避免 log amplification 与敏感行为泄露。
+
+Unexpected hash / persistence failure 只记录 structured safe metadata：
+
+- `stage`，例如 `PASSWORD_HASH` 或 `PERSISTENCE`；
+- exception class name；
+- 已存在时使用 request / trace correlation ID，但 S4B2c 不为此自行创建新的 trace system。
+
+禁止记录 raw password、normalized email、email local part、blocklist fingerprint、Argon2id
+verifier、SQL parameter、database exception message 或可能包含这些值的完整 cause chain。
+尤其不能把 PostgreSQL unique-constraint exception 直接作为 throwable 写入 Log，因为其 detail
+可能包含实际 email。使用现有 SLF4J，不新增 logging dependency。
 
 ## Password-hash Resource Protection
 

@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-23
+> Last updated: 2026-08-24
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4B2b / READY_TO_COMMIT
-> Production implementation: M0-S4B2b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
+> Current Gate: M0-S4B2c / READY_TO_COMMIT
+> Production implementation: M0-S4B2c IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
 
 ## Approved Decisions
 
@@ -24,6 +24,8 @@
 - M0-S4C2 必须实现 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 到 M6 在目标硬件确认。
 - M0-S4B2b password policy 使用 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括普通半角空格）；不做 composition rule、trim、字符替换或 Unicode normalization。该决定是 V1 usability / compatibility trade-off，低于当前 NIST password-only 15-character minimum 的 residual risk 必须明确保留。
 - M0-S4B2b offline blocklist 使用 pinned SecLists 2026.1 Top 250,000 prefix，经 12–64 printable ASCII exact filter 后生成 2,065 个 sorted binary SHA-256 fingerprints（baseline 66,080 bytes）；只在 registration / password change / reset 的 Argon2id 前检查，不进入 login path。
+- M0-S4B2c registration failure 只在 `LocalRegistrationService` 进行 structured safe logging；expected rejection 不记 ERROR，unexpected failure 只记录 stage、exception type 与已有 correlation ID，禁止 email、raw password、fingerprint、verifier、SQL parameter、database exception message 或完整 cause chain。
+- M0-S4B2c atomic registration Design 已确认：normalize / policy / Argon2id 在 transaction 外执行，独立 `LocalRegistrationPersistence` bean 的外层 transaction 原子写入 `app_user`、`auth_identity` 与 credential；database unique constraint 裁决 concurrent duplicate，失败请求整体 rollback。
 
 ## Completed Review
 
@@ -39,21 +41,25 @@
 10. M0-S4B1 authentication identity / credential persistence、transaction / foreign key boundary、Review 与 Human Ownership Check。
 11. M0-S4B2a versioned Argon2id hashing、verifier resource-parameter gate、Review 与 Human Ownership Check。
 12. M0-S4B2b printable-ASCII password policy、pinned offline blocklist、deterministic asset generation、Review 与 Human Ownership Check。
+13. M0-S4B2c atomic registration Scope、correctness、transaction、concurrent duplicate、safe logging、failure contract Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4B2b
+Selected slice: M0-S4B2c
 Gate: READY_TO_COMMIT
-Scope: APPROVED — password policy, immutable blocklist query, pinned binary asset and deterministic generator
-Verification: PASSED — 11 focused tests; regenerated asset byte-identical; full Maven test suite passed (7 environment-dependent DB integration tests skipped)
-Production baseline: M0-S4B2b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
-Later slices: atomic registration → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
+Scope: APPROVED
+Implementation: COMPLETE
+Verification: COMPLETE — service tests, PostgreSQL atomicity / concurrent duplicate tests and full backend regression passed
+Review: PASS — no blocking findings
+Ownership: COMPLETE — user explained transaction placement, rollback, duplicate mapping and safe exception boundary
+Production baseline: M0-S4B2c IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
+Later slices: Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-等待人工 Commit Decision；commit 前不进入 atomic registration slice。
+等待人工 Commit Decision；commit 前不进入 Redis Session slice。
 
 ## Blockers
 

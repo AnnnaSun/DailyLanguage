@@ -185,6 +185,9 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 - offline blocklist 固定为 SecLists 2026.1 Top 250,000 prefix 经 12–64 printable ASCII exact
   filter 生成的 sorted binary SHA-256 fingerprints；baseline 是 2,065 entries / 66,080 bytes，
   只在 registration / password change / reset 的 Argon2id 前检查；
+- registration failure 只在 `LocalRegistrationService` 记录 structured safe metadata；expected
+  policy / duplicate rejection 不记 ERROR，unexpected failure 禁止记录 email、raw password、
+  fingerprint、verifier、SQL parameter、database exception message 或完整 cause chain；
 - PostgreSQL 只保存 encoded verifier，不保存 plaintext 或 reversible encrypted password；
 - Session cookie、CSRF、session fixation protection、logout invalidation 与 same-site deployment
   boundary 必须在 M0-S4 内验证；
@@ -324,7 +327,14 @@ M0-S4B2b Implementation: COMPLETE
 M0-S4B2b Verification: COMPLETE
 M0-S4B2b Review: COMPLETE
 M0-S4B2b Ownership Check: COMPLETE
-M0-S4B2b: READY_TO_COMMIT
+M0-S4B2b: COMPLETE
+M0-S4B2c Design: APPROVED
+M0-S4B2c Scope: APPROVED
+M0-S4B2c Implementation: COMPLETE
+M0-S4B2c Verification: COMPLETE
+M0-S4B2c Review: COMPLETE
+M0-S4B2c Ownership Check: COMPLETE
+M0-S4B2c: READY_TO_COMMIT
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -334,5 +344,8 @@ Ownership Check 已完成。ASCII validation order 问题已经修正并由 regr
 `M0-S4B2` Design 与 `M0-S4B2a` Scope 已批准。Versioned Argon2id hasher 已完成
 implementation、focused verification、Review、Human Ownership Check 与人工 commit。当前进入
 `M0-S4B2b` password policy 与 offline blocklist Design、Scope、implementation、focused
-verification、Review 与 Human Ownership Check 已完成，当前等待人工 Commit Decision；commit
-前不进入 atomic registration slice。
+verification、Review、Human Ownership Check 与人工 commit 已完成。`M0-S4B2c` atomic
+registration 调用顺序、transaction boundary、duplicate identity、failure contract 与 safe
+logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL atomicity / concurrent
+duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
+完成。当前等待人工 Commit Decision，commit 前不进入 Redis Session slice。

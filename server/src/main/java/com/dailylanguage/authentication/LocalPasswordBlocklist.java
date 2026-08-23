@@ -39,6 +39,10 @@ public final class LocalPasswordBlocklist {
         this.sortedFingerprints = sortedFingerprints.clone();
     }
 
+    /**
+     * Checks only a candidate for an application-managed password credential.
+     * External provider passwords and phone OTP values do not enter this blocklist.
+     */
     boolean contains(String candidate) {
         Objects.requireNonNull(candidate, "candidate must not be null");
         // SHA-256 is only a public blocklist lookup key; stored credentials continue to use Argon2id.

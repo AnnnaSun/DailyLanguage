@@ -20,6 +20,10 @@ public class LocalAuthenticationRepository {
         this.localAuthenticationMapper = localAuthenticationMapper;
     }
 
+    /**
+     * Attaches an application-managed LOCAL_EMAIL credential to an existing User.
+     * Provider-issued subjects such as Apple {@code sub} values require their own persistence flow.
+     */
     @Transactional
     public UUID create(UUID userId, String email, String encodedPasswordVerifier) {
         Objects.requireNonNull(userId, "userId must not be null");
@@ -34,6 +38,9 @@ public class LocalAuthenticationRepository {
         return identityId;
     }
 
+    /**
+     * Loads only the application-managed LOCAL_EMAIL credential used for password authentication.
+     */
     public Optional<LocalAuthenticationCredential> findByEmail(String email) {
         return localAuthenticationMapper.findCredential(
                 LOCAL_EMAIL,

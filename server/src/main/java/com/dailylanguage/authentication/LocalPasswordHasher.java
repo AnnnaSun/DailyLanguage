@@ -42,6 +42,10 @@ public final class LocalPasswordHasher {
                 Map.of(CURRENT_VERSION, argon2idV1));
     }
 
+    /**
+     * Encodes only an application-managed local password for persistence.
+     * Passwords owned by Apple/OIDC providers must never reach this boundary.
+     */
     public String hash(CharSequence rawPassword) {
         Objects.requireNonNull(rawPassword, "rawPassword must not be null");
         String encodedVerifier = passwordEncoder.encode(rawPassword);
@@ -51,6 +55,9 @@ public final class LocalPasswordHasher {
         return encodedVerifier;
     }
 
+    /**
+     * Verifies only an application-managed local password against its stored verifier.
+     */
     public boolean matches(CharSequence rawPassword, String encodedVerifier) {
         if (rawPassword == null || !isCurrentVerifier(encodedVerifier)) {
             return false;

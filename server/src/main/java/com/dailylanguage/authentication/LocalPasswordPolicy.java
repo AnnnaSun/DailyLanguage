@@ -16,6 +16,10 @@ public final class LocalPasswordPolicy {
         this.blocklist = Objects.requireNonNull(blocklist, "blocklist must not be null");
     }
 
+    /**
+     * Validates a candidate for an application-managed password credential.
+     * Upstream provider passwords and phone OTP values must never be passed into this policy.
+     */
     public ValidationResult validate(String candidate, String normalizedEmail) {
         if (candidate == null) {
             return ValidationResult.INVALID_LENGTH;

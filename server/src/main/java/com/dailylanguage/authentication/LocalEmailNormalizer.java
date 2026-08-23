@@ -12,6 +12,10 @@ public final class LocalEmailNormalizer {
     private LocalEmailNormalizer() {
     }
 
+    /**
+     * Normalizes a LOCAL_EMAIL login subject, not an email claim from Apple/OIDC identity tokens.
+     * External providers must be keyed by their stable provider subject rather than this email value.
+     */
     public static String normalize(String email) {
         Objects.requireNonNull(email, "email must not be null");
         String candidate = email.strip();
