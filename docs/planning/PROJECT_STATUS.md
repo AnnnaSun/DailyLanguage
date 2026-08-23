@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-22
+> Last updated: 2026-08-23
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4B2a / READY_TO_COMMIT
-> Production implementation: M0-S4B2a IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
+> Current Gate: M0-S4B2b / READY_TO_COMMIT
+> Production implementation: M0-S4B2b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
 
 ## Approved Decisions
 
@@ -22,6 +22,8 @@
 - `app_user` 保持稳定 internal identity，login channel 通过 `auth_identity` 分离；multi-channel authentication 与 Account Linking 记录为 `IDEA-006`，不进入当前 M0-S4 implementation。
 - Argon2id security parameters 以 `argon2id-v1` 在 code 中版本化；password-hash concurrency 是 hardware-dependent capacity parameter，DEV / TEST 与 Self-hosted safe default 为 1，Hosted 必须显式配置。
 - M0-S4C2 必须实现 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 到 M6 在目标硬件确认。
+- M0-S4B2b password policy 使用 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括普通半角空格）；不做 composition rule、trim、字符替换或 Unicode normalization。该决定是 V1 usability / compatibility trade-off，低于当前 NIST password-only 15-character minimum 的 residual risk 必须明确保留。
+- M0-S4B2b offline blocklist 使用 pinned SecLists 2026.1 Top 250,000 prefix，经 12–64 printable ASCII exact filter 后生成 2,065 个 sorted binary SHA-256 fingerprints（baseline 66,080 bytes）；只在 registration / password change / reset 的 Argon2id 前检查，不进入 login path。
 
 ## Completed Review
 
@@ -35,21 +37,23 @@
 8. M0-S4A Spring Security boundary、trusted `UserContext` 调用链与 ownership-scoped access；
 9. M0-S4A unauthenticated、owner、cross-user 与 request `userId` spoofing verification。
 10. M0-S4B1 authentication identity / credential persistence、transaction / foreign key boundary、Review 与 Human Ownership Check。
+11. M0-S4B2a versioned Argon2id hashing、verifier resource-parameter gate、Review 与 Human Ownership Check。
+12. M0-S4B2b printable-ASCII password policy、pinned offline blocklist、deterministic asset generation、Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4B2a
+Selected slice: M0-S4B2b
 Gate: READY_TO_COMMIT
-Scope: versioned Argon2id hasher and Bouncy Castle cryptography dependency
-Verification: PASSED — fixed parameters, random salt, match / mismatch, malformed and unknown verifier fail-closed, current-version upgrade state
-Production baseline: M0-S4B2a IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
-Later slices: password policy / blocklist → atomic registration → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
+Scope: APPROVED — password policy, immutable blocklist query, pinned binary asset and deterministic generator
+Verification: PASSED — 11 focused tests; regenerated asset byte-identical; full Maven test suite passed (7 environment-dependent DB integration tests skipped)
+Production baseline: M0-S4B2b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
+Later slices: atomic registration → Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-等待人工 Commit Decision；commit 前不进入 password policy / blocklist slice。
+等待人工 Commit Decision；commit 前不进入 atomic registration slice。
 
 ## Blockers
 

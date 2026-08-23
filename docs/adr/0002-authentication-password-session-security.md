@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: S4A–S4B1 COMPLETE; S4B2a READY_TO_COMMIT; S4B2b–S4D NOT STARTED
+- Implementation: S4A–S4B2b READY_TO_COMMIT; S4B2c–S4D NOT STARTED
 
 ## Context
 
@@ -143,11 +143,42 @@ Trace、exception、metrics 或 Domain Event。
 
 Password policy 至少包含：
 
-- password-only authentication 最小长度 15 characters；
-- 支持至少 64 characters、space、password manager 与 paste/autofill；
+- password-only authentication 长度为 12–64 characters；
+- 只接受 printable ASCII `U+0020`–`U+007E`，包括普通半角空格；不接受 Unicode、
+  control characters、Tab 或换行；
+- 不 trim、不自动删除或替换字符；ASCII 输入直接进入 policy / blocklist / hash 或 match；
+- 支持 password manager 与 paste/autofill；
 - 不使用强制 character composition rule 或无理由 periodic rotation；
 - registration 对 common / compromised password blocklist 做检查；
-- Unicode 处理与 normalization 必须有确定性测试。
+- frontend validation 只负责 UX，backend policy 是 authoritative boundary。
+
+当前 NIST SP 800-63B 对 password-only authentication 采用 15-character minimum，并建议接受
+Unicode。项目为降低 V1 输入一致性与用户记忆负担，明确选择 12-character minimum 与
+printable-ASCII-only policy。该决定是产品与兼容性 trade-off，不视为等价的 security
+enhancement；其 residual risk 由 blocklist、Argon2id、Rate Limit 与 password-hash concurrency
+gate 共同降低。Printable ASCII 本身是 NFC-stable，因此本 policy 不执行 Unicode
+normalization。
+
+Offline blocklist 使用固定、可复现的 source artifact：
+
+- source 是 SecLists `2026.1` release / commit
+  `190c6f7bd58c847ceadfe57d9853592737f059e8` 中
+  `Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt` 的前
+  250,000 个 ranked entries；
+- build-time generation 只保留 12–64 printable ASCII entries，并按完整字符串进行
+  case-sensitive exact deduplication；当前固定 source 产生 2,065 个 baseline entries；
+- runtime artifact 保存按字节排序的 32-byte SHA-256 fingerprints，不保存原始 million-entry
+  source；baseline payload 是 66,080 bytes；
+- registration、password change 与 password reset 在 Argon2id 前检查完整 candidate；login
+  path 不执行 blocklist check；
+- 不进行 substring、case folding、character replacement 或其他 heuristic transformation；
+- service name 等少量 static context-specific values 进入 generated artifact；candidate 与
+  login email 或 email local part 完全相同时由 policy 动态拒绝；
+- 命中时只返回可操作的通用原因，不记录 candidate、fingerprint 或匹配 entry。
+
+Blocklist fingerprint 只用于公开 weak-password set membership，不是 credential verifier，
+不能替代 Argon2id。Source version、source checksum、filtered entry count 与 generated artifact
+checksum 必须由 deterministic test 固定，避免 dependency update 静默改变 password policy。
 
 M0-S4 不自行增加 pepper wrapper。Pepper 需要独立 Secret Manager / HSM、version、
 rotation、backup、loss recovery 与 forced-reset 策略；是否在 Hosted production 使用

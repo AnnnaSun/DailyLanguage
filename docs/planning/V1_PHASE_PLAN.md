@@ -179,6 +179,12 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
   browser-stored JWT；
 - local password verifier 使用 code-versioned `argon2id-v1`；algorithm parameters 不是可随意
   调低的 runtime configuration；
+- local password policy 接受 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括
+  普通半角空格），不做 composition rule、trim、字符替换或 Unicode normalization；该 V1
+  usability / compatibility trade-off 低于当前 NIST password-only 15-character minimum；
+- offline blocklist 固定为 SecLists 2026.1 Top 250,000 prefix 经 12–64 printable ASCII exact
+  filter 生成的 sorted binary SHA-256 fingerprints；baseline 是 2,065 entries / 66,080 bytes，
+  只在 registration / password change / reset 的 Argon2id 前检查；
 - PostgreSQL 只保存 encoded verifier，不保存 plaintext 或 reversible encrypted password；
 - Session cookie、CSRF、session fixation protection、logout invalidation 与 same-site deployment
   boundary 必须在 M0-S4 内验证；
@@ -214,6 +220,34 @@ Focused verification 限定为：
 
 明确不进入本 slice：public Register/Login API、raw password、Argon2id dependency / hashing、
 password policy / compromised-password check、Session、CSRF、Rate Limit 与外部 Provider。
+
+#### M0-S4B2b Scope
+
+Production files 限定为：
+
+1. `server/src/main/java/com/dailylanguage/authentication/LocalPasswordPolicy.java`；
+2. `server/src/main/java/com/dailylanguage/authentication/LocalPasswordBlocklist.java`；
+3. `server/src/main/resources/security/local-password-blocklist-v1.bin`。
+
+Development-only generation tool 限定为：
+
+4. `server/tools/GenerateLocalPasswordBlocklist.java`。
+
+Policy 只接受 12–64 printable ASCII，按完整 candidate 检查 normalized email / local part 与
+offline blocklist。Blocklist runtime 只加载并查询 pinned、strictly sorted binary SHA-256
+fingerprints；generator 验证固定 source checksum 后生成 asset，不进入 Maven build 或 runtime。
+
+Focused verification 限定为：
+
+- 11 / 12 / 64 / 65 长度边界与完整 printable-ASCII range；
+- control、Unicode、full-width 与 emoji rejection，且不 trim / normalization；
+- common、service-context、email 与 email-local-part rejection；
+- pinned entry count / checksum、strict ordering、malformed fail-closed 与 concurrent reads；
+- raw password 不进入 output；固定 source 可生成 byte-identical asset。
+
+明确不进入本 slice：Register/Login Controller、registration transaction、数据库、Redis
+Session、Rate Limit、password reset API、HIBP network integration、frontend message component、
+新 dependency 或 `LocalPasswordHasher` 修改。
 
 #### M0-S4 Capacity Decision
 
@@ -284,7 +318,13 @@ M0-S4B2a Implementation: COMPLETE
 M0-S4B2a Verification: COMPLETE
 M0-S4B2a Review: COMPLETE
 M0-S4B2a Ownership Check: COMPLETE
-M0-S4B2a: READY_TO_COMMIT
+M0-S4B2a: COMPLETE
+M0-S4B2b Scope: APPROVED
+M0-S4B2b Implementation: COMPLETE
+M0-S4B2b Verification: COMPLETE
+M0-S4B2b Review: COMPLETE
+M0-S4B2b Ownership Check: COMPLETE
+M0-S4B2b: READY_TO_COMMIT
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -292,5 +332,7 @@ M0-S4B2a: READY_TO_COMMIT
 `M0-S4B1` persistence design、Scope、implementation、focused verification、Review 与 Human
 Ownership Check 已完成。ASCII validation order 问题已经修正并由 regression test 覆盖。
 `M0-S4B2` Design 与 `M0-S4B2a` Scope 已批准。Versioned Argon2id hasher 已完成
-implementation、focused verification、Review 与 Human Ownership Check，当前等待人工 Commit
-Decision。
+implementation、focused verification、Review、Human Ownership Check 与人工 commit。当前进入
+`M0-S4B2b` password policy 与 offline blocklist Design、Scope、implementation、focused
+verification、Review 与 Human Ownership Check 已完成，当前等待人工 Commit Decision；commit
+前不进入 atomic registration slice。
