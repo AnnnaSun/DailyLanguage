@@ -17,12 +17,12 @@ import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationRes
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.COMMON_OR_COMPROMISED_PASSWORD;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.IDENTITY_UNAVAILABLE;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_EMAIL;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_PASSWORD_CHARACTER;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_PASSWORD_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.REGISTRATION_FAILED;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_EMAIL;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.inOrder;
@@ -32,9 +32,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class LocalRegistrationServiceTests {
 
-    private static final String RAW_PASSWORD = "safe-pass-12";
+    private static final String SUBMITTED_PASSWORD = "safe-pass-12";
     private static final String NORMALIZED_EMAIL = "owner@example.com";
-    private static final String ENCODED_VERIFIER = "{argon2id-v1}$encoded-verifier";
+    private static final String ENCODED_PASSWORD_HASH = "{argon2id-v1}$encoded-password-hash";
 
     @Mock
     private LocalPasswordPolicy passwordPolicy;
@@ -58,24 +58,25 @@ class LocalRegistrationServiceTests {
     @Test
     void normalizesValidatesHashesAndPersistsInOrder() {
         UUID userId = UUID.randomUUID();
-        when(passwordPolicy.validate(RAW_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
-        when(passwordHasher.hash(RAW_PASSWORD)).thenReturn(ENCODED_VERIFIER);
-        when(registrationPersistence.create(NORMALIZED_EMAIL, ENCODED_VERIFIER)).thenReturn(userId);
+        when(passwordPolicy.validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
+        when(passwordHasher.hash(SUBMITTED_PASSWORD)).thenReturn(ENCODED_PASSWORD_HASH);
+        when(registrationPersistence.createLocalAccount(NORMALIZED_EMAIL, ENCODED_PASSWORD_HASH))
+                .thenReturn(userId);
 
-        assertThat(registrationService.register(" Owner@Example.COM ", RAW_PASSWORD)).isEqualTo(userId);
+        assertThat(registrationService.register(" Owner@Example.COM ", SUBMITTED_PASSWORD)).isEqualTo(userId);
 
         InOrder order = inOrder(passwordPolicy, passwordHasher, registrationPersistence);
-        order.verify(passwordPolicy).validate(RAW_PASSWORD, NORMALIZED_EMAIL);
-        order.verify(passwordHasher).hash(RAW_PASSWORD);
-        order.verify(registrationPersistence).create(NORMALIZED_EMAIL, ENCODED_VERIFIER);
+        order.verify(passwordPolicy).validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL);
+        order.verify(passwordHasher).hash(SUBMITTED_PASSWORD);
+        order.verify(registrationPersistence).createLocalAccount(NORMALIZED_EMAIL, ENCODED_PASSWORD_HASH);
     }
 
     @Test
     void rejectsInvalidEmailBeforePasswordWork() {
         LocalRegistrationException exception = catchRegistrationFailure(
-                () -> registrationService.register("not-an-email", RAW_PASSWORD));
+                () -> registrationService.register("not-an-email", SUBMITTED_PASSWORD));
 
-        assertThat(exception.reason()).isEqualTo(INVALID_EMAIL);
+        assertThat(exception.failureReason()).isEqualTo(INVALID_EMAIL);
         assertThat(exception).hasNoCause();
         verifyNoInteractions(passwordPolicy, passwordHasher, registrationPersistence);
     }
@@ -90,13 +91,13 @@ class LocalRegistrationServiceTests {
     @Test
     void mapsDuplicateIdentityWithoutLoggingDatabaseDetails(CapturedOutput output) {
         prepareAcceptedPassword();
-        when(registrationPersistence.create(NORMALIZED_EMAIL, ENCODED_VERIFIER))
+        when(registrationPersistence.createLocalAccount(NORMALIZED_EMAIL, ENCODED_PASSWORD_HASH))
                 .thenThrow(new DuplicateKeyException("duplicate owner@example.com"));
 
         LocalRegistrationException exception = catchRegistrationFailure(
-                () -> registrationService.register(NORMALIZED_EMAIL, RAW_PASSWORD));
+                () -> registrationService.register(NORMALIZED_EMAIL, SUBMITTED_PASSWORD));
 
-        assertThat(exception.reason()).isEqualTo(IDENTITY_UNAVAILABLE);
+        assertThat(exception.failureReason()).isEqualTo(IDENTITY_UNAVAILABLE);
         assertThat(exception).hasNoCause();
         assertThat(output).doesNotContain(NORMALIZED_EMAIL);
     }
@@ -104,57 +105,58 @@ class LocalRegistrationServiceTests {
     @Test
     void logsOnlySafeMetadataForUnexpectedPersistenceFailure(CapturedOutput output) {
         prepareAcceptedPassword();
-        when(registrationPersistence.create(NORMALIZED_EMAIL, ENCODED_VERIFIER))
+        when(registrationPersistence.createLocalAccount(NORMALIZED_EMAIL, ENCODED_PASSWORD_HASH))
                 .thenThrow(new DataAccessResourceFailureException(
-                        "database rejected " + NORMALIZED_EMAIL + " " + RAW_PASSWORD + " " + ENCODED_VERIFIER));
+                        "database rejected " + NORMALIZED_EMAIL + " "
+                                + SUBMITTED_PASSWORD + " " + ENCODED_PASSWORD_HASH));
 
         LocalRegistrationException exception = catchRegistrationFailure(
-                () -> registrationService.register(NORMALIZED_EMAIL, RAW_PASSWORD));
+                () -> registrationService.register(NORMALIZED_EMAIL, SUBMITTED_PASSWORD));
 
-        assertThat(exception.reason()).isEqualTo(REGISTRATION_FAILED);
+        assertThat(exception.failureReason()).isEqualTo(REGISTRATION_FAILED);
         assertThat(exception).hasNoCause();
         assertThat(output)
                 .contains("stage=PERSISTENCE")
                 .contains("exceptionType=org.springframework.dao.DataAccessResourceFailureException")
                 .doesNotContain(NORMALIZED_EMAIL)
-                .doesNotContain(RAW_PASSWORD)
-                .doesNotContain(ENCODED_VERIFIER);
+                .doesNotContain(SUBMITTED_PASSWORD)
+                .doesNotContain(ENCODED_PASSWORD_HASH);
     }
 
     @Test
     void stopsBeforePersistenceWhenPasswordHashingFails(CapturedOutput output) {
-        when(passwordPolicy.validate(RAW_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
-        when(passwordHasher.hash(RAW_PASSWORD))
-                .thenThrow(new IllegalStateException("failed to hash " + RAW_PASSWORD));
+        when(passwordPolicy.validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
+        when(passwordHasher.hash(SUBMITTED_PASSWORD))
+                .thenThrow(new IllegalStateException("failed to hash " + SUBMITTED_PASSWORD));
 
         LocalRegistrationException exception = catchRegistrationFailure(
-                () -> registrationService.register(NORMALIZED_EMAIL, RAW_PASSWORD));
+                () -> registrationService.register(NORMALIZED_EMAIL, SUBMITTED_PASSWORD));
 
-        assertThat(exception.reason()).isEqualTo(REGISTRATION_FAILED);
+        assertThat(exception.failureReason()).isEqualTo(REGISTRATION_FAILED);
         assertThat(exception).hasNoCause();
         verifyNoInteractions(registrationPersistence);
         assertThat(output)
                 .contains("stage=PASSWORD_HASH")
                 .contains("exceptionType=java.lang.IllegalStateException")
-                .doesNotContain(RAW_PASSWORD);
+                .doesNotContain(SUBMITTED_PASSWORD);
     }
 
     private void assertPolicyRejection(
             LocalPasswordPolicy.ValidationResult validationResult,
-            LocalRegistrationException.Reason expectedReason) {
-        when(passwordPolicy.validate(RAW_PASSWORD, NORMALIZED_EMAIL)).thenReturn(validationResult);
+            LocalRegistrationException.FailureReason expectedFailureReason) {
+        when(passwordPolicy.validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL)).thenReturn(validationResult);
 
         LocalRegistrationException exception = catchRegistrationFailure(
-                () -> registrationService.register(NORMALIZED_EMAIL, RAW_PASSWORD));
+                () -> registrationService.register(NORMALIZED_EMAIL, SUBMITTED_PASSWORD));
 
-        assertThat(exception.reason()).isEqualTo(expectedReason);
+        assertThat(exception.failureReason()).isEqualTo(expectedFailureReason);
         assertThat(exception).hasNoCause();
         verifyNoInteractions(passwordHasher, registrationPersistence);
     }
 
     private void prepareAcceptedPassword() {
-        when(passwordPolicy.validate(RAW_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
-        when(passwordHasher.hash(RAW_PASSWORD)).thenReturn(ENCODED_VERIFIER);
+        when(passwordPolicy.validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
+        when(passwordHasher.hash(SUBMITTED_PASSWORD)).thenReturn(ENCODED_PASSWORD_HASH);
     }
 
     private static LocalRegistrationException catchRegistrationFailure(Runnable registration) {

@@ -10,38 +10,41 @@ public final class LocalPasswordPolicy {
     private static final int MINIMUM_LENGTH = 12;
     private static final int MAXIMUM_LENGTH = 64;
 
-    private final LocalPasswordBlocklist blocklist;
+    private final LocalPasswordBlocklist passwordBlocklist;
 
-    public LocalPasswordPolicy(LocalPasswordBlocklist blocklist) {
-        this.blocklist = Objects.requireNonNull(blocklist, "blocklist must not be null");
+    public LocalPasswordPolicy(LocalPasswordBlocklist passwordBlocklist) {
+        this.passwordBlocklist = Objects.requireNonNull(
+                passwordBlocklist,
+                "passwordBlocklist must not be null");
     }
 
     /**
-     * Validates a candidate for an application-managed password credential.
+     * Validates a submitted password for an application-managed password credential.
      * Upstream provider passwords and phone OTP values must never be passed into this policy.
      */
-    public ValidationResult validate(String candidate, String normalizedEmail) {
-        if (candidate == null) {
+    public ValidationResult validate(String submittedPassword, String normalizedEmail) {
+        if (submittedPassword == null) {
             return ValidationResult.INVALID_LENGTH;
         }
         // Unsupported characters take precedence so callers can return the actionable ASCII-only error.
-        if (!containsOnlyPrintableAscii(candidate)) {
+        if (!containsOnlyPrintableAscii(submittedPassword)) {
             return ValidationResult.INVALID_CHARACTER;
         }
-        if (candidate.length() < MINIMUM_LENGTH || candidate.length() > MAXIMUM_LENGTH) {
+        if (submittedPassword.length() < MINIMUM_LENGTH || submittedPassword.length() > MAXIMUM_LENGTH) {
             return ValidationResult.INVALID_LENGTH;
         }
 
         Objects.requireNonNull(normalizedEmail, "normalizedEmail must not be null");
-        if (matchesLoginIdentity(candidate, normalizedEmail) || blocklist.contains(candidate)) {
+        if (matchesLoginIdentity(submittedPassword, normalizedEmail)
+                || passwordBlocklist.contains(submittedPassword)) {
             return ValidationResult.COMMON_OR_COMPROMISED;
         }
         return ValidationResult.ACCEPTED;
     }
 
-    private static boolean containsOnlyPrintableAscii(String candidate) {
-        for (int index = 0; index < candidate.length(); index++) {
-            char character = candidate.charAt(index);
+    private static boolean containsOnlyPrintableAscii(String submittedPassword) {
+        for (int index = 0; index < submittedPassword.length(); index++) {
+            char character = submittedPassword.charAt(index);
             if (character < 0x20 || character > 0x7e) {
                 return false;
             }
@@ -49,14 +52,15 @@ public final class LocalPasswordPolicy {
         return true;
     }
 
-    private static boolean matchesLoginIdentity(String candidate, String normalizedEmail) {
-        // Identity normalization must not case-fold, trim, or otherwise change the password candidate.
-        if (candidate.equals(normalizedEmail)) {
+    private static boolean matchesLoginIdentity(String submittedPassword, String normalizedEmail) {
+        // Identity normalization must not case-fold, trim, or otherwise change the submitted password.
+        if (submittedPassword.equals(normalizedEmail)) {
             return true;
         }
-        int separator = normalizedEmail.indexOf('@');
-        return separator > 0 && candidate.regionMatches(0, normalizedEmail, 0, separator)
-                && candidate.length() == separator;
+        int emailAtSignIndex = normalizedEmail.indexOf('@');
+        return emailAtSignIndex > 0
+                && submittedPassword.regionMatches(0, normalizedEmail, 0, emailAtSignIndex)
+                && submittedPassword.length() == emailAtSignIndex;
     }
 
     public enum ValidationResult {

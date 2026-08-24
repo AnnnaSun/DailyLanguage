@@ -4,8 +4,8 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.dailylanguage.authentication.LocalAuthenticationMapper">
 
-    <resultMap id="localAuthenticationCredentialResult"
-               type="com.dailylanguage.authentication.LocalAuthenticationCredential">
+    <resultMap id="storedLocalPasswordCredentialResult"
+               type="com.dailylanguage.authentication.StoredLocalPasswordCredential">
         <constructor>
             <idArg column="auth_identity_id"
                    javaType="java.util.UUID"
@@ -18,7 +18,7 @@
         </constructor>
     </resultMap>
 
-    <select id="insertIdentityReturningId"
+    <select id="insertAuthenticationIdentityAndReturnId"
             resultType="java.util.UUID"
             affectData="true"
             flushCache="true">
@@ -31,23 +31,23 @@
         RETURNING id
     </select>
 
-    <insert id="insertCredential">
+    <insert id="insertLocalPasswordCredential">
         INSERT INTO local_password_credential (auth_identity_id, password_verifier)
         VALUES (
-            #{authIdentityId, jdbcType=OTHER},
-            #{passwordVerifier, jdbcType=VARCHAR}
+            #{authenticationIdentityId, jdbcType=OTHER},
+            #{encodedPasswordHash, jdbcType=VARCHAR}
         )
     </insert>
 
-    <select id="findCredential" resultMap="localAuthenticationCredentialResult">
-        SELECT auth.id AS auth_identity_id,
-               auth.user_id,
-               auth.provider_subject AS normalized_email,
-               credential.password_verifier
-        FROM auth_identity auth
-        JOIN local_password_credential credential
-          ON credential.auth_identity_id = auth.id
-        WHERE auth.provider = #{provider, jdbcType=VARCHAR}
-          AND auth.provider_subject = #{providerSubject, jdbcType=VARCHAR}
+    <select id="findLocalPasswordCredential" resultMap="storedLocalPasswordCredentialResult">
+        SELECT authentication_identity.id AS auth_identity_id,
+               authentication_identity.user_id,
+               authentication_identity.provider_subject AS normalized_email,
+               password_credential.password_verifier
+        FROM auth_identity authentication_identity
+        JOIN local_password_credential password_credential
+          ON password_credential.auth_identity_id = authentication_identity.id
+        WHERE authentication_identity.provider = #{provider, jdbcType=VARCHAR}
+          AND authentication_identity.provider_subject = #{providerSubject, jdbcType=VARCHAR}
     </select>
 </mapper>

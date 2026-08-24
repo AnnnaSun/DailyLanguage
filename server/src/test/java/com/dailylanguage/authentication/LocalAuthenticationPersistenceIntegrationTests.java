@@ -26,7 +26,7 @@ import com.dailylanguage.user.UserRepository;
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class LocalAuthenticationPersistenceIntegrationTests {
 
-    private static final String ENCODED_VERIFIER =
+    private static final String ENCODED_PASSWORD_HASH =
             "{argon2id-v1}$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
 
     @Autowired
@@ -48,53 +48,56 @@ class LocalAuthenticationPersistenceIntegrationTests {
     void createsUuidV7IdentityAndFindsNormalizedCredential() {
         UUID userId = userRepository.create();
 
-        UUID identityId = localAuthenticationRepository.create(
+        UUID authenticationIdentityId = localAuthenticationRepository.createLocalEmailIdentity(
                 userId,
                 " Owner@Example.COM ",
-                ENCODED_VERIFIER);
+                ENCODED_PASSWORD_HASH);
 
-        assertThat(identityId.version()).isEqualTo(7);
+        assertThat(authenticationIdentityId.version()).isEqualTo(7);
         assertThat(localAuthenticationRepository.findByEmail("owner@example.com"))
-                .contains(new LocalAuthenticationCredential(
-                        identityId,
+                .contains(new StoredLocalPasswordCredential(
+                        authenticationIdentityId,
                         userId,
                         "owner@example.com",
-                        ENCODED_VERIFIER));
+                        ENCODED_PASSWORD_HASH));
     }
 
     @Test
     void rejectsDuplicateNormalizedIdentityAcrossUsers() {
         UUID firstUserId = userRepository.create();
         UUID secondUserId = userRepository.create();
-        localAuthenticationRepository.create(firstUserId, "owner@example.com", ENCODED_VERIFIER);
+        localAuthenticationRepository.createLocalEmailIdentity(
+                firstUserId,
+                "owner@example.com",
+                ENCODED_PASSWORD_HASH);
 
-        assertThatThrownBy(() -> localAuthenticationRepository.create(
+        assertThatThrownBy(() -> localAuthenticationRepository.createLocalEmailIdentity(
                         secondUserId,
                         " OWNER@EXAMPLE.COM ",
-                        ENCODED_VERIFIER))
+                        ENCODED_PASSWORD_HASH))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void rejectsIdentityWithoutExistingUser() {
-        assertThatThrownBy(() -> localAuthenticationRepository.create(
+        assertThatThrownBy(() -> localAuthenticationRepository.createLocalEmailIdentity(
                         UUID.randomUUID(),
                         "missing@example.com",
-                        ENCODED_VERIFIER))
+                        ENCODED_PASSWORD_HASH))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void rejectsSecondCredentialForOneIdentity() {
         UUID userId = userRepository.create();
-        UUID identityId = localAuthenticationRepository.create(
+        UUID authenticationIdentityId = localAuthenticationRepository.createLocalEmailIdentity(
                 userId,
                 "owner@example.com",
-                ENCODED_VERIFIER);
+                ENCODED_PASSWORD_HASH);
 
-        assertThatThrownBy(() -> localAuthenticationMapper.insertCredential(
-                        identityId,
-                        ENCODED_VERIFIER))
+        assertThatThrownBy(() -> localAuthenticationMapper.insertLocalPasswordCredential(
+                        authenticationIdentityId,
+                        ENCODED_PASSWORD_HASH))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -102,9 +105,9 @@ class LocalAuthenticationPersistenceIntegrationTests {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void rollsBackIdentityWhenCredentialInsertFails() {
         UUID userId = userRepository.create();
-        String invalidDatabaseText = ENCODED_VERIFIER + '\0';
+        String invalidDatabaseText = ENCODED_PASSWORD_HASH + '\0';
 
-        assertThatThrownBy(() -> localAuthenticationRepository.create(
+        assertThatThrownBy(() -> localAuthenticationRepository.createLocalEmailIdentity(
                         userId,
                         "rollback@example.com",
                         invalidDatabaseText))
@@ -125,12 +128,12 @@ class LocalAuthenticationPersistenceIntegrationTests {
     @Test
     void deletingIdentityCascadesItsCredential() {
         UUID userId = userRepository.create();
-        UUID identityId = localAuthenticationRepository.create(
+        UUID authenticationIdentityId = localAuthenticationRepository.createLocalEmailIdentity(
                 userId,
                 "owner@example.com",
-                ENCODED_VERIFIER);
+                ENCODED_PASSWORD_HASH);
 
-        jdbcTemplate.update("DELETE FROM auth_identity WHERE id = ?", identityId);
+        jdbcTemplate.update("DELETE FROM auth_identity WHERE id = ?", authenticationIdentityId);
 
         assertThat(localAuthenticationRepository.findByEmail("owner@example.com")).isEmpty();
     }

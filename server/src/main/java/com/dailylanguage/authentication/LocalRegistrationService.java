@@ -8,12 +8,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.COMMON_OR_COMPROMISED_PASSWORD;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.IDENTITY_UNAVAILABLE;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_EMAIL;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_PASSWORD_CHARACTER;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.INVALID_PASSWORD_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.REGISTRATION_FAILED;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_EMAIL;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
 
 @Service
 public final class LocalRegistrationService {
@@ -39,13 +39,13 @@ public final class LocalRegistrationService {
      * Registers a LOCAL_EMAIL identity whose password credential is managed by this application.
      * Apple/OIDC credentials and phone OTP secrets must use provider-specific flows instead.
      */
-    public UUID register(String email, String rawPassword) {
-        String normalizedEmail = normalizeEmail(email);
-        validatePassword(rawPassword, normalizedEmail);
-        String encodedVerifier = hashPassword(rawPassword);
+    public UUID register(String submittedEmail, String submittedPassword) {
+        String normalizedEmail = normalizeEmail(submittedEmail);
+        validatePassword(submittedPassword, normalizedEmail);
+        String encodedPasswordHash = hashPassword(submittedPassword);
 
         try {
-            return registrationPersistence.create(normalizedEmail, encodedVerifier);
+            return registrationPersistence.createLocalAccount(normalizedEmail, encodedPasswordHash);
         }
         catch (DuplicateKeyException exception) {
             throw new LocalRegistrationException(IDENTITY_UNAVAILABLE);
@@ -56,26 +56,26 @@ public final class LocalRegistrationService {
         }
     }
 
-    private static String normalizeEmail(String email) {
+    private static String normalizeEmail(String submittedEmail) {
         try {
-            return LocalEmailNormalizer.normalize(email);
+            return LocalEmailNormalizer.normalize(submittedEmail);
         }
         catch (IllegalArgumentException | NullPointerException exception) {
             throw new LocalRegistrationException(INVALID_EMAIL);
         }
     }
 
-    private void validatePassword(String rawPassword, String normalizedEmail) {
-        LocalPasswordPolicy.ValidationResult validationResult;
+    private void validatePassword(String submittedPassword, String normalizedEmail) {
+        LocalPasswordPolicy.ValidationResult passwordValidationResult;
         try {
-            validationResult = passwordPolicy.validate(rawPassword, normalizedEmail);
+            passwordValidationResult = passwordPolicy.validate(submittedPassword, normalizedEmail);
         }
         catch (RuntimeException exception) {
             logUnexpectedFailure("PASSWORD_POLICY", exception);
             throw new LocalRegistrationException(REGISTRATION_FAILED);
         }
 
-        switch (validationResult) {
+        switch (passwordValidationResult) {
             case ACCEPTED -> {
                 return;
             }
@@ -86,9 +86,9 @@ public final class LocalRegistrationService {
         }
     }
 
-    private String hashPassword(String rawPassword) {
+    private String hashPassword(String submittedPassword) {
         try {
-            return passwordHasher.hash(rawPassword);
+            return passwordHasher.hash(submittedPassword);
         }
         catch (RuntimeException exception) {
             logUnexpectedFailure("PASSWORD_HASH", exception);
@@ -96,11 +96,11 @@ public final class LocalRegistrationService {
         }
     }
 
-    private static void logUnexpectedFailure(String stage, RuntimeException exception) {
+    private static void logUnexpectedFailure(String failureStage, RuntimeException exception) {
         // Database exception messages and throwable chains can contain the submitted email.
         LOGGER.error(
                 "Local registration failed stage={} exceptionType={}",
-                stage,
+                failureStage,
                 exception.getClass().getName());
     }
 }

@@ -9,16 +9,16 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 interface LocalAuthenticationMapper {
 
-    UUID insertIdentityReturningId(
+    UUID insertAuthenticationIdentityAndReturnId(
             @Param("userId") UUID userId,
             @Param("provider") String provider,
             @Param("providerSubject") String providerSubject);
 
-    void insertCredential(
-            @Param("authIdentityId") UUID authIdentityId,
-            @Param("passwordVerifier") String passwordVerifier);
+    void insertLocalPasswordCredential(
+            @Param("authenticationIdentityId") UUID authenticationIdentityId,
+            @Param("encodedPasswordHash") String encodedPasswordHash);
 
-    Optional<LocalAuthenticationCredential> findCredential(
+    Optional<StoredLocalPasswordCredential> findLocalPasswordCredential(
             @Param("provider") String provider,
             @Param("providerSubject") String providerSubject);
 }

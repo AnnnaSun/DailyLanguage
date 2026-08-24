@@ -4,19 +4,21 @@ import java.util.Objects;
 
 public final class LocalRegistrationException extends RuntimeException {
 
-    private final Reason reason;
+    private final FailureReason failureReason;
 
-    LocalRegistrationException(Reason reason) {
-        super(messageFor(reason));
-        this.reason = Objects.requireNonNull(reason, "reason must not be null");
+    LocalRegistrationException(FailureReason failureReason) {
+        super(messageFor(failureReason));
+        this.failureReason = Objects.requireNonNull(
+                failureReason,
+                "failureReason must not be null");
     }
 
-    public Reason reason() {
-        return reason;
+    public FailureReason failureReason() {
+        return failureReason;
     }
 
-    private static String messageFor(Reason reason) {
-        return switch (Objects.requireNonNull(reason, "reason must not be null")) {
+    private static String messageFor(FailureReason failureReason) {
+        return switch (Objects.requireNonNull(failureReason, "failureReason must not be null")) {
             case INVALID_EMAIL -> "Email address is invalid";
             case INVALID_PASSWORD_LENGTH -> "Password length is invalid";
             case INVALID_PASSWORD_CHARACTER -> "Password contains an unsupported character";
@@ -26,7 +28,7 @@ public final class LocalRegistrationException extends RuntimeException {
         };
     }
 
-    public enum Reason {
+    public enum FailureReason {
         INVALID_EMAIL,
         INVALID_PASSWORD_LENGTH,
         INVALID_PASSWORD_CHARACTER,

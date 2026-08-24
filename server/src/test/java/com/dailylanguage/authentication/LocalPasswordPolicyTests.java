@@ -32,9 +32,9 @@ class LocalPasswordPolicyTests {
     @Test
     void acceptsEveryPrintableAsciiCharacterIncludingSpace() {
         for (char character = 0x20; character <= 0x7e; character++) {
-            String candidate = "SecureBase12" + character;
+            String submittedPassword = "SecureBase12" + character;
 
-            assertThat(passwordPolicy.validate(candidate, NORMALIZED_EMAIL))
+            assertThat(passwordPolicy.validate(submittedPassword, NORMALIZED_EMAIL))
                     .as("printable ASCII U+%04X", (int) character)
                     .isEqualTo(ACCEPTED);
         }
@@ -78,10 +78,10 @@ class LocalPasswordPolicyTests {
 
     @Test
     void validationDoesNotLogRawPassword(CapturedOutput output) {
-        String rawPassword = "raw-password-must-not-leak";
+        String submittedPassword = "submitted-password-must-not-leak";
 
-        passwordPolicy.validate(rawPassword, NORMALIZED_EMAIL);
+        passwordPolicy.validate(submittedPassword, NORMALIZED_EMAIL);
 
-        assertThat(output).doesNotContain(rawPassword);
+        assertThat(output).doesNotContain(submittedPassword);
     }
 }

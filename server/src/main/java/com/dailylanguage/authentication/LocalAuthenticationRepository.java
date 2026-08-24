@@ -10,9 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class LocalAuthenticationRepository {
 
-    private static final String LOCAL_EMAIL = "LOCAL_EMAIL";
-    private static final String VERIFIER_PREFIX = "{argon2id-v1}$";
-    private static final int MAX_VERIFIER_LENGTH = 512;
+    private static final String LOCAL_EMAIL_PROVIDER = "LOCAL_EMAIL";
+    private static final String SUPPORTED_PASSWORD_HASH_PREFIX = "{argon2id-v1}$";
+    private static final int MAX_PASSWORD_HASH_LENGTH = 512;
 
     private final LocalAuthenticationMapper localAuthenticationMapper;
 
@@ -25,49 +25,54 @@ public class LocalAuthenticationRepository {
      * Provider-issued subjects such as Apple {@code sub} values require their own persistence flow.
      */
     @Transactional
-    public UUID create(UUID userId, String email, String encodedPasswordVerifier) {
+    public UUID createLocalEmailIdentity(
+            UUID userId,
+            String normalizedEmail,
+            String encodedPasswordHash) {
         Objects.requireNonNull(userId, "userId must not be null");
-        String normalizedEmail = LocalEmailNormalizer.normalize(email);
-        validateEncodedVerifier(encodedPasswordVerifier);
+        String validatedNormalizedEmail = LocalEmailNormalizer.normalize(normalizedEmail);
+        validateEncodedPasswordHash(encodedPasswordHash);
 
-        UUID identityId = localAuthenticationMapper.insertIdentityReturningId(
+        UUID authenticationIdentityId = localAuthenticationMapper.insertAuthenticationIdentityAndReturnId(
                 userId,
-                LOCAL_EMAIL,
-                normalizedEmail);
-        localAuthenticationMapper.insertCredential(identityId, encodedPasswordVerifier);
-        return identityId;
+                LOCAL_EMAIL_PROVIDER,
+                validatedNormalizedEmail);
+        localAuthenticationMapper.insertLocalPasswordCredential(
+                authenticationIdentityId,
+                encodedPasswordHash);
+        return authenticationIdentityId;
     }
 
     /**
      * Loads only the application-managed LOCAL_EMAIL credential used for password authentication.
      */
-    public Optional<LocalAuthenticationCredential> findByEmail(String email) {
-        return localAuthenticationMapper.findCredential(
-                LOCAL_EMAIL,
-                LocalEmailNormalizer.normalize(email));
+    public Optional<StoredLocalPasswordCredential> findByEmail(String submittedEmail) {
+        return localAuthenticationMapper.findLocalPasswordCredential(
+                LOCAL_EMAIL_PROVIDER,
+                LocalEmailNormalizer.normalize(submittedEmail));
     }
 
-    private static void validateEncodedVerifier(String encodedPasswordVerifier) {
-        Objects.requireNonNull(encodedPasswordVerifier, "encodedPasswordVerifier must not be null");
-        if (!encodedPasswordVerifier.startsWith(VERIFIER_PREFIX)
-                || encodedPasswordVerifier.length() > MAX_VERIFIER_LENGTH) {
-            throw new IllegalArgumentException("encodedPasswordVerifier must use argon2id-v1");
+    private static void validateEncodedPasswordHash(String encodedPasswordHash) {
+        Objects.requireNonNull(encodedPasswordHash, "encodedPasswordHash must not be null");
+        if (!encodedPasswordHash.startsWith(SUPPORTED_PASSWORD_HASH_PREFIX)
+                || encodedPasswordHash.length() > MAX_PASSWORD_HASH_LENGTH) {
+            throw new IllegalArgumentException("encodedPasswordHash must use argon2id-v1");
         }
     }
 }
 
-record LocalAuthenticationCredential(
-        UUID authIdentityId,
+record StoredLocalPasswordCredential(
+        UUID authenticationIdentityId,
         UUID userId,
         String normalizedEmail,
-        String passwordVerifier
+        String storedPasswordHash
 ) {
 
     @Override
     public String toString() {
-        return "LocalAuthenticationCredential[authIdentityId=" + authIdentityId
+        return "StoredLocalPasswordCredential[authenticationIdentityId=" + authenticationIdentityId
                 + ", userId=" + userId
                 + ", normalizedEmail=" + normalizedEmail
-                + ", passwordVerifier=<redacted>]";
+                + ", storedPasswordHash=<redacted>]";
     }
 }

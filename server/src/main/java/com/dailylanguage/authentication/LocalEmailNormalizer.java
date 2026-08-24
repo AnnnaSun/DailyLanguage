@@ -16,26 +16,26 @@ public final class LocalEmailNormalizer {
      * Normalizes a LOCAL_EMAIL login subject, not an email claim from Apple/OIDC identity tokens.
      * External providers must be keyed by their stable provider subject rather than this email value.
      */
-    public static String normalize(String email) {
-        Objects.requireNonNull(email, "email must not be null");
-        String candidate = email.strip();
-        if (!candidate.chars().allMatch(character -> character <= 0x7f)) {
+    public static String normalize(String submittedEmail) {
+        Objects.requireNonNull(submittedEmail, "submittedEmail must not be null");
+        String normalizedEmail = submittedEmail.strip();
+        if (!normalizedEmail.chars().allMatch(character -> character <= 0x7f)) {
             throw invalidEmail();
         }
 
-        candidate = candidate.toLowerCase(Locale.ROOT);
-        int atIndex = candidate.indexOf('@');
+        normalizedEmail = normalizedEmail.toLowerCase(Locale.ROOT);
+        int atSignIndex = normalizedEmail.indexOf('@');
 
-        if (candidate.isEmpty()
-                || candidate.length() > MAX_EMAIL_LENGTH
-                || atIndex <= 0
-                || atIndex != candidate.lastIndexOf('@')
-                || atIndex == candidate.length() - 1) {
+        if (normalizedEmail.isEmpty()
+                || normalizedEmail.length() > MAX_EMAIL_LENGTH
+                || atSignIndex <= 0
+                || atSignIndex != normalizedEmail.lastIndexOf('@')
+                || atSignIndex == normalizedEmail.length() - 1) {
             throw invalidEmail();
         }
 
-        String localPart = candidate.substring(0, atIndex);
-        String domain = candidate.substring(atIndex + 1);
+        String localPart = normalizedEmail.substring(0, atSignIndex);
+        String domain = normalizedEmail.substring(atSignIndex + 1);
         if (localPart.length() > MAX_LOCAL_PART_LENGTH
                 || localPart.startsWith(".")
                 || localPart.endsWith(".")
@@ -45,7 +45,7 @@ public final class LocalEmailNormalizer {
             throw invalidEmail();
         }
 
-        return candidate;
+        return normalizedEmail;
     }
 
     private static boolean isLocalPartCharacter(int character) {

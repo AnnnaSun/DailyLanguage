@@ -42,8 +42,8 @@ class MapperSqlSafetyTests {
                 .contains("#{userId, jdbcType=OTHER}")
                 .contains("#{provider, jdbcType=VARCHAR}")
                 .contains("#{providerSubject, jdbcType=VARCHAR}")
-                .contains("#{authIdentityId, jdbcType=OTHER}")
-                .contains("#{passwordVerifier, jdbcType=VARCHAR}");
+                .contains("#{authenticationIdentityId, jdbcType=OTHER}")
+                .contains("#{encodedPasswordHash, jdbcType=VARCHAR}");
     }
 
     private static String readResource(Resource resource) throws IOException {

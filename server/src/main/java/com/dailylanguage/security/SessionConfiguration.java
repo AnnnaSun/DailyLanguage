@@ -22,13 +22,13 @@ public class SessionConfiguration implements BeanClassLoaderAware {
     // Spring Session discovers a serializer override through this exact infrastructure bean name.
     @Bean(name = SPRING_SESSION_SERIALIZER_BEAN)
     RedisSerializer<Object> springSessionDefaultRedisSerializer() {
-        BasicPolymorphicTypeValidator.Builder allowedTypes = BasicPolymorphicTypeValidator.builder()
+        BasicPolymorphicTypeValidator.Builder allowedSessionTypes = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType(UserContext.class);
-        JsonMapper mapper = JsonMapper.builder()
-                .addModules(SecurityJacksonModules.getModules(beanClassLoader, allowedTypes))
+        JsonMapper sessionJsonMapper = JsonMapper.builder()
+                .addModules(SecurityJacksonModules.getModules(beanClassLoader, allowedSessionTypes))
                 .build();
 
-        return new JacksonJsonRedisSerializer<>(mapper, Object.class);
+        return new JacksonJsonRedisSerializer<>(sessionJsonMapper, Object.class);
     }
 
     @Override

@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 interface LanguageProfileMapper {
 
-    LanguageProfileIdentity insertReturning(
+    LanguageProfileIdentity insertLanguageProfileAndReturn(
             @Param("userId") UUID userId,
             @Param("languageCode") String languageCode);
 

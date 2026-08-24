@@ -15,27 +15,27 @@ class LocalAuthenticationRepositoryTests {
         var mapper = new RecordingMapper();
         var repository = new LocalAuthenticationRepository(mapper);
 
-        assertThatThrownBy(() -> repository.create(
+        assertThatThrownBy(() -> repository.createLocalEmailIdentity(
                         UUID.randomUUID(),
                         "owner@example.com",
                         "raw-password"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("encodedPasswordVerifier must use argon2id-v1");
+                .hasMessage("encodedPasswordHash must use argon2id-v1");
         assertThat(mapper.called).isFalse();
     }
 
     @Test
-    void redactsVerifierFromStringRepresentation() {
-        String verifier = "{argon2id-v1}$secret-verifier";
-        var credential = new LocalAuthenticationCredential(
+    void redactsStoredPasswordHashFromStringRepresentation() {
+        String storedPasswordHash = "{argon2id-v1}$secret-password-hash";
+        var credential = new StoredLocalPasswordCredential(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "owner@example.com",
-                verifier);
+                storedPasswordHash);
 
         assertThat(credential.toString())
-                .doesNotContain(verifier)
-                .contains("passwordVerifier=<redacted>");
+                .doesNotContain(storedPasswordHash)
+                .contains("storedPasswordHash=<redacted>");
     }
 
     private static final class RecordingMapper implements LocalAuthenticationMapper {
@@ -43,18 +43,25 @@ class LocalAuthenticationRepositoryTests {
         private boolean called;
 
         @Override
-        public UUID insertIdentityReturningId(UUID userId, String provider, String providerSubject) {
+        public UUID insertAuthenticationIdentityAndReturnId(
+                UUID userId,
+                String provider,
+                String providerSubject) {
             called = true;
             return UUID.randomUUID();
         }
 
         @Override
-        public void insertCredential(UUID authIdentityId, String passwordVerifier) {
+        public void insertLocalPasswordCredential(
+                UUID authenticationIdentityId,
+                String encodedPasswordHash) {
             called = true;
         }
 
         @Override
-        public Optional<LocalAuthenticationCredential> findCredential(String provider, String providerSubject) {
+        public Optional<StoredLocalPasswordCredential> findLocalPasswordCredential(
+                String provider,
+                String providerSubject) {
             called = true;
             return Optional.empty();
         }

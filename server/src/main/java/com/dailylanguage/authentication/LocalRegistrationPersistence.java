@@ -28,12 +28,15 @@ public class LocalRegistrationPersistence {
      * External provider identities do not enter this password-credential transaction.
      */
     @Transactional
-    public UUID create(String normalizedEmail, String encodedPasswordVerifier) {
+    public UUID createLocalAccount(String normalizedEmail, String encodedPasswordHash) {
         Objects.requireNonNull(normalizedEmail, "normalizedEmail must not be null");
-        Objects.requireNonNull(encodedPasswordVerifier, "encodedPasswordVerifier must not be null");
+        Objects.requireNonNull(encodedPasswordHash, "encodedPasswordHash must not be null");
 
         UUID userId = userRepository.create();
-        localAuthenticationRepository.create(userId, normalizedEmail, encodedPasswordVerifier);
+        localAuthenticationRepository.createLocalEmailIdentity(
+                userId,
+                normalizedEmail,
+                encodedPasswordHash);
         return userId;
     }
 }

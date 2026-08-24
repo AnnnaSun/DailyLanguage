@@ -329,12 +329,12 @@ Explicit non-goals：SPA CSRF token delivery、registration Controller、rate li
 concurrency gate、frontend、remember-me、device list、logout-all、maximum-session policy、external
 Provider、password reset、email verification，以及 `IDEA-007` Account Profile / `display_name`。
 
-Current first task：`M0-S4C1a`。本 slice 完成后必须独立 Review；不得在同一 Gate 顺带实现
-`M0-S4C1b/c`。
+Current implementation task：`M0-S4C1b`。`M0-S4C1a` 已完成并形成独立 commit checkpoint；C1b
+完成后必须停止，不得在同一 Gate 顺带实现 `M0-S4C1c`。
 
-##### M0-S4C1a Current Task Contract
+##### M0-S4C1a Completed Task Contract
 
-Status: SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；READY_TO_COMMIT。
+Status: SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；COMPLETE。
 
 Goal：使用 Spring Boot 4.1 auto-configuration 建立 Redis-backed `HttpSession` foundation，固定
 Jackson 3 Security serialization allowlist、Redis namespace、24-hour idle TTL 与 Session cookie
@@ -393,6 +393,50 @@ Verification evidence：
 - real Redis integration：default repository、24-hour interval、`daily-language:session:v1`
   namespace、second repository instance restore、JSON payload 与 Hosted Cookie property binding；
 - full backend default regression：PASS；真实 Redis test key 已在 finally 清理并通过 scan 确认。
+
+##### M0-S4C1b Current Task Contract
+
+Status: DESIGN / SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；
+READY_TO_COMMIT。
+
+Goal：通过 Spring Security `AuthenticationProvider` 连接现有 local credential repository 与
+`LocalPasswordHasher`，使成功认证只产生 credentials 已清除的 `UserContext(userId)`；unknown
+account、malformed email 与 wrong password 采用统一 credential rejection，unexpected repository /
+hasher failure 转换为不泄露底层详情的 authentication-unavailable failure。
+
+Implemented behavior：
+
+1. `LocalPasswordAuthenticationProvider` 只支持 `UsernamePasswordAuthenticationToken`，从请求
+   token 读取 submitted email / password，并由 repository 复用既有 normalization 与 credential
+   lookup boundary；
+2. known account 校验 stored password hash；unknown / malformed account 校验启动时生成且不持久化的
+   unknown-account password hash，避免用 Hash 工作量直接暴露账号是否存在；
+3. lookup / password verification 的 unexpected `RuntimeException` 分别映射为安全的
+   `ACCOUNT_LOOKUP` / `PASSWORD_VERIFY` stage，只记录 exception type，不记录 email、password、Hash、
+   exception message 或 cause chain；
+4. 成功结果的 principal 是 `UserContext(userId)`、credentials 为 `null`；原始 login request 在
+   `finally` 中清除 credentials，成功和失败路径均覆盖；
+5. 删除仅用于 walking skeleton 的空 `InMemoryUserDetailsManager`，让 Spring Security 使用当前
+   `AuthenticationProvider`；C1c 才接入 HTTP login filter、failure handler 与 Session lifecycle。
+
+Approved clarity scope：为降低 authentication 代码理解成本，将既有 `verifier`、`credential`、
+`rawPassword` 等容易混淆的局部命名统一为更直白的 `storedPasswordHash`、`submittedPassword`、
+`authenticationIdentityId` 等语义，并同步 mapper、registration、language-profile 调用点与测试；
+该命名整理不改变 database schema、SQL column、public HTTP API 或 Domain semantics。
+
+Explicitly out of scope：login / logout / me HTTP endpoint、Session creation / rotation / invalidation、
+CSRF token delivery、rate limit、global Argon2id concurrency gate、password re-hash persistence、
+Account Profile、frontend 与 external Provider。
+
+Verification evidence：
+
+- provider focused tests：成功 principal / null credentials、request credential clearing、unknown / malformed
+  account fallback Hash、wrong / missing password uniform rejection、unsupported token 与 safe failure mapping；
+- regression for failure classification：repository `NullPointerException` 不再伪装成 invalid credential，
+  与 database failure 一样进入 authentication-unavailable path；
+- PostgreSQL integration：真实持久化 local credential 可通过 provider 认证；
+- related hasher、repository 与 persistence tests：PASS；最终 provider focused tests 9 tests、0 failures、
+  0 errors；`git diff --check` PASS。
 
 #### M0-S4 Capacity Decision
 
@@ -484,7 +528,14 @@ M0-S4C1a Implementation: COMPLETE
 M0-S4C1a Verification: COMPLETE
 M0-S4C1a Review: COMPLETE
 M0-S4C1a Ownership Check: COMPLETE
-M0-S4C1a: READY_TO_COMMIT
+M0-S4C1a: COMPLETE
+M0-S4C1b Design: APPROVED
+M0-S4C1b Scope: APPROVED
+M0-S4C1b Implementation: COMPLETE
+M0-S4C1b Verification: COMPLETE
+M0-S4C1b Review: COMPLETE
+M0-S4C1b Ownership Check: COMPLETE
+M0-S4C1b: READY_TO_COMMIT
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -499,6 +550,7 @@ registration 调用顺序、transaction boundary、duplicate identity、failure 
 logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL atomicity / concurrent
 duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
 完成并由人工 commit / push。当前进入 `M0-S4C1` Login / Logout / Current User 与 Redis-backed
-Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation 已完成
-implementation、verification、独立 Diff Review 与 Human Ownership Check，当前
-`READY_TO_COMMIT`；人工 commit / push checkpoint 完成前不得开始 `M0-S4C1b`。
+Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation 已完成并
+形成独立本地 commit checkpoint。`M0-S4C1b` local `AuthenticationProvider` 已完成 implementation、
+verification、独立 Diff Review 与 Human Ownership Check，当前 `READY_TO_COMMIT`；人工 commit /
+push checkpoint 完成前不得开始 `M0-S4C1c`。

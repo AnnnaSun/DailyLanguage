@@ -17,7 +17,7 @@ public class LanguageProfileAccessService {
         this.languageProfileRepository = languageProfileRepository;
     }
 
-    public Optional<LanguageProfileIdentity> findOwnedBy(
+    public Optional<LanguageProfileIdentity> findProfileOwnedByUser(
             UUID languageProfileId,
             UserContext userContext
     ) {

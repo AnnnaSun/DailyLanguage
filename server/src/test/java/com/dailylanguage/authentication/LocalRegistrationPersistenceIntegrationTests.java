@@ -14,14 +14,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static com.dailylanguage.authentication.LocalRegistrationException.Reason.IDENTITY_UNAVAILABLE;
+import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class LocalRegistrationPersistenceIntegrationTests {
 
-    private static final String RAW_PASSWORD = "safe-pass-12";
+    private static final String SUBMITTED_PASSWORD = "safe-pass-12";
 
     @Autowired
     private LocalRegistrationService registrationService;
@@ -32,7 +32,7 @@ class LocalRegistrationPersistenceIntegrationTests {
     @Test
     void createsUserIdentityAndCredentialAtomically() {
         String email = uniqueEmail();
-        UUID userId = registrationService.register(email, RAW_PASSWORD);
+        UUID userId = registrationService.register(email, SUBMITTED_PASSWORD);
 
         try {
             assertThat(count("SELECT COUNT(*) FROM app_user WHERE id = ?", userId)).isOne();
@@ -76,7 +76,7 @@ class LocalRegistrationPersistenceIntegrationTests {
         try {
             assertThat(successfulUserIds).hasSize(1);
             assertThat(attempts.stream()
-                    .filter(attempt -> attempt.reason() == IDENTITY_UNAVAILABLE))
+                    .filter(attempt -> attempt.failureReason() == IDENTITY_UNAVAILABLE))
                     .hasSize(1);
             assertThat(count("SELECT COUNT(*) FROM app_user")).isEqualTo(userCountBefore + 1);
             assertThat(count(
@@ -101,10 +101,10 @@ class LocalRegistrationPersistenceIntegrationTests {
         ready.countDown();
         start.await();
         try {
-            return new RegistrationAttempt(registrationService.register(email, RAW_PASSWORD), null);
+            return new RegistrationAttempt(registrationService.register(email, SUBMITTED_PASSWORD), null);
         }
         catch (LocalRegistrationException exception) {
-            return new RegistrationAttempt(null, exception.reason());
+            return new RegistrationAttempt(null, exception.failureReason());
         }
     }
 
@@ -124,7 +124,7 @@ class LocalRegistrationPersistenceIntegrationTests {
 
     private record RegistrationAttempt(
             UUID userId,
-            LocalRegistrationException.Reason reason
+            LocalRegistrationException.FailureReason failureReason
     ) {
     }
 }

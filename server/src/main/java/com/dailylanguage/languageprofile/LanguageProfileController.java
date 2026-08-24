@@ -22,10 +22,11 @@ public class LanguageProfileController {
     }
 
     @GetMapping("/{languageProfileId}")
-    ResponseEntity<LanguageProfileIdentity> findById(
+    ResponseEntity<LanguageProfileIdentity> getLanguageProfile(
             @PathVariable UUID languageProfileId,
             @AuthenticationPrincipal UserContext userContext
     ) {
-        return ResponseEntity.of(languageProfileAccessService.findOwnedBy(languageProfileId, userContext));
+        return ResponseEntity.of(
+                languageProfileAccessService.findProfileOwnedByUser(languageProfileId, userContext));
     }
 }

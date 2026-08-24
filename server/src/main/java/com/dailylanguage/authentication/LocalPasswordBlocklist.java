@@ -20,33 +20,35 @@ public final class LocalPasswordBlocklist {
     private static final String EXPECTED_RESOURCE_SHA256 =
             "dc4260507736ce8464d32b760097c38e105c66158fb8a9192e0a324d25929aa8";
 
-    private final byte[] sortedFingerprints;
+    private final byte[] sortedBlockedPasswordFingerprints;
 
     public LocalPasswordBlocklist() {
         this(readResource(), true);
     }
 
-    LocalPasswordBlocklist(byte[] sortedFingerprints) {
-        this(sortedFingerprints, false);
+    LocalPasswordBlocklist(byte[] sortedBlockedPasswordFingerprints) {
+        this(sortedBlockedPasswordFingerprints, false);
     }
 
-    private LocalPasswordBlocklist(byte[] sortedFingerprints, boolean requirePinnedResource) {
-        Objects.requireNonNull(sortedFingerprints, "sortedFingerprints must not be null");
-        validateStructure(sortedFingerprints);
+    private LocalPasswordBlocklist(byte[] sortedBlockedPasswordFingerprints, boolean requirePinnedResource) {
+        Objects.requireNonNull(
+                sortedBlockedPasswordFingerprints,
+                "sortedBlockedPasswordFingerprints must not be null");
+        validateStructure(sortedBlockedPasswordFingerprints);
         if (requirePinnedResource) {
-            validatePinnedResource(sortedFingerprints);
+            validatePinnedResource(sortedBlockedPasswordFingerprints);
         }
-        this.sortedFingerprints = sortedFingerprints.clone();
+        this.sortedBlockedPasswordFingerprints = sortedBlockedPasswordFingerprints.clone();
     }
 
     /**
-     * Checks only a candidate for an application-managed password credential.
+     * Checks only a submitted password for an application-managed password credential.
      * External provider passwords and phone OTP values do not enter this blocklist.
      */
-    boolean contains(String candidate) {
-        Objects.requireNonNull(candidate, "candidate must not be null");
+    boolean contains(String submittedPassword) {
+        Objects.requireNonNull(submittedPassword, "submittedPassword must not be null");
         // SHA-256 is only a public blocklist lookup key; stored credentials continue to use Argon2id.
-        byte[] candidateFingerprint = sha256(candidate.getBytes(StandardCharsets.UTF_8));
+        byte[] submittedPasswordFingerprint = sha256(submittedPassword.getBytes(StandardCharsets.UTF_8));
 
         int low = 0;
         int high = entryCount() - 1;
@@ -54,10 +56,10 @@ public final class LocalPasswordBlocklist {
             int middle = (low + high) >>> 1;
             int offset = middle * FINGERPRINT_BYTES;
             int comparison = Arrays.compareUnsigned(
-                    candidateFingerprint,
+                    submittedPasswordFingerprint,
                     0,
                     FINGERPRINT_BYTES,
-                    sortedFingerprints,
+                    sortedBlockedPasswordFingerprints,
                     offset,
                     offset + FINGERPRINT_BYTES);
             if (comparison == 0) {
@@ -74,7 +76,7 @@ public final class LocalPasswordBlocklist {
     }
 
     int entryCount() {
-        return sortedFingerprints.length / FINGERPRINT_BYTES;
+        return sortedBlockedPasswordFingerprints.length / FINGERPRINT_BYTES;
     }
 
     private static byte[] readResource() {
@@ -89,16 +91,19 @@ public final class LocalPasswordBlocklist {
         }
     }
 
-    private static void validateStructure(byte[] fingerprints) {
-        if (fingerprints.length == 0 || fingerprints.length % FINGERPRINT_BYTES != 0) {
+    private static void validateStructure(byte[] blockedPasswordFingerprints) {
+        if (blockedPasswordFingerprints.length == 0
+                || blockedPasswordFingerprints.length % FINGERPRINT_BYTES != 0) {
             throw new IllegalStateException("Local password blocklist has an invalid length");
         }
-        for (int offset = FINGERPRINT_BYTES; offset < fingerprints.length; offset += FINGERPRINT_BYTES) {
+        for (int offset = FINGERPRINT_BYTES;
+                offset < blockedPasswordFingerprints.length;
+                offset += FINGERPRINT_BYTES) {
             int comparison = Arrays.compareUnsigned(
-                    fingerprints,
+                    blockedPasswordFingerprints,
                     offset - FINGERPRINT_BYTES,
                     offset,
-                    fingerprints,
+                    blockedPasswordFingerprints,
                     offset,
                     offset + FINGERPRINT_BYTES);
             if (comparison >= 0) {
@@ -107,20 +112,20 @@ public final class LocalPasswordBlocklist {
         }
     }
 
-    private static void validatePinnedResource(byte[] fingerprints) {
-        if (fingerprints.length != EXPECTED_ENTRY_COUNT * FINGERPRINT_BYTES) {
+    private static void validatePinnedResource(byte[] blockedPasswordFingerprints) {
+        if (blockedPasswordFingerprints.length != EXPECTED_ENTRY_COUNT * FINGERPRINT_BYTES) {
             throw new IllegalStateException("Local password blocklist entry count is unexpected");
         }
-        String actualSha256 = HexFormat.of().formatHex(sha256(fingerprints));
+        String actualResourceSha256 = HexFormat.of().formatHex(sha256(blockedPasswordFingerprints));
         // A resource update must not silently change the registration security policy.
-        if (!EXPECTED_RESOURCE_SHA256.equals(actualSha256)) {
+        if (!EXPECTED_RESOURCE_SHA256.equals(actualResourceSha256)) {
             throw new IllegalStateException("Local password blocklist checksum is unexpected");
         }
     }
 
-    private static byte[] sha256(byte[] value) {
+    private static byte[] sha256(byte[] bytesToHash) {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(value);
+            return MessageDigest.getInstance("SHA-256").digest(bytesToHash);
         }
         catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);

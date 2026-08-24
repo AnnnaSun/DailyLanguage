@@ -17,7 +17,7 @@
         </constructor>
     </resultMap>
 
-    <select id="insertReturning"
+    <select id="insertLanguageProfileAndReturn"
             resultMap="languageProfileIdentityResult"
             affectData="true"
             flushCache="true">
