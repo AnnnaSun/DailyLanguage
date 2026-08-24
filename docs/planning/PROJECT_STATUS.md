@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-22
+> Last updated: 2026-08-25
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S3 / COMPLETE
-> Production implementation: M0-S3 COMPLETE
+> Current Gate: M0-S4C1b / READY_TO_COMMIT
+> Production implementation: M0-S4C1b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
 
 ## Approved Decisions
 
@@ -18,6 +18,21 @@
 - User → LanguageProfile foreign key 使用 `ON DELETE RESTRICT`；M0-S3 不实现 physical / logical deletion，lifecycle decision 已记录到 Backlog。
 - Language Profile 读取通过 `languageProfileId + userId` scoped query 建立 persistence ownership boundary；可信 `UserContext` 留到 M0-S4。
 - SQL variables 只通过 `#{}` parameter binding；禁止 `${}`、Java SQL annotation / string、客户端 SQL fragment 与 `last` / `apply` / `SqlRunner` 等拼接入口。
+- M0-S4 采用 `ADR-0002`：Hosted V1 使用 Spring Security、Argon2id local credential、Redis-backed server-side Session、CSRF 与 authenticated `UserContext`；不使用 browser-stored JWT。
+- `app_user` 保持稳定 internal identity，login channel 通过 `auth_identity` 分离；multi-channel authentication 与 Account Linking 记录为 `IDEA-006`，不进入当前 M0-S4 implementation。
+- Argon2id security parameters 以 `argon2id-v1` 在 code 中版本化；password-hash concurrency 是 hardware-dependent capacity parameter，DEV / TEST 与 Self-hosted safe default 为 1，Hosted 必须显式配置。
+- M0-S4C2 必须实现 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 到 M6 在目标硬件确认。
+- M0-S4B2b password policy 使用 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括普通半角空格）；不做 composition rule、trim、字符替换或 Unicode normalization。该决定是 V1 usability / compatibility trade-off，低于当前 NIST password-only 15-character minimum 的 residual risk 必须明确保留。
+- M0-S4B2b offline blocklist 使用 pinned SecLists 2026.1 Top 250,000 prefix，经 12–64 printable ASCII exact filter 后生成 2,065 个 sorted binary SHA-256 fingerprints（baseline 66,080 bytes）；只在 registration / password change / reset 的 Argon2id 前检查，不进入 login path。
+- M0-S4B2c registration failure 只在 `LocalRegistrationService` 进行 structured safe logging；expected rejection 不记 ERROR，unexpected failure 只记录 stage、exception type 与已有 correlation ID，禁止 email、raw password、fingerprint、verifier、SQL parameter、database exception message 或完整 cause chain。
+- M0-S4B2c atomic registration Design 已确认：normalize / policy / Argon2id 在 transaction 外执行，独立 `LocalRegistrationPersistence` bean 的外层 transaction 原子写入 `app_user`、`auth_identity` 与 credential；database unique constraint 裁决 concurrent duplicate，失败请求整体 rollback。
+- M0-S4C1 Redis Session dependency direction 已确认：使用 Spring Boot 管理的 `spring-boot-starter-session-data-redis` 与 auto-configuration，不手写 Session lifecycle，也不无理由用 `@EnableRedisHttpSession` 绕过 Boot configuration。
+- M0-S4C1 Login lifecycle 已确认：form-urlencoded `POST /api/auth/login` 经 Spring Security username/password filter 与 local `AuthenticationProvider`；unknown account 使用 dummy Argon2id，credential failure 返回统一 401，infrastructure failure 返回通用 503，成功清除 credentials、rotation Session ID 并返回 204。
+- M0-S4C1 Session policy 已确认：Jackson JSON + Spring Security modules + strict `UserContext` allowlist；namespace `daily-language:session:v1`；24-hour idle TTL、无 remember-me、允许多设备、logout 仅当前 Session、默认 non-indexed repository，Redis unavailable 不回退到 in-memory Session。
+- M0-S4C1 API contract 已确认：CSRF-protected `POST /api/auth/login`、CSRF-protected `POST /api/auth/logout`、authenticated `GET /api/auth/me`；成功分别返回 204 / 204 / `200 {"userId":"<uuid>"}`，credential / infrastructure / unauthenticated failure 使用固定 401 / 503 / 401 code，CSRF rejection 为 403。
+- M0-S4C1 Cookie contract 已确认：opaque `SESSION` cookie 使用 HttpOnly、SameSite=Lax、Path `/`、无 Domain、无 persistent Max-Age；Hosted Secure=true、local HTTP development 显式 Secure=false，Redis 24-hour idle TTL 是 validity authority。
+- M0-S4C1 feature plan 已确认：C1a Redis Session foundation → C1b local `AuthenticationProvider` → C1c login/logout/me HTTP lifecycle；一次只实现一个 slice。
+- 最小 Account Profile 与 `display_name` 已记录为 `IDEA-007`，不修改当前 S4C1 schema、`UserContext` 或 `/api/auth/me` contract。
 
 ## Completed Review
 
@@ -28,29 +43,36 @@
 5. M0-S2 pgvector availability 与 Flyway-owned installation boundary。
 6. M0-S3 UUIDv7 identity schema、Language Profile ownership boundary 与 deletion constraints；
 7. M0-S3 MyBatis Mapper XML persistence path、UUID TypeHandler 与 SQL injection safety boundary。
+8. M0-S4A Spring Security boundary、trusted `UserContext` 调用链与 ownership-scoped access；
+9. M0-S4A unauthenticated、owner、cross-user 与 request `userId` spoofing verification。
+10. M0-S4B1 authentication identity / credential persistence、transaction / foreign key boundary、Review 与 Human Ownership Check。
+11. M0-S4B2a versioned Argon2id hashing、verifier resource-parameter gate、Review 与 Human Ownership Check。
+12. M0-S4B2b printable-ASCII password policy、pinned offline blocklist、deterministic asset generation、Review 与 Human Ownership Check。
+13. M0-S4B2c atomic registration Scope、correctness、transaction、concurrent duplicate、safe logging、failure contract Diff Review 与 Human Ownership Check。
+14. M0-S4C1a Boot-managed Redis Session、JSON / Security serialization allowlist、namespace、idle TTL、Cookie configuration、Redis restore / fail-closed Diff Review 与 Human Ownership Check。
+15. M0-S4C1b local `AuthenticationProvider`、unknown-account Argon2id、uniform credential rejection、infrastructure failure、safe logging、credential clearing Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S3
-Implementation changes: Flyway identity migration, UUIDv7 User / Language Profile persistence, MyBatis Mapper XML and ownership-scoped query
-Verification:
-  - Java 25 default test suite without Docker dependency: PASS
-  - Mapper XML raw substitution / plain statement safety checks: PASS
-  - Flyway migration against PostgreSQL 18.6: PASS
-  - pgvector extension installation through Flyway: PASS
-  - PostgreSQL-generated UUIDv7 for User and Language Profile: PASS
-  - BCP 47 language code validation, normalization and per-user uniqueness: PASS
-  - missing User foreign-key rejection: PASS
-  - User deletion RESTRICT with existing Profile: PASS
-  - languageProfileId + userId ownership-scoped lookup: PASS
-  - SQL injection payload rejection followed by successful repository operation: PASS
-  - External PostgreSQL port 15432 integration run: PASS
+Selected slice: M0-S4C1b
+Gate: READY_TO_COMMIT
+API contract: APPROVED
+Feature task breakdown: APPROVED
+Scope: APPROVED
+Implementation: COMPLETE
+Verification: COMPLETE
+Review: COMPLETE
+Ownership Check: COMPLETE
+Production baseline: M0-S4C1a COMPLETE
+Next slice: M0-S4C1c login / logout / me HTTP lifecycle
+Later slices: CSRF delivery / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-M0-S3 implementation、verification、Diff Review 与 Human Ownership Check 已完成。本次 commit 后停在 M0-S3；进入 `M0-S4` 前需要新的 Scope Review。
+人工检查最终 Diff 后 commit / push `M0-S4C1b`。完成该 checkpoint 后，在新对话开始
+`M0-S4C1c` Design / Scope；当前不得提前实现 login / logout / me HTTP lifecycle。
 
 ## Blockers
 

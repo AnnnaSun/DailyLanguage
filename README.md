@@ -84,6 +84,15 @@ cd server
 ./mvnw spring-boot:run
 ```
 
+Session cookie 默认启用 `Secure`，防止 Hosted HTTPS deployment 意外下发可通过明文 HTTP
+传输的认证 cookie。本地直接使用 HTTP 启动后端时，必须显式覆盖：
+
+```bash
+SESSION_COOKIE_SECURE=false ./mvnw spring-boot:run
+```
+
+该 override 只用于 local HTTP development，Hosted deployment 不得关闭 `Secure`。
+
 默认 test suite 不要求本地基础设施。需要验证 Flyway、Repository 与真实
 PostgreSQL constraints 时，先启动 PostgreSQL，再显式启用 database tests：
 
@@ -93,6 +102,24 @@ RUN_DATABASE_TESTS=true ./mvnw test
 ```
 
 如果 PostgreSQL 使用了非默认端口，应同时传入相同的 `DATABASE_PORT`。
+
+需要验证 Redis-backed Session persistence、JSON round-trip 与 namespace 时，先启动 Redis，
+再显式启用 Redis integration tests：
+
+```bash
+cd server
+RUN_REDIS_TESTS=true ./mvnw -Dtest=RedisSessionIntegrationTests test
+```
+
+如果 Redis 使用了非默认端口，应同时传入相同的 `REDIS_PORT`。
+
+Redis unavailable fail-closed test 会故意连接不可用的 local port，因此与正常 Redis test
+分开显式执行：
+
+```bash
+cd server
+RUN_REDIS_UNAVAILABLE_TESTS=true ./mvnw -Dtest=RedisSessionUnavailableIntegrationTests test
+```
 
 基础设施启动后，通过以下健康检查接口验证两个连接：
 
