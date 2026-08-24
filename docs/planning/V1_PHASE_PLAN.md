@@ -334,7 +334,7 @@ Current first task：`M0-S4C1a`。本 slice 完成后必须独立 Review；不�
 
 ##### M0-S4C1a Current Task Contract
 
-Status: SCOPE APPROVED；IMPLEMENTATION / VERIFICATION COMPLETE；REVIEW_PENDING。
+Status: SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；READY_TO_COMMIT。
 
 Goal：使用 Spring Boot 4.1 auto-configuration 建立 Redis-backed `HttpSession` foundation，固定
 Jackson 3 Security serialization allowlist、Redis namespace、24-hour idle TTL 与 Session cookie
@@ -482,7 +482,9 @@ M0-S4C1 Design: APPROVED
 M0-S4C1a Scope: APPROVED
 M0-S4C1a Implementation: COMPLETE
 M0-S4C1a Verification: COMPLETE
-M0-S4C1a: REVIEW_PENDING
+M0-S4C1a Review: COMPLETE
+M0-S4C1a Ownership Check: COMPLETE
+M0-S4C1a: READY_TO_COMMIT
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -498,5 +500,5 @@ logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL
 duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
 完成并由人工 commit / push。当前进入 `M0-S4C1` Login / Logout / Current User 与 Redis-backed
 Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation 已完成
-implementation 与 verification，当前等待独立 Diff Review / Human Ownership Check；Review 完成前
-不得开始 `M0-S4C1b`。
+implementation、verification、独立 Diff Review 与 Human Ownership Check，当前
+`READY_TO_COMMIT`；人工 commit / push checkpoint 完成前不得开始 `M0-S4C1b`。

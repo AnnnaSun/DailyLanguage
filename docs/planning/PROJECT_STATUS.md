@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-24
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4C1a / REVIEW_PENDING
-> Production implementation: M0-S4C1a IMPLEMENTED; REVIEW NOT STARTED
+> Current Gate: M0-S4C1a / READY_TO_COMMIT
+> Production implementation: M0-S4C1a IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
 
 ## Approved Decisions
 
@@ -49,25 +49,28 @@
 11. M0-S4B2a versioned Argon2id hashing、verifier resource-parameter gate、Review 与 Human Ownership Check。
 12. M0-S4B2b printable-ASCII password policy、pinned offline blocklist、deterministic asset generation、Review 与 Human Ownership Check。
 13. M0-S4B2c atomic registration Scope、correctness、transaction、concurrent duplicate、safe logging、failure contract Diff Review 与 Human Ownership Check。
+14. M0-S4C1a Boot-managed Redis Session、JSON / Security serialization allowlist、namespace、idle TTL、Cookie configuration、Redis restore / fail-closed Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
 Selected slice: M0-S4C1a
-Gate: REVIEW_PENDING
+Gate: READY_TO_COMMIT
 API contract: APPROVED
 Feature task breakdown: APPROVED
 Scope: APPROVED
 Implementation: COMPLETE
 Verification: COMPLETE
+Review: COMPLETE
+Ownership Check: COMPLETE
 Production baseline: M0-S4B2c COMPLETE
 Later slices: CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-执行 `M0-S4C1a` 独立 Diff Review 与 Human Ownership Check。Review 完成前不得开始 C1b
-`AuthenticationProvider` 或 C1c HTTP lifecycle。
+人工检查最终 Diff 后 commit / push `M0-S4C1a`。完成该 checkpoint 后，在新对话开始
+`M0-S4C1b` Design / Scope；当前不得提前实现 C1b `AuthenticationProvider` 或 C1c HTTP lifecycle。
 
 ## Blockers
 
