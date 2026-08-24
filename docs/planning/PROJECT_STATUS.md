@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-24
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4B2c / READY_TO_COMMIT
-> Production implementation: M0-S4B2c IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE — COMMIT PENDING
+> Current Gate: M0-S4C1a / REVIEW_PENDING
+> Production implementation: M0-S4C1a IMPLEMENTED; REVIEW NOT STARTED
 
 ## Approved Decisions
 
@@ -26,6 +26,13 @@
 - M0-S4B2b offline blocklist 使用 pinned SecLists 2026.1 Top 250,000 prefix，经 12–64 printable ASCII exact filter 后生成 2,065 个 sorted binary SHA-256 fingerprints（baseline 66,080 bytes）；只在 registration / password change / reset 的 Argon2id 前检查，不进入 login path。
 - M0-S4B2c registration failure 只在 `LocalRegistrationService` 进行 structured safe logging；expected rejection 不记 ERROR，unexpected failure 只记录 stage、exception type 与已有 correlation ID，禁止 email、raw password、fingerprint、verifier、SQL parameter、database exception message 或完整 cause chain。
 - M0-S4B2c atomic registration Design 已确认：normalize / policy / Argon2id 在 transaction 外执行，独立 `LocalRegistrationPersistence` bean 的外层 transaction 原子写入 `app_user`、`auth_identity` 与 credential；database unique constraint 裁决 concurrent duplicate，失败请求整体 rollback。
+- M0-S4C1 Redis Session dependency direction 已确认：使用 Spring Boot 管理的 `spring-boot-starter-session-data-redis` 与 auto-configuration，不手写 Session lifecycle，也不无理由用 `@EnableRedisHttpSession` 绕过 Boot configuration。
+- M0-S4C1 Login lifecycle 已确认：form-urlencoded `POST /api/auth/login` 经 Spring Security username/password filter 与 local `AuthenticationProvider`；unknown account 使用 dummy Argon2id，credential failure 返回统一 401，infrastructure failure 返回通用 503，成功清除 credentials、rotation Session ID 并返回 204。
+- M0-S4C1 Session policy 已确认：Jackson JSON + Spring Security modules + strict `UserContext` allowlist；namespace `daily-language:session:v1`；24-hour idle TTL、无 remember-me、允许多设备、logout 仅当前 Session、默认 non-indexed repository，Redis unavailable 不回退到 in-memory Session。
+- M0-S4C1 API contract 已确认：CSRF-protected `POST /api/auth/login`、CSRF-protected `POST /api/auth/logout`、authenticated `GET /api/auth/me`；成功分别返回 204 / 204 / `200 {"userId":"<uuid>"}`，credential / infrastructure / unauthenticated failure 使用固定 401 / 503 / 401 code，CSRF rejection 为 403。
+- M0-S4C1 Cookie contract 已确认：opaque `SESSION` cookie 使用 HttpOnly、SameSite=Lax、Path `/`、无 Domain、无 persistent Max-Age；Hosted Secure=true、local HTTP development 显式 Secure=false，Redis 24-hour idle TTL 是 validity authority。
+- M0-S4C1 feature plan 已确认：C1a Redis Session foundation → C1b local `AuthenticationProvider` → C1c login/logout/me HTTP lifecycle；一次只实现一个 slice。
+- 最小 Account Profile 与 `display_name` 已记录为 `IDEA-007`，不修改当前 S4C1 schema、`UserContext` 或 `/api/auth/me` contract。
 
 ## Completed Review
 
@@ -46,20 +53,21 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S4B2c
-Gate: READY_TO_COMMIT
+Selected slice: M0-S4C1a
+Gate: REVIEW_PENDING
+API contract: APPROVED
+Feature task breakdown: APPROVED
 Scope: APPROVED
 Implementation: COMPLETE
-Verification: COMPLETE — service tests, PostgreSQL atomicity / concurrent duplicate tests and full backend regression passed
-Review: PASS — no blocking findings
-Ownership: COMPLETE — user explained transaction placement, rollback, duplicate mapping and safe exception boundary
-Production baseline: M0-S4B2c IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
-Later slices: Redis Session → CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
+Verification: COMPLETE
+Production baseline: M0-S4B2c COMPLETE
+Later slices: CSRF / throttling / hash capacity → Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-等待人工 Commit Decision；commit 前不进入 Redis Session slice。
+执行 `M0-S4C1a` 独立 Diff Review 与 Human Ownership Check。Review 完成前不得开始 C1b
+`AuthenticationProvider` 或 C1c HTTP lifecycle。
 
 ## Blockers
 

@@ -133,3 +133,167 @@ Hosted Account 未来可能支持多个登录渠道，例如 Sign in with Apple�
 - Provider credential、token 与验证材料的 persistence、encryption、rotation、redaction 和 retention boundary。
 
 本条目只保留多渠道认证与 Account Linking 的后续 Product / Security Decision，不代表已进入 V1、`M0-S4` 或已经批准具体 Provider integration。
+
+## IDEA-007 — Define the minimal user account profile
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: PRODUCT_DATA_MODEL
+
+### Context
+
+当前 `app_user` 只保存稳定的内部 `userId` 与创建时间，email 等登录标识归属于
+`auth_identity`，语言、水平、目标与长期学习状态归属于独立的 `LanguageProfile`。产品需要考虑
+一个不作为登录凭证、允许重复且可以修改的用户展示名，但 AI Language Tutor 的重点不是社交型
+个人资料系统，不应无实际用途地收集头像、性别、生日、地区、个人简介或其他个人信息。
+
+候选最小模型是在 `app_user` 中加入 `display_name` 与相应更新时间。用户级共享的 timezone、
+UI language、默认学习时长和 notification preference 只有在 Planner、Today 或对应功能产生真实
+需求时再单独决定，不得混入语言专属学习状态。Mutable profile data 不进入 `UserContext` 或
+Redis `SecurityContext`；认证 authority 继续只使用稳定的内部 `userId`。
+
+### Follow-up
+
+进入正式 Scope 前决定并验证：
+
+- `display_name` 是 registration 必填字段、可选字段，还是在 onboarding 中补充；
+- 长度、Unicode、空白、control character 与展示层 escaping 规则；
+- 是否直接扩展 `app_user`，还是已有多个真实 account preference 后再建立独立 profile / preference boundary；
+- current-user API 是否返回最新 `display_name`，以及如何避免把可变昵称缓存在长期 Session 中；
+- timezone、UI language、默认学习时长等用户级 preference 的真实消费者与实现时点；
+- account status、头像、notification 等能力是否存在已批准 use case，避免为假想需求提前建模；
+- migration、existing account backfill、registration transaction 与 profile update authorization。
+
+本条目只保存最小 Account Profile 的后续 Product / Data Model Decision，不修改当前
+`M0-S4C1` Scope，不代表已经进入 V1 或批准 database schema / public API 变更。
+
+## IDEA-008 — Advanced content capture and content-to-transfer practice
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: POST_M3_REVIEW
+- Type: FUTURE_PRODUCT
+
+### Context
+
+V1 `M3` 已包含 Reading / imported content 的最小训练路径和受控 Content / RAG boundary，但不要求一次覆盖网页、PDF、电子书、视频字幕等高级导入入口，也不要求把同一内容自动转换为多种 Practice。未来可以评估以用户真实兴趣内容为起点，将 contextual vocabulary、natural expression 与 source provenance 保留下来，并继续生成 Reading、Conversation 或 Writing Practice。
+
+Content 与 Retrieval Result 只能作为 Practice / Agent Context，不能直接成为长期学习状态事实。任何内容产生的学习变化仍必须经过 Practice、Evaluator、Evidence qualification 与 Learning Memory aggregation。
+
+### Follow-up
+
+在 `M3` 最小 Content Pipeline 获得真实使用证据后评估：
+
+- 网页、PDF、电子书、视频字幕等 connector 的用户价值、解析成本与版权边界；
+- contextual vocabulary / expression 是否保存原句、scenario、register、source 与 language metadata；
+- 同一内容如何生成 Reading、Conversation、Writing 等不同 Practice，而不建立彼此隔离的长期状态；
+- furigana、pinyin 等 language-specific reading aid 如何通过集中配置扩展，避免散落的 language conditional；
+- imported private content 的 storage、retention、embedding、trace 与 deletion boundary；
+- 如何通过新场景 Practice 验证 Transfer，而不是重复原文即判定掌握。
+
+本条目只保存超出 `M3` 最小范围的高级 Content Capture 与跨 Practice 增强，不重复批准基础 Reading / imported content，也不代表进入 V1。
+
+## IDEA-009 — Shadow Reading and same-content multi-skill transfer
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: M5_SCOPE_REVIEW
+- Type: FUTURE_PRACTICE
+
+### Context
+
+同一内容可以依次用于 Reading、Listening、Shadow Reading、Scenario Conversation 与 Free Expression，使识别、模仿和受控练习最终回到真实表达。该方向与项目的 Transfer principle 一致：专项 Repair / imitation success 不能直接视为长期掌握，后续新场景中的独立使用应拥有更高 Evidence 价值。
+
+V1 `M5` 当前只批准 Listening 与 turn-based Voice 的受控最小能力，尚未批准 Shadow Reading、phoneme-level scoring 或完整跨技能 Practice sequence。
+
+### Follow-up
+
+在 `M5` Scope Review 时评估：
+
+- Shadow Reading 是否解决首批 dogfooding 用户的真实 listening / pronunciation / fluency 问题；
+- Reading → Listening → Shadow Reading → Conversation 的最小可验证 sequence；
+- pronunciation、fluency、comprehension 与 communication Evidence 如何保持语义分离；
+- imitation success 与 independent transfer success 的不同 Evidence 权重；
+- phoneme / timing score 的 Provider 差异、confidence 与 failure isolation；
+- 是否能够复用 Practice Runtime、Evaluator 与 Learning Memory，而不是建立独立 mastery truth。
+
+本条目只记录候选 Practice enhancement；是否进入 V1、`M5` 或后续 Phase 仍需独立 Scope Decision。
+
+## IDEA-010 — Realtime voice runtime and fast/slow evaluation pipeline
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: POST_V1_REVIEW
+- Type: FUTURE_PRODUCT_ARCHITECTURE
+
+### Context
+
+V1 Voice 明确采用 turn-based STT / TTS，realtime full-duplex voice、streaming、barge-in 与 semantic endpointing 不进入当前范围。未来若真实用户反馈表明 turn-based interaction 明显妨碍自然交流，可以评估将 Voice Runtime 拆分为维持对话连续性的 Fast Path，以及异步完成 pronunciation、grammar、communication diagnosis 和 Evidence qualification 的 Slow Path。
+
+该设计不得让 realtime Agent 绕过 Model / Tool Gateway，也不得让低延迟要求降低 Structured Output validation、language isolation 或长期状态 mutation boundary。
+
+### Follow-up
+
+V1 完成后根据实际 Voice latency、turn-taking failure 与用户中断行为评估：
+
+- streaming STT / TTS、semantic endpointing、barge-in 和 full-duplex 的真实必要性；
+- Fast Path 可以读取的最小 Context，以及它是否只产生 Session interaction；
+- Slow Path 如何异步执行 Evaluation、retry、timeout 和 failure recovery；
+- Provider-neutral audio event / transcript contract 与 adapter boundary；
+- transcript correction、audio retention、privacy、cost、trace 与 deletion policy；
+- Fast / Slow result 不一致时的 authority、idempotency 与 Evidence qualification rules。
+
+本条目只安排 Post-V1 architecture evaluation，不代表批准 realtime Voice、具体 Voice Provider 或新增 production dependency。
+
+## IDEA-011 — Contextual expression capture and Expression Garden
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: POST_M3_REVIEW
+- Type: FUTURE_PRODUCT_UX
+
+### Context
+
+用户在 Reading、Conversation 或 imported content 中遇到值得保留的词汇和表达时，未来可以提供低摩擦的 contextual capture，并用 `Expression Garden` 展示表达从 encountered、recognized、assisted usage 到 independent usage 的变化。该体验应服务于 Natural Expression 和真实沟通，而不是把产品重心转为词汇数量、收藏数量或普通背单词 App。
+
+Expression Garden 只能作为 Vocabulary / Expression State 的 read-only 或 evidence-backed projection，不得建立第二套 mastery truth。一次收藏、查看或单次答对应不足以直接形成 MASTERED 状态。
+
+### Follow-up
+
+在 `M3` Content 与 `M2` Persistent Adaptation 获得真实 Evidence 后评估：
+
+- capture 时保存 expression、sentence、scenario、register、source 和 languageProfileId 的最小模型；
+- 用户手动收藏、模型推荐与 Practice 自动观察之间的 authority 区别；
+- recognition、recall、assisted usage 与 independent usage 如何产生不同 Evidence；
+- Expression Garden 如何解释状态与 provenance，而不泄露私密 Conversation / imported content；
+- 如何从已收藏表达生成 Review、Conversation 或 Writing Practice；
+- 是否确有可用性证据支持视觉化 Garden，而不是先实现装饰性 UI。
+
+本条目只保存 Contextual Expression UX 候选，不改变 V1 North Star，也不代表批准新的长期状态模型。
+
+## IDEA-012 — Evaluate FSRS and BKT for advanced review and mastery estimation
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: POST_V1_REVIEW
+- Type: FUTURE_LEARNING_MODEL
+
+### Context
+
+V1 Review 使用 simple time / mastery / failure / evidence rules，并保持 Review System、Planner 与 Learning Memory 的职责分离。FSRS 可能适合部分 vocabulary recognition / recall scheduling，BKT 或其他 learner-model algorithm 可能帮助估计特定 Skill State，但在缺少真实 longitudinal Evidence 时提前引入只会增加无法验证的复杂度。
+
+任何后续算法都只能消费经过 qualification 的 language-specific Evidence，并输出受控的 schedule / state candidate；不得绕过 Java deterministic transition、建立第二套 mastery truth，或用单一 score 混合 severity、confidence 与 independence。
+
+### Follow-up
+
+V1 获得足够 dogfooding 与 longitudinal data 后执行离线评估：
+
+- 当前 simple rules 的 prediction、review timing 与 user burden baseline；
+- FSRS 是否只适用于 vocabulary / recognition，还是能安全扩展到其他 Review target；
+- BKT 的 knowledge component 定义是否适合 communication、natural expression 与 cross-scenario transfer；
+- cold start、sparse evidence、correct evidence、confidence 与 multi-language isolation 的处理；
+- algorithm versioning、migration、explainability、offline replay 与 regression eval；
+- 复杂算法相对简单规则是否产生足够的真实 Product Value。
+
+本条目只批准未来评估，不批准引入 FSRS、BKT、Knowledge Graph 或新的 mastery authority。

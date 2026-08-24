@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: S4A–S4B2b COMPLETE; S4B2c READY_TO_COMMIT; S4C–S4D NOT STARTED
+- Implementation: S4A–S4B2c COMPLETE; S4C1a IMPLEMENTED / REVIEW_PENDING; S4C1b–S4D NOT STARTED
 
 ## Context
 
@@ -221,6 +221,9 @@ managed pepper 留到 M6 Security Gate 决定，不能用未经管理的 `.env` 
 
 Hosted V1 使用 Redis-backed server-side HTTP Session：
 
+- 使用 Spring Boot 管理的 `spring-boot-starter-session-data-redis` 与 auto-configuration，不手写
+  Session ID / Redis key lifecycle，也不在没有当前需求时用 `@EnableRedisHttpSession` 接管
+  auto-configuration；
 - browser 只持有 opaque Session cookie；
 - Hosted cookie 使用 `HttpOnly`、`Secure`、适当 `SameSite` 与最小 Path/Domain scope；
 - login success 触发 session ID rotation；
@@ -229,8 +232,54 @@ Hosted V1 使用 Redis-backed server-side HTTP Session：
 - Vue / PWA 与 Backend 默认通过 same-site deployment / reverse proxy 通信；
 - Redis Session 不保存 raw password、password verifier 或 BYOK API Key。
 
+Session attributes 使用 Jackson JSON serializer，而不是 Java native serialization；Spring
+Security types 使用 `SecurityJacksonModules`，自定义 polymorphic type 只 allowlist
+`UserContext`。Redis namespace 固定为 `daily-language:session:v1`，serialization contract
+不兼容时必须升级 namespace 并让旧 Session fail closed。
+
+Hosted V1 Session idle timeout 为 24 hours，不启用 remember-me，S4C1 不自行增加 absolute
+lifetime filter。允许同一 User 在多个设备拥有独立 Session，使用默认 non-indexed
+`RedisSessionRepository`；logout 只失效当前 Session，不实现 device list、logout-all 或最大
+Session 数量。Redis unavailable 返回通用 service-unavailable failure，不回退到 JVM in-memory
+Session。
+
 Authentication 使用 Spring Security filter / provider lifecycle，不在 Controller 手工比较
 password 并自行拼装 SecurityContext。
+
+Local login 使用 `POST /api/auth/login` 的 `application/x-www-form-urlencoded` body（`email`、
+`password`），复用 Spring Security username/password filter lifecycle，并通过
+`LocalPasswordAuthenticationProvider` 连接现有 credential repository 与 Argon2id hasher。
+Unknown identity 仍执行 dummy Argon2id verification；unknown identity、malformed identity 与 wrong
+password 统一返回 `401 INVALID_CREDENTIALS`。Infrastructure failure 返回不含底层详情的
+`503 AUTHENTICATION_UNAVAILABLE`。成功返回 `204 No Content`，经 session fixation protection
+更换 Session ID，并只将 credentials 已清除的 `UserContext(userId)` authentication 写入 Session。
+Login 不执行 registration-only password blocklist，也不使用 saved-request redirect。
+
+S4C1 public authentication contract 固定为：
+
+| Endpoint | Request / authority | Success | Expected failure |
+| --- | --- | --- | --- |
+| `POST /api/auth/login` | unauthenticated access allowed；form-urlencoded `email` / `password`；必须有有效 CSRF token | `204 No Content`，创建或 rotation 当前 Session | invalid / missing / malformed credential → `401 {"code":"INVALID_CREDENTIALS"}`；authentication infrastructure unavailable → `503 {"code":"AUTHENTICATION_UNAVAILABLE"}`；missing / invalid CSRF → `403` |
+| `POST /api/auth/logout` | 当前 Session；无 request body；必须有有效 CSRF token | `204 No Content`，只失效当前 Redis Session、清除 SecurityContext 与 cookie | missing / invalid CSRF → `403` |
+| `GET /api/auth/me` | authenticated `UserContext` | `200 application/json`，body 仅为 `{"userId":"<uuid>"}` | unauthenticated / expired Session → `401 {"code":"UNAUTHENTICATED"}` |
+
+Login / logout 不提供 GET variant、redirect 或 saved-request behavior。Credential rejection response
+不区分 unknown email、malformed email 与 wrong password，也不返回底层 exception detail。`/me`
+只读取已恢复的 `UserContext`，S4C1 不为此查询 `app_user`，也不返回 email、Session ID、TTL、
+verifier 或 mutable account profile。
+
+Session cookie 名称为 `SESSION`，`HttpOnly=true`、`SameSite=Lax`、`Path=/`、不设置
+`Domain` 或 persistent `Max-Age`。Hosted HTTPS 强制 `Secure=true`；local HTTP development 使用
+显式 externalized configuration override `Secure=false`。Cookie 只保存 opaque Session ID，24-hour idle validity 由
+server-side Redis TTL 裁决。Login rotation cookie，logout 清除 cookie。
+
+Login 与 logout 均保持 CSRF protection；`permitAll` 只表示 login 不要求已有 Authentication，
+不等于绕过 CSRF。S4C1 verification 使用有效 / 缺失 / 错误 token 覆盖 filter behavior；SPA 获取
+和提交 CSRF token 的正式 delivery contract 属于 S4C2，因此 S4C1 不能单独作为完整 browser
+authentication release。
+
+最小 Account Profile 与 `display_name` 决策由 `IDEA-007` 保留，不扩大 S4C1 schema、
+registration contract、`UserContext` 或 `/api/auth/me` response。
 
 ## Registration Safe Logging
 

@@ -177,6 +177,24 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 
 - Hosted V1 使用 Spring Security + Redis-backed server-side HTTP Session，不使用
   browser-stored JWT；
+- Redis-backed HTTP Session 使用 Spring Boot 管理的
+  `spring-boot-starter-session-data-redis` 与 auto-configuration，不手写 Session ID / Redis key
+  lifecycle，也不无理由用 `@EnableRedisHttpSession` 接管配置；
+- local login 使用 form-urlencoded `POST /api/auth/login` 与 Spring Security
+  username/password filter → local `AuthenticationProvider` lifecycle；unknown account 仍执行
+  dummy Argon2id，credential failure 统一 401，infrastructure failure 使用通用 503，成功后清除
+  credentials、rotation Session ID 并返回 204；
+- Session attributes 使用 Jackson JSON、Spring Security Jackson modules 与 strict
+  `UserContext` allowlist；namespace 为 `daily-language:session:v1`，idle TTL 为 24 hours，不启用
+  remember-me，允许多设备且 logout 只失效当前 Session，Redis unavailable 不回退到 JVM
+  in-memory Session；
+- S4C1 public contract 固定为 CSRF-protected form-urlencoded `POST /api/auth/login`、
+  CSRF-protected `POST /api/auth/logout` 与 authenticated `GET /api/auth/me`；login / logout 成功均
+  返回 204，`/me` 只返回 `userId`，不提供 GET logout、redirect、saved request 或 mutable
+  account profile；
+- Session cookie 使用 `SESSION`、`HttpOnly=true`、`SameSite=Lax`、`Path=/`，不设置 Domain 或
+  persistent Max-Age；Hosted HTTPS 强制 Secure，local HTTP development 通过显式 profile
+  override 关闭 Secure；server-side Redis 24-hour idle TTL 是 Session validity authority；
 - local password verifier 使用 code-versioned `argon2id-v1`；algorithm parameters 不是可随意
   调低的 runtime configuration；
 - local password policy 接受 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括
@@ -251,6 +269,130 @@ Focused verification 限定为：
 明确不进入本 slice：Register/Login Controller、registration transaction、数据库、Redis
 Session、Rate Limit、password reset API、HIBP network integration、frontend message component、
 新 dependency 或 `LocalPasswordHasher` 修改。
+
+#### M0-S4C1 Feature Plan
+
+Status: APPROVED — API contract 与 task breakdown 已确认。
+
+Goal：在不手写 Session lifecycle 的前提下，通过 Spring Security + Spring Session 建立 local
+login、current-user、current-session logout 的 Redis-backed authentication lifecycle。
+
+Ownership Level：A — Authentication / Session / CSRF / public API security boundary。
+
+Target flow：
+
+```text
+POST /api/auth/login + CSRF
+    → Spring Security username/password filter
+    → LocalPasswordAuthenticationProvider
+    → credential lookup + dummy/real Argon2id verification
+    → authenticated UserContext(userId), credentials cleared
+    → Session ID rotation
+    → Redis-backed SecurityContext
+
+SESSION cookie
+    → Spring Session restores SecurityContext
+    → GET /api/auth/me
+    → {"userId":"<uuid>"}
+
+POST /api/auth/logout + CSRF
+    → invalidate current Redis Session
+    → clear SecurityContext + SESSION cookie
+    → 204 No Content
+```
+
+Public contract：
+
+| Endpoint | Success | Failure boundary |
+| --- | --- | --- |
+| `POST /api/auth/login` | `204` + rotated `SESSION` cookie | credential rejection `401 INVALID_CREDENTIALS`；infrastructure unavailable `503 AUTHENTICATION_UNAVAILABLE`；CSRF rejection `403` |
+| `POST /api/auth/logout` | `204`，仅当前 Session 失效 | CSRF rejection `403` |
+| `GET /api/auth/me` | `200 {"userId":"<uuid>"}` | unauthenticated / expired Session `401 UNAUTHENTICATED` |
+
+Cookie contract：`SESSION`、HttpOnly、SameSite=Lax、Path `/`、无 Domain、无 persistent Max-Age；
+Hosted Secure=true，local HTTP development 显式 Secure=false。Cookie 不携带 user data；Redis
+24-hour idle TTL 是有效期 authority。
+
+Task breakdown：
+
+| Task | Goal | Ownership | Depends on |
+| --- | --- | --- | --- |
+| M0-S4C1a | 引入 Boot-managed Spring Session Redis、JSON / Security serialization allowlist、namespace、idle TTL 与 Cookie configuration；验证 Redis restore / expiry / fail-closed | A | 已批准 S4C1 dependency / Session policy |
+| M0-S4C1b | 实现 local `AuthenticationProvider`，覆盖 normalize / lookup、unknown-account dummy Argon2id、uniform credential rejection、infrastructure failure 与 credential clearing | A | S4B1 repository、S4B2a hasher、S4C1a Session foundation |
+| M0-S4C1c | 接入 login/logout/me HTTP contract，验证 CSRF、Session rotation / reuse / expiry / invalidation、Cookie 与 error response | A | S4C1a、S4C1b |
+
+Architecture impact：新增已批准的 Spring Session Redis starter；修改 Spring Security / Session
+configuration 与 public authentication API；不修改 database schema、transaction boundary、
+learning Domain、Model / Tool boundary 或 Hosted / Self-hosted core business path。
+
+Explicit non-goals：SPA CSRF token delivery、registration Controller、rate limit、global Argon2id
+concurrency gate、frontend、remember-me、device list、logout-all、maximum-session policy、external
+Provider、password reset、email verification，以及 `IDEA-007` Account Profile / `display_name`。
+
+Current first task：`M0-S4C1a`。本 slice 完成后必须独立 Review；不得在同一 Gate 顺带实现
+`M0-S4C1b/c`。
+
+##### M0-S4C1a Current Task Contract
+
+Status: SCOPE APPROVED；IMPLEMENTATION / VERIFICATION COMPLETE；REVIEW_PENDING。
+
+Goal：使用 Spring Boot 4.1 auto-configuration 建立 Redis-backed `HttpSession` foundation，固定
+Jackson 3 Security serialization allowlist、Redis namespace、24-hour idle TTL 与 Session cookie
+configuration，并形成真实 Redis / unavailable Redis verification evidence。
+
+Files to modify：
+
+1. `server/pom.xml`：用 `spring-boot-starter-session-data-redis` 替代当前直接的
+   `spring-boot-starter-data-redis`；由 Maven dependency tree 验证 Redis client / health 所需依赖
+   仍由 Session starter 提供；
+2. `server/src/main/resources/application.yml`：配置 `spring.session.timeout=24h`、Boot 4.1
+   `spring.session.data.redis.namespace=daily-language:session:v1`、显式 default repository 与
+   `SESSION` cookie boundary；Hosted `Secure=true` 为默认值，local HTTP 只允许显式 externalized
+   configuration override；
+3. `README.md`：记录 local HTTP 的 cookie Secure override 与 Redis integration test command。
+
+Files to add：
+
+1. `server/src/main/java/com/dailylanguage/security/SessionConfiguration.java`：只提供固定 bean name
+   `springSessionDefaultRedisSerializer`；使用 Jackson 3 `JacksonJsonRedisSerializer<Object>`、
+   `SecurityJacksonModules` 和只额外允许 `UserContext` 的 `BasicPolymorphicTypeValidator`；
+2. `server/src/test/java/com/dailylanguage/security/SessionSerializationConfigurationTests.java`：
+   验证 authenticated `UserContext` / SecurityContext JSON round trip、非 Java native serialization
+   与未 allowlist custom type fail-closed；
+3. `server/src/test/java/com/dailylanguage/security/RedisSessionIntegrationTests.java`：由
+   `RUN_REDIS_TESTS=true` 显式启用，验证 default non-indexed repository、namespace、24-hour idle
+   interval 与跨 repository read 的 SecurityContext round trip；
+4. `server/src/test/java/com/dailylanguage/security/RedisSessionUnavailableIntegrationTests.java`：
+   使用短 Redis connection timeout 与不可用 test port，验证 Session persistence failure 不回退到
+   servlet/JVM in-memory Session。
+
+Actual diff：主要 production files 3 个（其中 1 个新增），production changed LOC 约 55；test
+files 3 个；documentation 1 个。若 serializer 需要修改 `UserContext` annotation、
+新增 custom Session abstraction 或手工 repository/filter，即视为 Scope Change，必须停止。
+
+Architecture impact：使用已批准的 Spring Session Redis starter 与 Boot auto-configuration；不使用
+`@EnableRedisHttpSession`，不手写 Session ID、Redis key、repository 或 servlet filter lifecycle。
+
+Database/API/transaction impact：NONE。C1a 不新增 endpoint，不修改 database schema、registration
+transaction 或 `SecurityConfiguration` authentication rules。
+
+Security impact：Session attribute 从 Java native serialization 改为带 Spring Security modules 的
+Jackson 3 JSON；polymorphic type validation 只放行 Spring Security 所需类型与 `UserContext`；
+Redis unavailable 时 fail closed；Cookie 不携带 user data。
+
+Explicitly out of scope：`AuthenticationProvider`、login/logout/me endpoint、CSRF token delivery、
+Session rotation/invalidation HTTP behavior、rate limit、Argon2id concurrency gate、Account Profile、
+`display_name`、frontend 与 Hosted hardware capacity confirmation。
+
+Verification evidence：
+
+- serializer focused test：SecurityContext / UserContext JSON round trip、credentials remain null、
+  Java native serialization signature absent、non-allowlisted type fail-closed；
+- Redis-unavailable focused test：唯一 `SessionRepository` 为 `RedisSessionRepository`，save 在
+  unavailable Redis 上抛出 `DataAccessException`，无 JVM repository fallback；
+- real Redis integration：default repository、24-hour interval、`daily-language:session:v1`
+  namespace、second repository instance restore、JSON payload 与 Hosted Cookie property binding；
+- full backend default regression：PASS；真实 Redis test key 已在 finally 清理并通过 scan 确认。
 
 #### M0-S4 Capacity Decision
 
@@ -334,7 +476,13 @@ M0-S4B2c Implementation: COMPLETE
 M0-S4B2c Verification: COMPLETE
 M0-S4B2c Review: COMPLETE
 M0-S4B2c Ownership Check: COMPLETE
-M0-S4B2c: READY_TO_COMMIT
+M0-S4B2c: COMPLETE
+M0-S4C1 API Contract: APPROVED
+M0-S4C1 Design: APPROVED
+M0-S4C1a Scope: APPROVED
+M0-S4C1a Implementation: COMPLETE
+M0-S4C1a Verification: COMPLETE
+M0-S4C1a: REVIEW_PENDING
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -348,4 +496,7 @@ verification、Review、Human Ownership Check 与人工 commit 已完成。`M0-S
 registration 调用顺序、transaction boundary、duplicate identity、failure contract 与 safe
 logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL atomicity / concurrent
 duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
-完成。当前等待人工 Commit Decision，commit 前不进入 Redis Session slice。
+完成并由人工 commit / push。当前进入 `M0-S4C1` Login / Logout / Current User 与 Redis-backed
+Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation 已完成
+implementation 与 verification，当前等待独立 Diff Review / Human Ownership Check；Review 完成前
+不得开始 `M0-S4C1b`。
