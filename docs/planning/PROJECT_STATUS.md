@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-25
+> Last updated: 2026-08-26
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4C1b / READY_TO_COMMIT
-> Production implementation: M0-S4C1b IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE
+> Current Gate: M0-S4C2 / DESIGN_PENDING
+> Production implementation: M0-S4C1 COMPLETE
 
 ## Approved Decisions
 
@@ -51,28 +51,28 @@
 13. M0-S4B2c atomic registration Scope、correctness、transaction、concurrent duplicate、safe logging、failure contract Diff Review 与 Human Ownership Check。
 14. M0-S4C1a Boot-managed Redis Session、JSON / Security serialization allowlist、namespace、idle TTL、Cookie configuration、Redis restore / fail-closed Diff Review 与 Human Ownership Check。
 15. M0-S4C1b local `AuthenticationProvider`、unknown-account Argon2id、uniform credential rejection、infrastructure failure、safe logging、credential clearing Diff Review 与 Human Ownership Check。
+16. M0-S4C1c framework-managed login/logout/me HTTP lifecycle、Session rotation / restore / invalidation、Cookie lifecycle、fixed authentication error response、Redis unavailable fail-closed Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4C1b
-Gate: READY_TO_COMMIT
-API contract: APPROVED
-Feature task breakdown: APPROVED
-Scope: APPROVED
-Implementation: COMPLETE
-Verification: COMPLETE
-Review: COMPLETE
-Ownership Check: COMPLETE
-Production baseline: M0-S4C1a COMPLETE
-Next slice: M0-S4C1c login / logout / me HTTP lifecycle
-Later slices: CSRF delivery / throttling / hash capacity → Self-hosted SINGLE_USER
+Selected slice: M0-S4C2
+Gate: DESIGN_PENDING
+Phase scope: APPROVED
+Detailed Design: PENDING
+Slice breakdown: PENDING
+Implementation Scope: NOT_APPROVED
+Implementation: NOT_STARTED
+Production baseline: M0-S4C1 COMPLETE (`5b191f7`)
+Current target: SPA CSRF delivery / authentication throttling / global hash concurrency / provisional resource verification
+Later slice: M0-S4D Self-hosted SINGLE_USER
 ```
 
 ## Next Action
 
-人工检查最终 Diff 后 commit / push `M0-S4C1b`。完成该 checkpoint 后，在新对话开始
-`M0-S4C1c` Design / Scope；当前不得提前实现 login / logout / me HTTP lifecycle。
+进入 `M0-S4C2` A 类 Design：基于 ADR-0002 与当前 C1 implementation，明确 SPA CSRF delivery、
+Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 和 provisional
+restricted-Container verification 的职责边界与可 Review slices。Design 与 Scope 未批准前不得实现。
 
 ## Blockers
 

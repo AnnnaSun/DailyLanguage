@@ -272,7 +272,8 @@ Session、Rate Limit、password reset API、HIBP network integration、frontend 
 
 #### M0-S4C1 Feature Plan
 
-Status: APPROVED — API contract 与 task breakdown 已确认。
+Status: COMPLETE — API contract、task breakdown、implementation、verification、Review、Ownership 与
+人工 commit / push 均已完成。
 
 Goal：在不手写 Session lifecycle 的前提下，通过 Spring Security + Spring Session 建立 local
 login、current-user、current-session logout 的 Redis-backed authentication lifecycle。
@@ -329,8 +330,8 @@ Explicit non-goals：SPA CSRF token delivery、registration Controller、rate li
 concurrency gate、frontend、remember-me、device list、logout-all、maximum-session policy、external
 Provider、password reset、email verification，以及 `IDEA-007` Account Profile / `display_name`。
 
-Current implementation task：`M0-S4C1b`。`M0-S4C1a` 已完成并形成独立 commit checkpoint；C1b
-完成后必须停止，不得在同一 Gate 顺带实现 `M0-S4C1c`。
+Current implementation task：`M0-S4C1` 已完成并形成 C1a、C1b、C1c 独立 commit checkpoints。
+下一 task 是 `M0-S4C2`，必须先完成独立 A 类 Design 与 Scope，不得直接实现。
 
 ##### M0-S4C1a Completed Task Contract
 
@@ -394,10 +395,10 @@ Verification evidence：
   namespace、second repository instance restore、JSON payload 与 Hosted Cookie property binding；
 - full backend default regression：PASS；真实 Redis test key 已在 finally 清理并通过 scan 确认。
 
-##### M0-S4C1b Current Task Contract
+##### M0-S4C1b Completed Task Contract
 
 Status: DESIGN / SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；
-READY_TO_COMMIT。
+COMPLETE。
 
 Goal：通过 Spring Security `AuthenticationProvider` 连接现有 local credential repository 与
 `LocalPasswordHasher`，使成功认证只产生 credentials 已清除的 `UserContext(userId)`；unknown
@@ -437,6 +438,48 @@ Verification evidence：
 - PostgreSQL integration：真实持久化 local credential 可通过 provider 认证；
 - related hasher、repository 与 persistence tests：PASS；最终 provider focused tests 9 tests、0 failures、
   0 errors；`git diff --check` PASS。
+
+##### M0-S4C1c Completed Task Contract
+
+Status: DESIGN / SCOPE APPROVED；IMPLEMENTATION / VERIFICATION / REVIEW / OWNERSHIP COMPLETE；
+COMPLETE。
+
+Goal：使用 Spring Security framework-managed form login / logout 与 Spring Session Redis 接入
+`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me` public contract；成功认证只把
+credentials 已清除的 `UserContext(userId)` 保存进 Redis Session，Session storage unavailable 时
+fail closed 并返回固定、无敏感细节的 HTTP error。
+
+Implemented behavior：
+
+1. `SecurityConfiguration` 配置 form-urlencoded login、current-session logout、Session ID rotation、
+   request cache / HTTP Basic disable，以及 authenticated-request entry point；不生成 HTML login page；
+2. credential rejection 返回 `401 INVALID_CREDENTIALS`，未认证访问返回 `401 UNAUTHENTICATED`，
+   authentication / Session infrastructure unavailable 返回 `503 AUTHENTICATION_UNAVAILABLE`；
+3. `GET /api/auth/me` 只从 authenticated `UserContext` 返回 `userId`，request body / parameter 对身份
+   没有 authority；
+4. logout 清除 Authentication 并 invalidate 当前 `HttpSession`；Redis Session 删除与过期 Cookie
+   由 Spring Session lifecycle 单独负责，不重复手写 `SESSION` Cookie 删除；
+5. `SessionStorageFailureFilter` 只在 login / logout / me 边界映射
+   `RedisConnectionFailureException`，保留已写入的 Spring Security response headers，并不把其他
+   `RuntimeException` 伪装成 Session storage failure。
+
+Architecture / Scope impact：production files 4 个，沿用已批准的 Spring Security、Spring Session
+Redis 与 local `AuthenticationProvider` boundary；不新增 dependency、database schema、transaction、
+custom Session repository 或手写 Session ID / Redis key lifecycle。Implementation commit：`5b191f7`。
+
+Explicitly out of scope：SPA CSRF token delivery、registration Controller、rate limit、global Argon2id
+concurrency gate、password re-hash persistence、Account Profile、frontend、external Provider、password
+reset、email verification、remember-me、device list、logout-all 与 maximum-session policy。
+
+Verification evidence：
+
+- HTTP contract focused tests：login success / failure、Session ID rotation、CSRF rejection、logout
+  idempotency、current-user 与 fixed error response；
+- real PostgreSQL + Redis integration：真实 registration / Argon2id / provider login、Redis
+  SecurityContext restore、credentials remain null、Session deletion 与单一安全 Cookie expiry；
+- Redis-unavailable integration：login save 与 `/me` restore 均返回固定 503，response 不泄露 Redis
+  connection detail，并保留 Spring Security headers；
+- C1c combined suite 12 tests 全部通过；full backend default regression 与 `git diff --check` PASS。
 
 #### M0-S4 Capacity Decision
 
@@ -535,7 +578,17 @@ M0-S4C1b Implementation: COMPLETE
 M0-S4C1b Verification: COMPLETE
 M0-S4C1b Review: COMPLETE
 M0-S4C1b Ownership Check: COMPLETE
-M0-S4C1b: READY_TO_COMMIT
+M0-S4C1b: COMPLETE
+M0-S4C1c Design: APPROVED
+M0-S4C1c Scope: APPROVED
+M0-S4C1c Implementation: COMPLETE
+M0-S4C1c Verification: COMPLETE
+M0-S4C1c Review: COMPLETE
+M0-S4C1c Ownership Check: COMPLETE
+M0-S4C1c: COMPLETE
+M0-S4C1: COMPLETE
+M0-S4C2 Detailed Design: PENDING
+M0-S4C2 Scope: NOT_APPROVED
 ```
 
 `M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
@@ -550,7 +603,8 @@ registration 调用顺序、transaction boundary、duplicate identity、failure 
 logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL atomicity / concurrent
 duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
 完成并由人工 commit / push。当前进入 `M0-S4C1` Login / Logout / Current User 与 Redis-backed
-Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation 已完成并
-形成独立本地 commit checkpoint。`M0-S4C1b` local `AuthenticationProvider` 已完成 implementation、
-verification、独立 Diff Review 与 Human Ownership Check，当前 `READY_TO_COMMIT`；人工 commit /
-push checkpoint 完成前不得开始 `M0-S4C1c`。
+Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation、
+`M0-S4C1b` local `AuthenticationProvider` 与 `M0-S4C1c` login / logout / me HTTP lifecycle 均已完成
+implementation、focused / integration verification、独立 Diff Review、Human Ownership Check 与人工
+commit / push。当前进入 `M0-S4C2` Detailed Design；Scope 获得人工批准前不得实现 SPA CSRF、
+authentication throttling、global password-hash concurrency gate 或 provisional resource verification。
