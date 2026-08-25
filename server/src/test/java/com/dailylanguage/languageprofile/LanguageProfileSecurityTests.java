@@ -22,10 +22,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.dailylanguage.security.SecurityConfiguration;
+import com.dailylanguage.security.AuthenticationHttpResponseWriter;
 import com.dailylanguage.security.UserContext;
 
 @WebMvcTest(LanguageProfileController.class)
-@Import({SecurityConfiguration.class, LanguageProfileAccessService.class})
+@Import({
+        SecurityConfiguration.class,
+        AuthenticationHttpResponseWriter.class,
+        LanguageProfileAccessService.class
+})
 class LanguageProfileSecurityTests {
 
     @Autowired
