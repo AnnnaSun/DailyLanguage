@@ -1,5 +1,6 @@
 package com.dailylanguage.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -7,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration(proxyBeanMethods = false)
@@ -15,8 +17,12 @@ public class SecurityConfiguration {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            AuthenticationHttpResponseWriter authenticationHttpResponseWriter) throws Exception {
+            AuthenticationHttpResponseWriter authenticationHttpResponseWriter,
+            @Value("${server.servlet.session.cookie.secure}") boolean secureCookie) throws Exception {
         return http
+                .csrf(csrf -> csrf
+                        .spa()
+                        .csrfTokenRepository(spaCsrfTokenRepository(secureCookie)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/actuator/health",
@@ -56,5 +62,16 @@ public class SecurityConfiguration {
                         .authenticationEntryPoint((request, response, exception) ->
                                 authenticationHttpResponseWriter.writeUnauthenticated(response)))
                 .build();
+    }
+
+    private static CookieCsrfTokenRepository spaCsrfTokenRepository(boolean secureCookie) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieName("XSRF-TOKEN");
+        repository.setHeaderName("X-XSRF-TOKEN");
+        repository.setCookieCustomizer(cookie -> cookie
+                .path("/")
+                .sameSite("Lax")
+                .secure(secureCookie));
+        return repository;
     }
 }
