@@ -16,6 +16,11 @@ spring:
         namespace: daily-language:session:v1
         repository-type: default
 
+app:
+  security:
+    password-hashing:
+      max-concurrent: ${PASSWORD_HASH_MAX_CONCURRENT:1}
+
 server:
   servlet:
     session:

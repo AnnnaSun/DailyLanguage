@@ -90,6 +90,9 @@ public final class LocalRegistrationService {
         try {
             return passwordHasher.hash(submittedPassword);
         }
+        catch (PasswordHashCapacityExceededException exception) {
+            throw new LocalRegistrationException(REGISTRATION_FAILED);
+        }
         catch (RuntimeException exception) {
             logUnexpectedFailure("PASSWORD_HASH", exception);
             throw new LocalRegistrationException(REGISTRATION_FAILED);

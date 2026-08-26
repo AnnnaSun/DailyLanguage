@@ -141,6 +141,24 @@ class LocalRegistrationServiceTests {
                 .doesNotContain(SUBMITTED_PASSWORD);
     }
 
+    @Test
+    void mapsPasswordHashCapacityExhaustionToSafeRegistrationFailure(CapturedOutput output) {
+        when(passwordPolicy.validate(SUBMITTED_PASSWORD, NORMALIZED_EMAIL)).thenReturn(ACCEPTED);
+        when(passwordHasher.hash(SUBMITTED_PASSWORD))
+                .thenThrow(new PasswordHashCapacityExceededException());
+
+        LocalRegistrationException exception = catchRegistrationFailure(
+                () -> registrationService.register(NORMALIZED_EMAIL, SUBMITTED_PASSWORD));
+
+        assertThat(exception.failureReason()).isEqualTo(REGISTRATION_FAILED);
+        assertThat(exception).hasNoCause();
+        verifyNoInteractions(registrationPersistence);
+        assertThat(output)
+                .doesNotContain("Local registration failed")
+                .doesNotContain(PasswordHashCapacityExceededException.class.getName())
+                .doesNotContain(SUBMITTED_PASSWORD);
+    }
+
     private void assertPolicyRejection(
             LocalPasswordPolicy.ValidationResult validationResult,
             LocalRegistrationException.FailureReason expectedFailureReason) {

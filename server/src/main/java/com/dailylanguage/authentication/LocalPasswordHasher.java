@@ -31,8 +31,12 @@ public final class LocalPasswordHasher {
                     + "\\$([A-Za-z0-9+/]{22})\\$([A-Za-z0-9+/]{43})");
 
     private final PasswordEncoder passwordEncoder;
+    private final PasswordHashConcurrencyGate passwordHashConcurrencyGate;
 
-    public LocalPasswordHasher() {
+    public LocalPasswordHasher(PasswordHashConcurrencyGate passwordHashConcurrencyGate) {
+        this.passwordHashConcurrencyGate = Objects.requireNonNull(
+                passwordHashConcurrencyGate,
+                "passwordHashConcurrencyGate must not be null");
         PasswordEncoder argon2idPasswordEncoder = new Argon2PasswordEncoder(
                 SALT_LENGTH_BYTES,
                 HASH_LENGTH_BYTES,
@@ -51,7 +55,8 @@ public final class LocalPasswordHasher {
      */
     public String hash(CharSequence submittedPassword) {
         Objects.requireNonNull(submittedPassword, "submittedPassword must not be null");
-        String encodedPasswordHash = passwordEncoder.encode(submittedPassword);
+        String encodedPasswordHash = passwordHashConcurrencyGate.runWithAvailableSlot(
+                () -> passwordEncoder.encode(submittedPassword));
         if (!isCurrentPasswordHash(encodedPasswordHash)) {
             throw new IllegalStateException("Argon2id encoder produced an unexpected password hash format");
         }
@@ -65,7 +70,8 @@ public final class LocalPasswordHasher {
         if (submittedPassword == null || !isCurrentPasswordHash(encodedPasswordHash)) {
             return false;
         }
-        return passwordEncoder.matches(submittedPassword, encodedPasswordHash);
+        return passwordHashConcurrencyGate.runWithAvailableSlot(
+                () -> passwordEncoder.matches(submittedPassword, encodedPasswordHash));
     }
 
     public boolean needsUpgrade(String encodedPasswordHash) {

@@ -199,6 +199,27 @@ class LocalPasswordAuthenticationProviderTests {
     }
 
     @Test
+    void mapsPasswordHashCapacityExhaustionToAuthenticationUnavailable(CapturedOutput output) {
+        var credential = credential(UUID.randomUUID(), STORED_PASSWORD_HASH);
+        when(authenticationRepository.findByEmail(EMAIL)).thenReturn(Optional.of(credential));
+        when(passwordHasher.matches(SUBMITTED_PASSWORD, STORED_PASSWORD_HASH))
+                .thenThrow(new PasswordHashCapacityExceededException());
+        var request = request(EMAIL, SUBMITTED_PASSWORD);
+
+        AuthenticationServiceException exception = catchThrowableOfType(
+                () -> authenticationManager.authenticate(request),
+                AuthenticationServiceException.class);
+
+        assertUnavailableFailureIsSafe(exception, request);
+        assertThat(output)
+                .doesNotContain("Local authentication failed")
+                .doesNotContain(PasswordHashCapacityExceededException.class.getName())
+                .doesNotContain(EMAIL)
+                .doesNotContain(SUBMITTED_PASSWORD)
+                .doesNotContain(STORED_PASSWORD_HASH);
+    }
+
+    @Test
     void supportsOnlyUsernamePasswordAuthenticationTokens() {
         assertThat(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).isTrue();
         assertThat(authenticationProvider.supports(Authentication.class)).isFalse();

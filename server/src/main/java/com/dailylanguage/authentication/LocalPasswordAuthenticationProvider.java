@@ -100,6 +100,9 @@ public final class LocalPasswordAuthenticationProvider implements Authentication
         try {
             return passwordHasher.matches(submittedPassword, passwordHashToCheck);
         }
+        catch (PasswordHashCapacityExceededException exception) {
+            throw new AuthenticationServiceException(AUTHENTICATION_UNAVAILABLE);
+        }
         catch (RuntimeException exception) {
             throw authenticationUnavailable("PASSWORD_VERIFY", exception);
         }

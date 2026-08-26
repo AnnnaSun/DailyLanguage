@@ -11,7 +11,8 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 @ExtendWith(OutputCaptureExtension.class)
 class LocalPasswordHasherTests {
 
-    private final LocalPasswordHasher passwordHasher = new LocalPasswordHasher();
+    private final LocalPasswordHasher passwordHasher =
+            new LocalPasswordHasher(new PasswordHashConcurrencyGate(1));
 
     @Test
     void hashesWithVersionedArgon2idParameters() {
