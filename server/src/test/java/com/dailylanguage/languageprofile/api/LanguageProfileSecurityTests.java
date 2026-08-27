@@ -1,4 +1,4 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.api;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,10 +21,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.dailylanguage.security.SecurityConfiguration;
-import com.dailylanguage.security.AuthenticationHttpResponseWriter;
-import com.dailylanguage.security.RedisAuthenticationAttemptRateLimiter;
-import com.dailylanguage.security.UserContext;
+import com.dailylanguage.languageprofile.application.LanguageProfileAccessService;
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
+import com.dailylanguage.languageprofile.infrastructure.LanguageProfileRepository;
+import com.dailylanguage.security.domain.UserContext;
+import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
+import com.dailylanguage.security.infrastructure.SecurityConfiguration;
 
 @WebMvcTest(LanguageProfileController.class)
 @Import({

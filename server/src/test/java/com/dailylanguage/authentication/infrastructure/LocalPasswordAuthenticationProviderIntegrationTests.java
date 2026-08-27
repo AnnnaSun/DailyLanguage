@@ -10,8 +10,8 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dailylanguage.security.UserContext;
-import com.dailylanguage.user.UserRepository;
+import com.dailylanguage.security.domain.UserContext;
+import com.dailylanguage.user.infrastructure.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

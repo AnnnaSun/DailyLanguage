@@ -22,7 +22,7 @@ import org.springframework.session.data.redis.RedisSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import com.dailylanguage.security.UserContext;
+import com.dailylanguage.security.domain.UserContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;

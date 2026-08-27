@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.domain;
 
 import java.util.Objects;
 import java.util.UUID;

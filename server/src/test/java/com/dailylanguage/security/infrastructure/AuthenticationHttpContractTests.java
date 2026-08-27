@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.infrastructure;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
+import com.dailylanguage.security.api.CurrentUserController;
+import com.dailylanguage.security.domain.UserContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

@@ -14,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 
-import com.dailylanguage.security.UserContext;
+import com.dailylanguage.security.domain.UserContext;
 
 @Component
 public final class LocalPasswordAuthenticationProvider implements AuthenticationProvider {

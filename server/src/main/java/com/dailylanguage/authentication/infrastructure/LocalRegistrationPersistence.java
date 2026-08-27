@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dailylanguage.user.UserRepository;
+import com.dailylanguage.user.infrastructure.UserRepository;
 
 @Component
 public class LocalRegistrationPersistence {

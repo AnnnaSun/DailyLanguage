@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.infrastructure;
 
 import java.util.Objects;
 
@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.security.jackson.SecurityJacksonModules;
+
+import com.dailylanguage.security.domain.UserContext;
 
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;

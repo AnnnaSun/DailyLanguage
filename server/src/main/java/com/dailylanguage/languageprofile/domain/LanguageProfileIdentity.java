@@ -1,4 +1,4 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.domain;
 
 import java.util.UUID;
 

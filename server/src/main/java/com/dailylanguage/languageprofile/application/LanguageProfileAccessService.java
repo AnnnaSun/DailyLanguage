@@ -1,4 +1,4 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.application;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -6,7 +6,9 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.dailylanguage.security.UserContext;
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
+import com.dailylanguage.languageprofile.infrastructure.LanguageProfileRepository;
+import com.dailylanguage.security.domain.UserContext;
 
 @Service
 public class LanguageProfileAccessService {

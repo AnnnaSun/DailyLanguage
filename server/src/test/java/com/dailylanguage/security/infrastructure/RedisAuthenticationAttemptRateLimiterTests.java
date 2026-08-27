@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.infrastructure;
 
 import java.time.Duration;
 import java.util.List;

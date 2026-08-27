@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.infrastructure;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

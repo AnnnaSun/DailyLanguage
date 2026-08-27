@@ -1,4 +1,4 @@
-package com.dailylanguage.security;
+package com.dailylanguage.security.infrastructure;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
+import com.dailylanguage.security.domain.UserContext;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;

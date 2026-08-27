@@ -17,9 +17,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.dailylanguage.authentication.api.LocalRegistrationController;
 import com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason;
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
-import com.dailylanguage.security.AuthenticationHttpResponseWriter;
-import com.dailylanguage.security.RedisAuthenticationAttemptRateLimiter;
-import com.dailylanguage.security.SecurityConfiguration;
+import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
+import com.dailylanguage.security.infrastructure.SecurityConfiguration;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;

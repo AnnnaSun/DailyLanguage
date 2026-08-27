@@ -1,10 +1,12 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.infrastructure;
 
 import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
 
 @Mapper
 interface LanguageProfileMapper {

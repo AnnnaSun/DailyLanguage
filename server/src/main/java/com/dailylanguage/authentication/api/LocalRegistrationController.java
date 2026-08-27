@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dailylanguage.authentication.application.LocalRegistrationException;
 import com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason;
 import com.dailylanguage.authentication.application.LocalRegistrationService;
-import com.dailylanguage.security.RedisAuthenticationAttemptRateLimiter;
+import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
 
 @RestController
 @RequestMapping("/api/auth/registration")

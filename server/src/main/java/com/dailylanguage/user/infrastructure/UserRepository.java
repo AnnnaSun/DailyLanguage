@@ -1,4 +1,4 @@
-package com.dailylanguage.user;
+package com.dailylanguage.user.infrastructure;
 
 import java.util.UUID;
 

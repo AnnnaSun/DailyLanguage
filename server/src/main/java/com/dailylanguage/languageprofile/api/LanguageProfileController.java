@@ -1,4 +1,4 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.api;
 
 import java.util.UUID;
 
@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.dailylanguage.security.UserContext;
+import com.dailylanguage.languageprofile.application.LanguageProfileAccessService;
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
+import com.dailylanguage.security.domain.UserContext;
 
 @RestController
 @RequestMapping("/api/language-profiles")

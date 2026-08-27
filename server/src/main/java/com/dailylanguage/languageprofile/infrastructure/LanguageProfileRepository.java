@@ -1,4 +1,4 @@
-package com.dailylanguage.languageprofile;
+package com.dailylanguage.languageprofile.infrastructure;
 
 import java.util.IllformedLocaleException;
 import java.util.Locale;
@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Repository;
+
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
 
 @Repository
 public class LanguageProfileRepository {

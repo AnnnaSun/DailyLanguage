@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dailylanguage.user.UserRepository;
+import com.dailylanguage.user.infrastructure.UserRepository;
 
 @SpringBootTest
 @Transactional
