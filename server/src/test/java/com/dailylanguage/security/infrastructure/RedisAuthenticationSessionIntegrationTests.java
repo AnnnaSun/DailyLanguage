@@ -114,6 +114,7 @@ class RedisAuthenticationSessionIntegrationTests {
         assertThat(sessionRepository.findById(sessionId)).isNull();
         createdSessionIds.remove(sessionId);
         assertThat(logoutResult.getResponse().getHeaders("Set-Cookie"))
+                .filteredOn(setCookie -> setCookie.startsWith("SESSION="))
                 .singleElement()
                 .satisfies(setCookie -> assertThat(setCookie)
                         .contains("SESSION=")

@@ -19,6 +19,7 @@ import com.dailylanguage.authentication.application.LocalRegistrationException.F
 import com.dailylanguage.authentication.application.RegistrationCapability.State;
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
 import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.infrastructure.PersistentSingleUser;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
 import com.dailylanguage.security.infrastructure.SecurityConfiguration;
 
@@ -60,10 +61,14 @@ class LocalRegistrationHttpContractTests {
     @MockitoBean
     private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
 
+    @MockitoBean
+    private PersistentSingleUser persistentSingleUser;
+
     @BeforeEach
     void allowRegistrationAttempt() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
         when(registrationCapability.state()).thenReturn(State.PUBLIC);
+        when(persistentSingleUser.userContext()).thenReturn(java.util.Optional.empty());
         when(authenticationAttemptRateLimiter.recordRegistrationAttempt(any(), nullable(String.class)))
                 .thenReturn(new RedisAuthenticationAttemptRateLimiter.AttemptDecision(true, 0));
     }

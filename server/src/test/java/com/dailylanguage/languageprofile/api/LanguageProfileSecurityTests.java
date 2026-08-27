@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -26,6 +27,7 @@ import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
 import com.dailylanguage.languageprofile.infrastructure.LanguageProfileRepository;
 import com.dailylanguage.security.domain.UserContext;
 import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.infrastructure.PersistentSingleUser;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
 import com.dailylanguage.security.infrastructure.SecurityConfiguration;
 
@@ -45,6 +47,14 @@ class LanguageProfileSecurityTests {
 
     @MockitoBean
     private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
+
+    @MockitoBean
+    private PersistentSingleUser persistentSingleUser;
+
+    @BeforeEach
+    void useRegisteredUserAuthenticationMode() {
+        when(persistentSingleUser.userContext()).thenReturn(Optional.empty());
+    }
 
     @Test
     void rejectsUnauthenticatedAccess() throws Exception {
@@ -100,6 +110,23 @@ class LanguageProfileSecurityTests {
 
         verify(languageProfileRepository).findByIdAndUserId(profileId, authenticatedUserId);
         verify(languageProfileRepository, never()).findByIdAndUserId(profileId, ownerId);
+    }
+
+    @Test
+    void singleUserModeUsesThePersistentUserContextForDomainAuthorization() throws Exception {
+        UUID singleUserId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        when(persistentSingleUser.userContext())
+                .thenReturn(Optional.of(new UserContext(singleUserId)));
+        when(languageProfileRepository.findByIdAndUserId(profileId, singleUserId))
+                .thenReturn(Optional.of(new LanguageProfileIdentity(profileId, singleUserId, "en")));
+
+        mockMvc.perform(get("/api/language-profiles/{id}", profileId)
+                        .param("userId", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(singleUserId.toString()));
+
+        verify(languageProfileRepository).findByIdAndUserId(profileId, singleUserId);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor authenticatedAs(UUID userId) {

@@ -20,6 +20,7 @@ public class SecurityConfiguration {
             HttpSecurity http,
             AuthenticationHttpResponseWriter authenticationHttpResponseWriter,
             RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter,
+            PersistentSingleUser persistentSingleUser,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookie) throws Exception {
         return http
                 .csrf(csrf -> csrf
@@ -64,12 +65,15 @@ public class SecurityConfiguration {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
                                 authenticationHttpResponseWriter.writeUnauthenticated(response)))
-                // Invalid CSRF requests stop first; accepted requests are rate-limited before database and Argon2 work.
+                .addFilterAfter(
+                        new SingleUserAuthenticationFilter(persistentSingleUser),
+                        CsrfFilter.class)
+                // Invalid CSRF requests stop first; single-user mode stops login before Redis and Argon2 work.
                 .addFilterAfter(
                         new LoginRateLimitFilter(
                                 authenticationAttemptRateLimiter,
                                 authenticationHttpResponseWriter),
-                        CsrfFilter.class)
+                        SingleUserAuthenticationFilter.class)
                 .build();
     }
 

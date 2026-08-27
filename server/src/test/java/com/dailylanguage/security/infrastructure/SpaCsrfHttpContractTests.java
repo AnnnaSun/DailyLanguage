@@ -1,6 +1,7 @@
 package com.dailylanguage.security.infrastructure;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.servlet.http.Cookie;
@@ -47,9 +48,13 @@ class SpaCsrfHttpContractTests {
     @MockitoBean
     private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
 
+    @MockitoBean
+    private PersistentSingleUser persistentSingleUser;
+
     @BeforeEach
     void supportsUsernamePasswordLogin() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
+        when(persistentSingleUser.userContext()).thenReturn(Optional.empty());
         when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
                 .thenReturn(RedisAuthenticationAttemptRateLimiter.AttemptDecision.allow());
     }

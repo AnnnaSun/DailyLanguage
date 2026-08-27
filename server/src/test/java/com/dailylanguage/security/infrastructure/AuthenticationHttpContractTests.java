@@ -1,6 +1,7 @@
 package com.dailylanguage.security.infrastructure;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ import static org.springframework.security.web.context.HttpSessionSecurityContex
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,11 +57,68 @@ class AuthenticationHttpContractTests {
     @MockitoBean
     private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
 
+    @MockitoBean
+    private PersistentSingleUser persistentSingleUser;
+
     @BeforeEach
     void supportsUsernamePasswordLogin() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
+        when(persistentSingleUser.userContext()).thenReturn(Optional.empty());
         when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
                 .thenReturn(RedisAuthenticationAttemptRateLimiter.AttemptDecision.allow());
+    }
+
+    @Test
+    void singleUserModeAuthenticatesCurrentUserWithoutSession() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(persistentSingleUser.userContext()).thenReturn(Optional.of(new UserContext(userId)));
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(cookie().doesNotExist("SESSION"));
+    }
+
+    @Test
+    void singleUserModeOverridesAnExistingSessionIdentity() throws Exception {
+        UUID singleUserId = UUID.randomUUID();
+        when(persistentSingleUser.userContext())
+                .thenReturn(Optional.of(new UserContext(singleUserId)));
+
+        mockMvc.perform(get("/api/auth/me").session(sessionFor(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(singleUserId.toString()));
+    }
+
+    @Test
+    void singleUserModeStopsLoginBeforeRateLimitAndPasswordAuthentication() throws Exception {
+        when(persistentSingleUser.userContext())
+                .thenReturn(Optional.of(new UserContext(UUID.randomUUID())));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", SUBMITTED_EMAIL)
+                        .param("password", SUBMITTED_PASSWORD))
+                .andExpect(status().isNotFound());
+
+        verify(authenticationAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
+        verify(authenticationProvider, never()).authenticate(any());
+    }
+
+    @Test
+    void singleUserLoginStillRequiresCsrfBeforeItIsHidden() throws Exception {
+        when(persistentSingleUser.userContext())
+                .thenReturn(Optional.of(new UserContext(UUID.randomUUID())));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", SUBMITTED_EMAIL)
+                        .param("password", SUBMITTED_PASSWORD))
+                .andExpect(status().isForbidden());
+
+        verify(authenticationAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
+        verify(authenticationProvider, never()).authenticate(any());
     }
 
     @Test
