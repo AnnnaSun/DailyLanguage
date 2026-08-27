@@ -17,7 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.dailylanguage.authentication.LocalPasswordAuthenticationProvider;
+import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;

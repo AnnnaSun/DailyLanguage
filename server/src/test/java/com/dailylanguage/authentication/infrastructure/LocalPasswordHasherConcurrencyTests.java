@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.infrastructure;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;

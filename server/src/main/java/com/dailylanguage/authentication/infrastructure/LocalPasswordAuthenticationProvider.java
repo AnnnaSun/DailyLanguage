@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.infrastructure;
 
 import java.util.List;
 import java.util.Objects;

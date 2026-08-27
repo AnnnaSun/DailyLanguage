@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.infrastructure;
 
 import java.util.Objects;
 import java.util.UUID;

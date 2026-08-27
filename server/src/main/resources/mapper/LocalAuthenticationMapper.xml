@@ -2,10 +2,10 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dailylanguage.authentication.LocalAuthenticationMapper">
+<mapper namespace="com.dailylanguage.authentication.infrastructure.LocalAuthenticationMapper">
 
     <resultMap id="storedLocalPasswordCredentialResult"
-               type="com.dailylanguage.authentication.StoredLocalPasswordCredential">
+               type="com.dailylanguage.authentication.infrastructure.StoredLocalPasswordCredential">
         <constructor>
             <idArg column="auth_identity_id"
                    javaType="java.util.UUID"

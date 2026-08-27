@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.infrastructure;
 
 public final class PasswordHashCapacityExceededException extends RuntimeException {
 
