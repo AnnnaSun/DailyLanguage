@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.dailylanguage.security.SecurityConfiguration;
 import com.dailylanguage.security.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.RedisLoginAttemptRateLimiter;
 import com.dailylanguage.security.UserContext;
 
 @WebMvcTest(LanguageProfileController.class)
@@ -38,6 +39,9 @@ class LanguageProfileSecurityTests {
 
     @MockitoBean
     private LanguageProfileRepository languageProfileRepository;
+
+    @MockitoBean
+    private RedisLoginAttemptRateLimiter loginAttemptRateLimiter;
 
     @Test
     void rejectsUnauthenticatedAccess() throws Exception {

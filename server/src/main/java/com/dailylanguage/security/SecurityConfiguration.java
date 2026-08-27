@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
@@ -18,6 +19,7 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             AuthenticationHttpResponseWriter authenticationHttpResponseWriter,
+            RedisLoginAttemptRateLimiter loginAttemptRateLimiter,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookie) throws Exception {
         return http
                 .csrf(csrf -> csrf
@@ -61,6 +63,10 @@ public class SecurityConfiguration {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
                                 authenticationHttpResponseWriter.writeUnauthenticated(response)))
+                // Invalid CSRF requests stop first; accepted requests are rate-limited before database and Argon2 work.
+                .addFilterAfter(
+                        new LoginRateLimitFilter(loginAttemptRateLimiter, authenticationHttpResponseWriter),
+                        CsrfFilter.class)
                 .build();
     }
 

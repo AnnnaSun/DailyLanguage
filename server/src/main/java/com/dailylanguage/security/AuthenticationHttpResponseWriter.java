@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ public final class AuthenticationHttpResponseWriter {
     private static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
     private static final String UNAUTHENTICATED = "UNAUTHENTICATED";
     private static final String AUTHENTICATION_UNAVAILABLE = "AUTHENTICATION_UNAVAILABLE";
+    private static final String TOO_MANY_LOGIN_ATTEMPTS = "TOO_MANY_LOGIN_ATTEMPTS";
 
     private final JsonMapper jsonMapper;
 
@@ -34,6 +36,11 @@ public final class AuthenticationHttpResponseWriter {
 
     void writeAuthenticationUnavailable(HttpServletResponse response) throws IOException {
         writeError(response, HttpStatus.SERVICE_UNAVAILABLE, AUTHENTICATION_UNAVAILABLE);
+    }
+
+    void writeTooManyLoginAttempts(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
+        writeError(response, HttpStatus.TOO_MANY_REQUESTS, TOO_MANY_LOGIN_ATTEMPTS);
     }
 
     private void writeError(HttpServletResponse response, HttpStatus status, String code) throws IOException {

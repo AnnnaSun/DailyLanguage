@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -24,6 +25,8 @@ import com.dailylanguage.authentication.LocalPasswordAuthenticationProvider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
@@ -47,9 +50,14 @@ class AuthenticationHttpContractTests {
     @MockitoBean
     private LocalPasswordAuthenticationProvider authenticationProvider;
 
+    @MockitoBean
+    private RedisLoginAttemptRateLimiter loginAttemptRateLimiter;
+
     @BeforeEach
     void supportsUsernamePasswordLogin() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
+        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenReturn(RedisLoginAttemptRateLimiter.LoginAttemptDecision.allow());
     }
 
     @Test
@@ -117,6 +125,43 @@ class AuthenticationHttpContractTests {
     }
 
     @Test
+    void rateLimitedLoginReturnsRetryAfterWithoutAuthenticating() throws Exception {
+        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenReturn(RedisLoginAttemptRateLimiter.LoginAttemptDecision.rejectFor(47));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", SUBMITTED_EMAIL)
+                        .param("password", SUBMITTED_PASSWORD))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "47"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_LOGIN_ATTEMPTS"));
+
+        verify(authenticationProvider, never()).authenticate(any());
+    }
+
+    @Test
+    void loginRateLimitStorageFailureStopsAuthenticationAndReturnsUnavailable() throws Exception {
+        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenThrow(new RedisConnectionFailureException("redis connection detail"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", SUBMITTED_EMAIL)
+                        .param("password", SUBMITTED_PASSWORD))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_UNAVAILABLE"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("redis connection detail"))));
+
+        verify(authenticationProvider, never()).authenticate(any());
+    }
+
+    @Test
     void unauthenticatedCurrentUserReturnsFixedResponse() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized())
@@ -132,6 +177,7 @@ class AuthenticationHttpContractTests {
                         .param("password", SUBMITTED_PASSWORD))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(authenticationProvider);
+        verify(loginAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
 
         MockHttpSession authenticatedSession = sessionFor(UUID.randomUUID());
         mockMvc.perform(post("/api/auth/logout")
