@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.dailylanguage.authentication.LocalRegistrationException.FailureReason;
+import com.dailylanguage.authentication.application.LocalRegistrationException;
+import com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason;
+import com.dailylanguage.authentication.application.LocalRegistrationService;
 import com.dailylanguage.security.RedisAuthenticationAttemptRateLimiter;
 
 @RestController

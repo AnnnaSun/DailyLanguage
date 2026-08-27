@@ -14,7 +14,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
+import com.dailylanguage.authentication.application.LocalRegistrationException;
+import com.dailylanguage.authentication.application.LocalRegistrationService;
+
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest

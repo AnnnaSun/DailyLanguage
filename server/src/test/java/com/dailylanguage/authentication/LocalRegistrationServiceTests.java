@@ -13,16 +13,19 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 
+import com.dailylanguage.authentication.application.LocalRegistrationException;
+import com.dailylanguage.authentication.application.LocalRegistrationService;
+
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.ACCEPTED;
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
 import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_EMAIL;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_EMAIL;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.inOrder;

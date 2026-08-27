@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.application;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -8,12 +8,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_EMAIL;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
-import static com.dailylanguage.authentication.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
+import com.dailylanguage.authentication.LocalEmailNormalizer;
+import com.dailylanguage.authentication.LocalPasswordHasher;
+import com.dailylanguage.authentication.LocalPasswordPolicy;
+import com.dailylanguage.authentication.LocalRegistrationPersistence;
+import com.dailylanguage.authentication.PasswordHashCapacityExceededException;
+
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_EMAIL;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_PASSWORD_CHARACTER;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_PASSWORD_LENGTH;
+import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.REGISTRATION_FAILED;
 
 @Service
 public final class LocalRegistrationService {
