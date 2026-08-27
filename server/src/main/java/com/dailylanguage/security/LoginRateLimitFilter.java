@@ -17,15 +17,15 @@ final class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginRateLimitFilter.class);
 
-    private final RedisLoginAttemptRateLimiter loginAttemptRateLimiter;
+    private final RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
     private final AuthenticationHttpResponseWriter authenticationHttpResponseWriter;
 
     LoginRateLimitFilter(
-            RedisLoginAttemptRateLimiter loginAttemptRateLimiter,
+            RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter,
             AuthenticationHttpResponseWriter authenticationHttpResponseWriter) {
-        this.loginAttemptRateLimiter = Objects.requireNonNull(
-                loginAttemptRateLimiter,
-                "loginAttemptRateLimiter must not be null");
+        this.authenticationAttemptRateLimiter = Objects.requireNonNull(
+                authenticationAttemptRateLimiter,
+                "authenticationAttemptRateLimiter must not be null");
         this.authenticationHttpResponseWriter = Objects.requireNonNull(
                 authenticationHttpResponseWriter,
                 "authenticationHttpResponseWriter must not be null");
@@ -36,9 +36,9 @@ final class LoginRateLimitFilter extends OncePerRequestFilter {
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        RedisLoginAttemptRateLimiter.LoginAttemptDecision decision;
+        RedisAuthenticationAttemptRateLimiter.AttemptDecision decision;
         try {
-            decision = loginAttemptRateLimiter.recordLoginAttempt(
+            decision = authenticationAttemptRateLimiter.recordLoginAttempt(
                     request.getRemoteAddr(),
                     request.getParameter("email"));
         }
@@ -49,7 +49,6 @@ final class LoginRateLimitFilter extends OncePerRequestFilter {
             authenticationHttpResponseWriter.writeAuthenticationUnavailable(response);
             return;
         }
-//限流报错，直接 return 不 filter
         if (!decision.allowed()) {
             authenticationHttpResponseWriter.writeTooManyLoginAttempts(
                     response,

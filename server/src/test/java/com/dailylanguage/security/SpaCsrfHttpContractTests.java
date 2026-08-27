@@ -43,13 +43,13 @@ class SpaCsrfHttpContractTests {
     private LocalPasswordAuthenticationProvider authenticationProvider;
 
     @MockitoBean
-    private RedisLoginAttemptRateLimiter loginAttemptRateLimiter;
+    private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
 
     @BeforeEach
     void supportsUsernamePasswordLogin() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
-        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
-                .thenReturn(RedisLoginAttemptRateLimiter.LoginAttemptDecision.allow());
+        when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenReturn(RedisAuthenticationAttemptRateLimiter.AttemptDecision.allow());
     }
 
     @Test
@@ -86,7 +86,7 @@ class SpaCsrfHttpContractTests {
                 .andExpect(status().isForbidden());
 
         verify(authenticationProvider, never()).authenticate(any());
-        verify(loginAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
+        verify(authenticationAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
     }
 
     @Test

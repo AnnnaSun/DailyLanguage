@@ -19,7 +19,7 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             AuthenticationHttpResponseWriter authenticationHttpResponseWriter,
-            RedisLoginAttemptRateLimiter loginAttemptRateLimiter,
+            RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookie) throws Exception {
         return http
                 .csrf(csrf -> csrf
@@ -29,7 +29,8 @@ public class SecurityConfiguration {
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/health/**",
-                                "/api/auth/login")
+                                "/api/auth/login",
+                                "/api/auth/registration")
                         .permitAll()
                         .anyRequest().authenticated())
                 .formLogin(formLogin -> formLogin
@@ -65,7 +66,9 @@ public class SecurityConfiguration {
                                 authenticationHttpResponseWriter.writeUnauthenticated(response)))
                 // Invalid CSRF requests stop first; accepted requests are rate-limited before database and Argon2 work.
                 .addFilterAfter(
-                        new LoginRateLimitFilter(loginAttemptRateLimiter, authenticationHttpResponseWriter),
+                        new LoginRateLimitFilter(
+                                authenticationAttemptRateLimiter,
+                                authenticationHttpResponseWriter),
                         CsrfFilter.class)
                 .build();
     }

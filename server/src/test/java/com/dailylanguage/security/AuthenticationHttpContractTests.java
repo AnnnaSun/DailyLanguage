@@ -51,13 +51,13 @@ class AuthenticationHttpContractTests {
     private LocalPasswordAuthenticationProvider authenticationProvider;
 
     @MockitoBean
-    private RedisLoginAttemptRateLimiter loginAttemptRateLimiter;
+    private RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
 
     @BeforeEach
     void supportsUsernamePasswordLogin() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
-        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
-                .thenReturn(RedisLoginAttemptRateLimiter.LoginAttemptDecision.allow());
+        when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenReturn(RedisAuthenticationAttemptRateLimiter.AttemptDecision.allow());
     }
 
     @Test
@@ -126,8 +126,8 @@ class AuthenticationHttpContractTests {
 
     @Test
     void rateLimitedLoginReturnsRetryAfterWithoutAuthenticating() throws Exception {
-        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
-                .thenReturn(RedisLoginAttemptRateLimiter.LoginAttemptDecision.rejectFor(47));
+        when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
+                .thenReturn(RedisAuthenticationAttemptRateLimiter.AttemptDecision.rejectFor(47));
 
         mockMvc.perform(post("/api/auth/login")
                         .with(csrf())
@@ -144,7 +144,7 @@ class AuthenticationHttpContractTests {
 
     @Test
     void loginRateLimitStorageFailureStopsAuthenticationAndReturnsUnavailable() throws Exception {
-        when(loginAttemptRateLimiter.recordLoginAttempt(any(), any()))
+        when(authenticationAttemptRateLimiter.recordLoginAttempt(any(), any()))
                 .thenThrow(new RedisConnectionFailureException("redis connection detail"));
 
         mockMvc.perform(post("/api/auth/login")
@@ -177,7 +177,7 @@ class AuthenticationHttpContractTests {
                         .param("password", SUBMITTED_PASSWORD))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(authenticationProvider);
-        verify(loginAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
+        verify(authenticationAttemptRateLimiter, never()).recordLoginAttempt(any(), any());
 
         MockHttpSession authenticatedSession = sessionFor(UUID.randomUUID());
         mockMvc.perform(post("/api/auth/logout")

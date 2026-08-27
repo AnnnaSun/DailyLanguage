@@ -25,6 +25,11 @@ app:
       max-attempts-per-client-address: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_CLIENT_ADDRESS:20}
       max-attempts-per-email: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_EMAIL:5}
       key-prefix: daily-language:auth-login-rate-limit:v1
+    registration-rate-limit:
+      window: ${REGISTRATION_RATE_LIMIT_WINDOW:1h}
+      max-attempts-per-client-address: ${REGISTRATION_RATE_LIMIT_MAX_ATTEMPTS_PER_CLIENT_ADDRESS:5}
+      max-attempts-per-email: ${REGISTRATION_RATE_LIMIT_MAX_ATTEMPTS_PER_EMAIL:3}
+      key-prefix: daily-language:auth-registration-rate-limit:v1
 
 server:
   servlet:
