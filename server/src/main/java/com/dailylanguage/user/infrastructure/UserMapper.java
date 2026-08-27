@@ -8,4 +8,8 @@ import org.apache.ibatis.annotations.Mapper;
 interface UserMapper {
 
     UUID insertReturningId();
+
+    UUID lockSingleUserId();
+
+    int assignSingleUser(UUID userId);
 }
