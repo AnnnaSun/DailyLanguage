@@ -15,11 +15,12 @@ import org.springframework.dao.DuplicateKeyException;
 
 import com.dailylanguage.authentication.application.LocalRegistrationException;
 import com.dailylanguage.authentication.application.LocalRegistrationService;
+import com.dailylanguage.authentication.domain.LocalPasswordPolicy;
 
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.ACCEPTED;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.ACCEPTED;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.INVALID_EMAIL;

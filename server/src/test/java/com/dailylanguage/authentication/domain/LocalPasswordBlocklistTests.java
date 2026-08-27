@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.domain;
 
 import java.util.stream.IntStream;
 

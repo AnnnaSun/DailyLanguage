@@ -1,14 +1,14 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.domain;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.ACCEPTED;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
-import static com.dailylanguage.authentication.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.ACCEPTED;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.INVALID_CHARACTER;
+import static com.dailylanguage.authentication.domain.LocalPasswordPolicy.ValidationResult.INVALID_LENGTH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 

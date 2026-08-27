@@ -14,7 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-import com.dailylanguage.authentication.LocalEmailNormalizer;
+import com.dailylanguage.authentication.domain.LocalEmailNormalizer;
 
 @Component
 public final class RedisAuthenticationAttemptRateLimiter {

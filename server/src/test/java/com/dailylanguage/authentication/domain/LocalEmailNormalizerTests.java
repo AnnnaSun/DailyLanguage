@@ -1,4 +1,4 @@
-package com.dailylanguage.authentication;
+package com.dailylanguage.authentication.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

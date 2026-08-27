@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dailylanguage.authentication.domain.LocalEmailNormalizer;
+
 @Repository
 public class LocalAuthenticationRepository {
 

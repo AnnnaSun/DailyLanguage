@@ -8,11 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import com.dailylanguage.authentication.LocalEmailNormalizer;
 import com.dailylanguage.authentication.LocalPasswordHasher;
-import com.dailylanguage.authentication.LocalPasswordPolicy;
 import com.dailylanguage.authentication.LocalRegistrationPersistence;
 import com.dailylanguage.authentication.PasswordHashCapacityExceededException;
+import com.dailylanguage.authentication.domain.LocalEmailNormalizer;
+import com.dailylanguage.authentication.domain.LocalPasswordPolicy;
 
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.COMMON_OR_COMPROMISED_PASSWORD;
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
