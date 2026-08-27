@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dailylanguage.authentication.application.LocalRegistrationException;
 import com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason;
 import com.dailylanguage.authentication.application.LocalRegistrationService;
+import com.dailylanguage.authentication.application.RegistrationCapability;
+import com.dailylanguage.authentication.application.RegistrationCapability.State;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
 
 @RestController
@@ -25,19 +27,22 @@ public final class LocalRegistrationController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalRegistrationController.class);
 
+    private final RegistrationCapability registrationCapability;
     private final RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
     private final LocalRegistrationService localRegistrationService;
 
     public LocalRegistrationController(
+            RegistrationCapability registrationCapability,
             RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter,
             LocalRegistrationService localRegistrationService) {
+        this.registrationCapability = registrationCapability;
         this.authenticationAttemptRateLimiter = authenticationAttemptRateLimiter;
         this.localRegistrationService = localRegistrationService;
     }
 
     @GetMapping
     RegistrationStateResponse registrationState() {
-        return new RegistrationStateResponse("PUBLIC");
+        return new RegistrationStateResponse(registrationCapability.state());
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -45,6 +50,11 @@ public final class LocalRegistrationController {
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String password,
             HttpServletRequest request) {
+        if (registrationCapability.state() != State.PUBLIC) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new RegistrationErrorResponse("REGISTRATION_DISABLED"));
+        }
+
         RedisAuthenticationAttemptRateLimiter.AttemptDecision decision;
         try {
             decision = authenticationAttemptRateLimiter.recordRegistrationAttempt(
@@ -92,7 +102,7 @@ public final class LocalRegistrationController {
                 .body(new RegistrationErrorResponse("REGISTRATION_UNAVAILABLE"));
     }
 
-    record RegistrationStateResponse(String state) {
+    record RegistrationStateResponse(State state) {
     }
 
     record RegistrationErrorResponse(String code) {

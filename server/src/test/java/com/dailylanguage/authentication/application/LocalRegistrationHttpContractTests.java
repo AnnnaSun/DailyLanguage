@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.dailylanguage.authentication.api.LocalRegistrationController;
 import com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason;
+import com.dailylanguage.authentication.application.RegistrationCapability.State;
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
 import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
@@ -51,6 +52,9 @@ class LocalRegistrationHttpContractTests {
     private LocalRegistrationService registrationService;
 
     @MockitoBean
+    private RegistrationCapability registrationCapability;
+
+    @MockitoBean
     private LocalPasswordAuthenticationProvider authenticationProvider;
 
     @MockitoBean
@@ -59,6 +63,7 @@ class LocalRegistrationHttpContractTests {
     @BeforeEach
     void allowRegistrationAttempt() {
         when(authenticationProvider.supports(UsernamePasswordAuthenticationToken.class)).thenReturn(true);
+        when(registrationCapability.state()).thenReturn(State.PUBLIC);
         when(authenticationAttemptRateLimiter.recordRegistrationAttempt(any(), nullable(String.class)))
                 .thenReturn(new RedisAuthenticationAttemptRateLimiter.AttemptDecision(true, 0));
     }
@@ -69,6 +74,30 @@ class LocalRegistrationHttpContractTests {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.state").value("PUBLIC"));
+    }
+
+    @Test
+    void reportsSelfHostedRegistrationAsDisabled() throws Exception {
+        when(registrationCapability.state()).thenReturn(State.DISABLED);
+
+        mockMvc.perform(get("/api/auth/registration"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("DISABLED"));
+    }
+
+    @Test
+    void disabledRegistrationStopsBeforeRateLimitAndRegistration() throws Exception {
+        when(registrationCapability.state()).thenReturn(State.DISABLED);
+
+        mockMvc.perform(post("/api/auth/registration")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", SUBMITTED_EMAIL)
+                        .param("password", SUBMITTED_PASSWORD))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_DISABLED"));
+
+        verifyNoInteractions(authenticationAttemptRateLimiter, registrationService);
     }
 
     @Test
