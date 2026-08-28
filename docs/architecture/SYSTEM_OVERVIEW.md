@@ -112,7 +112,7 @@ AI Language Tutor 是一个：
     │  ├─ Model Gateway                       │
     │  ├─ Structured Output Validation        │
     │  ├─ RAG / Retrieval (M3)                │
-    │  ├─ Tool Gateway (when required)        │
+    │  ├─ Tool Gateway (M3)                   │
     │  └─ Voice Gateway (M5)                  │
     │                                         │
     │  Platform                               │
@@ -182,12 +182,15 @@ AI Language Tutor 是一个：
 - Structured Output；
 - Evidence Aggregation；
 - Model failure isolation；
+- Grounding / hallucination control；
+- Controlled Agent handoff / Tool Calling；
 - Context Engineering；
+- Token / quality / cost measurement；
 - Eval；
 - Observability。
 
-Tool Calling、RAG 或 Voice 只有在对应已批准 Phase 产生真实产品需求时进入实现，不能作为
-所有 Learning Flow 的默认前置条件。
+RAG 与 Tool Calling 已在 M3 Content / Reading flow 获得 Scope；Voice 在 M5 进入。它们不是所有
+Learning Flow 的默认前置条件，但必须在对应 Phase 形成可运行、可评测的 Engineering Evidence。
 
 ---
 
@@ -356,7 +359,7 @@ RAG：
 
 ### Tool Gateway
 
-V1 conditional capability：只有首个已批准的真实 model tool call 出现时才实现，不为 Planner / 
+V1 Scope：`P1 / M3`。首个正式 use case 是 Controlled Multi-role Agent Workflow，不为 Planner /
 Evaluator 预建空的 generic tool loop。
 
 负责受控 Tool Execution。
@@ -628,6 +631,25 @@ V1 重点处理：
 - PDF。
 
 更复杂的 EPUB / URL / Audio / Video 等进入后续增强范围。
+
+M3 在 READY_BASIC / READY_FULL Content 上运行受控 Multi-role Agent Workflow：
+
+    Content Retrieval Role
+          ↓
+    Grounded Source Chunks
+          ↓
+    Lesson Design Role
+          ↓
+    Structured Lesson Candidate
+          ↓
+    Quality Review Role
+          ↓
+    Accept / One Bounded Revision / Reject
+          ↓
+    Java Validation / Publish
+
+每个事实性或材料相关 claim 必须保留 source / chunk provenance。Java 控制 workflow state、
+permission、maximum turns / tool calls、timeout、idempotency、validation 与 publish authority。
 
 ---
 
@@ -955,6 +977,7 @@ Hosted / Self-hosted 共用核心业务代码。
 - Reading / imported content；
 - Content Library / Content Pipeline；
 - RAG / Retrieval；
+- Tool Gateway / Controlled Multi-role Agent Workflow；
 - Listening；
 - Language Fundamentals；
 - Language Tools；
@@ -963,10 +986,13 @@ Hosted / Self-hosted 共用核心业务代码。
 - Product-facing Trace；
 - Product-facing Eval。
 
-### Conditional Capability
+### Evidence-driven Capability
 
-- Tool Gateway / model tool loop：首个真实 tool-using flow 获得 Scope 后实现；
-- advanced Context ranking / compression：M3 Retrieval 数据与 Eval 证明需要后实现。
+- Context budget / selection / dedup：P0 按 Role 提供最小策略与 token trace；
+- advanced Context ranking / compression：M3 使用 Retrieval 数据，通过 quality / token / latency /
+  cost Eval 决定；
+- automatic Model routing：V1 保持 fixed capability mapping，M6 先完成 provider comparison 与 fallback
+  evidence，不预建复杂 router。
 
 ### Interface / Backlog
 
@@ -1164,6 +1190,12 @@ V1 明确优先真实闭环，避免提前实现终局复杂度。
 回答：
 
 > 为什么选择这个架构方案？
+
+### `docs/planning/ENGINEERING_EVIDENCE_PLAN.md`
+
+回答：
+
+> Agent / Java 面试能力必须通过哪些 Product Flow、Test、Eval、Trace 与 measurement 证明？
 
 ### `docs/ownership/OWNERSHIP_MATRIX.md`
 

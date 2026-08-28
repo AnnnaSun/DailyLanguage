@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.3
+> Version: 1.4
 > Approved: 2026-08-21
-> Last updated: 2026-08-29 — ADR-0003 bounded AI dependency clarification
+> Last updated: 2026-08-29 — Engineering Evidence Track and M3 Controlled Multi-role Agent Workflow
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -83,7 +83,9 @@ V1 不要求证明长期流利度或完整等级提升，但至少需要形成�
 
 ### 3.3 Project Goal Priority
 
-项目采用 Product-first、Engineering Evidence secondary 的双轨目标。
+项目采用 Product Value 与 Engineering Evidence 相互约束的双轨目标。Product semantics 不得为了展示
+技术而被破坏；已批准的 Engineering Evidence Track 同样属于 V1 Required Deliverable，不得仅因它超出
+最小 Happy Path 而自动移出 Scope。
 
 **Primary Product Goal**
 
@@ -91,7 +93,7 @@ V1 不要求证明长期流利度或完整等级提升，但至少需要形成�
 
 个人 dogfooding 可以证明产品服务了至少一个真实用户，并为 Learner Model、Planner、Evaluator 与 Practice 设计提供持续反馈；但 `N=1` 的个人改善不能被表述为产品已经具备普遍学习有效性。面向更广泛用户的结论仍需独立 Product Validation。
 
-**Secondary Engineering Goal**
+**Required Engineering Goal**
 
 通过同一真实产品闭环，形成可验证的 Engineering Evidence，展示 Persistent Learner Model、controlled Agent Runtime、Structured Output、Model Gateway、Evaluation、Observability、hallucination risk control、strategy reliability 与 AI Reliability 等工程能力。
 
@@ -102,12 +104,28 @@ Engineering Evidence 应优先来自真实 Product Problem、failure path、Test
 当 Product Value 与 Engineering Showcase 发生 Scope 冲突时：
 
 1. 优先选择能够验证用户学习价值的最小实现；
-2. 纯展示性技术不自动进入 V1 Product Scope；
+2. 纯展示性技术不自动进入 V1 Product Scope；已批准并绑定真实 Product Flow 的 Engineering
+   Evidence capability 按正式 Phase 交付；
 3. 与当前 Product Loop 无直接关系、但值得保留的 Engineering Experiment 进入 Backlog，等待独立 Scope Decision；
-4. 不得仅为了展示 Agent、RAG、Tool Calling、Voice、Model Routing 或其他技术而制造不必要的 abstraction、workflow 或 product capability；
+4. 不得仅为了展示数量而制造无职责 Agent、无边界 Tool Loop 或无验证 abstraction；
 5. 面试展示以核心调用链的可运行性、可靠性、失败隔离、验证证据和 Human Ownership 为主要标准。
 
-### 3.4 Minimum Learning Loop
+### 3.4 Required Engineering Evidence Track
+
+V1 必须对以下能力形成 `Design → Implementation → Failure Test → Eval / Trace → Demo` 证据：
+
+- grounded / hallucination-controlled AI output；
+- Persistent Learning Memory、versioned aggregation 与 deterministic replay；
+- role-specific Context、token budget 与 quality / token / latency / cost comparison；
+- M3 Controlled Multi-role Agent Workflow；
+- RAG provenance、Tool permission 与 prompt-injection defense；
+- Provider contract、fallback 与跨模型行为比较；
+- AI/Java transaction、idempotency、concurrency、recovery、observability 与 capacity evidence；
+- automated regression / Eval gate 与可重复 interview demo。
+
+详细验收见 `docs/planning/ENGINEERING_EVIDENCE_PLAN.md`。
+
+### 3.5 Minimum Learning Loop
 
 V1 必须形成一个可验证的最小学习闭环：
 
@@ -217,6 +235,7 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - lightweight Practice Feedback；
 - Reading / imported content 的最小训练路径；
 - 基础 Content retrieval / RAG，且 Retrieval Result 只作为 Context；
+- Tool Gateway 与 Controlled Multi-role Agent Workflow，用于 grounded material preparation / review；
 - Milestone Check；
 - Listening 与 turn-based Voice 的受控最小能力；
 - 必要的 PWA / offline UX，但不包含完整跨设备同步。
@@ -242,10 +261,10 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 | M0 | Engineering Foundation & Language Workspace | 建立可运行工程、状态 authority、语言隔离与 Model/BYOK 边界 |
 | M1 | Minimum Text Practice Loop | 跑通一次 text practice 与 session-level evaluation |
 | M2 | Persistent Adaptation Loop | Evidence 进入长期状态并影响下一次 Planner 决策 |
-| M3 | Reading / Content / RAG | 内容驱动练习和受控 retrieval 进入统一 Evidence 链路 |
+| M3 | Content / RAG / Multi-role Agent Workflow | grounded retrieval、Tool Gateway 和受控 Multi-role Agent Workflow 进入统一 Evidence 链路 |
 | M4 | Learning Completeness | 补齐 Milestone Check、Review 与 V1 学习完整性 |
 | M5 | Listening / Turn-based Voice | 增加非实时的听说训练闭环 |
-| M6 | V1 Hardening & Delivery | 完成 security、reliability、eval 与部署验收 |
+| M6 | V1 Hardening & Evidence Delivery | 完成 security、reliability、Eval、capacity、CI、部署与 interview evidence 验收 |
 
 具体 Gate、Done Criteria 与当前 Phase slices 见 `docs/planning/V1_PHASE_PLAN.md`。
 

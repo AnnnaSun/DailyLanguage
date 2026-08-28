@@ -1191,6 +1191,42 @@ RAG Failure：
 
 ---
 
+## 18.3 M3 Controlled Multi-role Agent Content Preparation
+
+M3 Content preparation 数据流：
+
+    Imported / Curated Content
+        ↓
+    Retrieval Query + UserContext + languageProfileId
+        ↓
+    Permission-filtered Source Chunks
+        + provenance / retrieval metadata
+        ↓
+    Lesson Design Candidate
+        + referenced source IDs / spans
+        ↓
+    Quality Review Result
+        ↓
+    ACCEPT / REVISE_ONCE / REJECT
+        ↓
+    Java Validation + Idempotent Publish
+        ↓
+    Learning Material
+
+Java 保存独立 workflow / job state、attempt、model / prompt / context version、selected source IDs、
+tool calls、terminal status 与 sanitized Trace metadata。
+
+禁止：
+
+    Model-generated unsupported claim
+        ↓
+    published material
+
+也禁止 Agent 因内容生成结果直接修改 Learning Memory。后续用户 Practice 才能通过统一
+Evaluation / Evidence 流进入长期状态。
+
+---
+
 # 19. Context Assembly Flow / 上下文组装流
 
 Context Manager 数据来源：
@@ -1627,6 +1663,16 @@ Eval Result：
 - User Level；
 - Weakness；
 - Vocabulary Mastery。
+
+Required V1 metrics 按 capability 选择：
+
+- groundedness / unsupported claim rate；
+- issue false positive / false negative；
+- retrieval relevance / permission isolation；
+- task completion / constraint satisfaction；
+- token、latency 与 cost；
+- retry / fallback / recovery result；
+- deterministic replay equality。
 
 ---
 

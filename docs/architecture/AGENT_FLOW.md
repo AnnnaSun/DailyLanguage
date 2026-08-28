@@ -154,7 +154,8 @@ Tool 或多轮 Agent Loop。
         ↓
     Trace / Usage / Eval Hooks
 
-只有某个 Role 获得已批准的真实 tool requirement 后，才扩展为：
+只有某个 Role 获得已批准的真实 tool requirement 后，才扩展为。M3 Content / Reading Flow 已批准为
+首个正式 use case：
 
     Bounded Model Task
         ↓
@@ -961,6 +962,41 @@ Agent 不应随意扩大 Retrieval Scope。
 
 ---
 
+## 21.1 M3 Controlled Multi-role Agent Workflow
+
+M3 正式实现一条由 Java 控制的 Multi-role Agent handoff：
+
+    Content Retrieval Role
+        ↓
+    Source Chunks + Provenance
+        ↓
+    Lesson Design Role
+        ↓
+    Structured Lesson Candidate
+        ↓
+    Quality Review Role
+        ↓
+    Accept / One Bounded Revision / Reject
+        ↓
+    Java Validation / Publish
+
+这条 Flow 用于展示真实 Agent Engineering，而不是让 Agent 自治管理系统。Java 控制：
+
+- workflow state；
+- maximum model turns / tool calls；
+- `UserContext`、language / content permission；
+- timeout、retry、idempotency 与 terminal failure；
+- provenance / schema / semantic validation；
+- final publish authority。
+
+Quality Review 至少检查 groundedness、difficulty、language quality 与 unsafe / unsupported claim。
+Agent 输出必须引用 source / chunk ID；缺少合法 provenance 的 material candidate 不得发布。
+三个 Role 具有独立 contract、Context Budget、Tool Allowlist 与 Trace span，只通过 typed artifact
+handoff，不共享可变 Prompt State。每次 Role invocation 是 bounded Agent execution，但整体不是
+autonomous Multi-agent System。
+
+---
+
 # 22. Context Manager Flow / Context Manager
 
 Context Manager 负责：
@@ -1002,6 +1038,17 @@ Context Item 可以具有：
     Optional LLM Compression
 
 不得首先裁掉业务必需 Hard Constraint。
+
+每个 Role 需要定义：
+
+- input token budget；
+- reserved output budget；
+- truncation / summary order；
+- selected context IDs；
+- actual token、latency 与 cost metadata。
+
+M3 必须比较 Full Context baseline 与 budgeted strategy，不能只凭 token 减少声明优化成功；质量、
+groundedness 与任务完成率不得出现未经接受的 regression。
 
 ---
 
@@ -1529,7 +1576,10 @@ Eval 回答：
 - false positive；
 - confidence；
 - schema correctness；
-- historical bias。
+- historical bias；
+- source turn / span grounding；
+- unsupported claim rate；
+- false-positive long-term issue risk。
 
 ---
 
@@ -1888,11 +1938,12 @@ V1 应重点展示：
 - Prompt / Rubric / Context Version；
 - Basic Eval。
 
-V1 conditional / later-phase capability：
+V1 planned later-phase capability：
 
-- Tool Allowlist / Tool Gateway：首个真实 tool-using flow 获得批准后实现；
-- RAG：按 V1 Scope 在 M3 Content / Retrieval flow 实现；
-- advanced Context ranking / compression：由 M3 数据和 Eval 驱动。
+- Tool Allowlist / Tool Gateway：M3 Controlled Multi-role Agent Workflow；
+- RAG：M3 Content / Retrieval grounding；
+- bounded Agent handoff / review loop：M3；
+- advanced Context ranking / compression：由 M3 quality / token / latency / cost Eval 驱动。
 
 V1 暂不需要为了完整性引入：
 
@@ -1952,6 +2003,7 @@ Optimization / Self-improvement 当前保持受控：
 - Agent 真正需要哪些 Context？
 - 是否读取过多？
 - 是否保持 language isolation？
+- 是否定义 token budget、裁剪顺序与质量对照？
 
 ### Tools
 
@@ -1968,6 +2020,7 @@ Optimization / Self-improvement 当前保持受控：
 
 - 是否有明确 Contract？
 - Structured Output 是否验证？
+- semantic claim 是否引用可验证 source turn / chunk？
 
 ### State
 
@@ -1985,6 +2038,7 @@ Optimization / Self-improvement 当前保持受控：
 ### Eval
 
 - 这个 Agent 行为以后如何验证没有回归？
+- 是否同时检查 groundedness、quality、token、latency、cost 与适用的 failure path？
 
 ---
 

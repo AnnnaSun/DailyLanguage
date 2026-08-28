@@ -1,7 +1,7 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.1
+> Version: 1.2
 > Approved: 2026-08-20  
 > Last updated: 2026-08-29
 > Scope baseline: `docs/product/V1_SCOPE.md`
@@ -14,7 +14,7 @@ V1 按 M0–M6 顺序推进。每个 Phase 只在前一 Phase 的 exit criteria 
 M0 Foundation
   → M1 Minimum Practice
   → M2 Persistent Adaptation
-  → M3 Content / RAG
+  → M3 Content / RAG / Multi-role Agent Workflow
   → M4 Learning Completeness
   → M5 Listening / Voice
   → M6 Hardening / Delivery
@@ -32,6 +32,9 @@ Scope
 ```
 
 完成一个 slice 后停止，不自动开始下一个 slice。
+
+每个核心 AI / Java capability 还必须按 `ENGINEERING_EVIDENCE_PLAN.md` 形成适用的 failure test、
+Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径通过不等于 Evidence Gate 完成。
 
 ## 2. Phase Overview
 
@@ -63,9 +66,12 @@ Scope
 - 用户完成 text conversation / writing practice；
 - Practice 产生 trusted event 可确定的 deterministic assessment；
 - Model 可用时 Evaluator 生成经过 validation 的 semantic diagnosis；
+- semantic issue 可以定位到具体 Practice turn / span；缺少 grounding 的 claim 不得进入 Evidence；
 - Model failure 只隔离 model-derived result，Practice 与 deterministic assessment 被正确保存；
 - Planner 在 Model unavailable / invalid output 时仍能生成合法的 deterministic fallback task；
-- Evaluator 不直接改变 Weakness、Level 或 Mastery。
+- Evaluator 不直接改变 Weakness、Level 或 Mastery；
+- invalid structure、unsupported claim、Model failure 与 Provider contract 有自动化验证；
+- Planner / Evaluator Trace 记录 model、version、token、latency 与 result status，不记录 Secret。
 
 ### M2 — Persistent Adaptation Loop
 
@@ -80,22 +86,30 @@ Scope
 - Weakness / Skill State 由 Java 规则执行确定性 transition；
 - Aggregation、Weakness lifecycle 与 Profile projection 可以基于已有 Qualified Evidence
   在不调用模型的情况下重放并得到相同结果；
+- aggregation policy version、mutation lineage 与 replay result 可追踪；
+- duplicate evaluation、retry、concurrent aggregation 与 lost-update path 有自动化验证；
 - Planner 使用 compact Profile、active state、due review 与 recent practice；
 - Progress 是现有长期状态的 read-only projection；
 - 支持 core continuous assessment 与 lightweight Practice Feedback；
 - 不同 `languageProfileId` 的状态不可串用。
 
-### M3 — Reading / Content / RAG
+### M3 — Content / RAG / Multi-role Agent Workflow
 
 **Goal**
 
-加入内容驱动的练习与检索，同时维持 structured state authority。
+加入内容驱动的练习、grounded retrieval、Tool Gateway 与受控 Multi-role Agent Workflow，
+同时维持 structured state authority。
 
 **Done Criteria**
 
 - Reading / imported content 可以生成 LearningTask 与 Evidence；
 - Retrieval 具备 language isolation、provenance 与基础 relevance metadata；
 - RAG Result 只作为 Context，不直接成为长期状态事实；
+- `Content Retrieval Role → Lesson Design Role → Quality Review Role → bounded revision` 由 Java
+  workflow state、turn/tool limit、validation 与 publish authority 控制；
+- Tool Gateway 覆盖 schema、allowlist、permission、timeout、retry、idempotency 与 trace；
+- source / chunk grounding、prompt injection、cross-language retrieval 与 tool-loop termination 有验证；
+- Full Context baseline 与 budgeted Context strategy 完成 quality、token、latency、cost 对比；
 - Content Practice 进入统一 Evaluation / Memory 链路。
 
 ### M4 — Learning Completeness
@@ -125,20 +139,24 @@ Scope
 - Voice 不绕过 Tool / Model Gateway；
 - realtime full-duplex voice 不进入 V1。
 
-### M6 — V1 Hardening & Delivery
+### M6 — V1 Hardening & Evidence Delivery
 
 **Goal**
 
-完成 V1 的安全、可靠性、Eval、部署和 ownership 验收。
+完成 V1 的安全、可靠性、Eval、capacity、CI、部署、interview evidence 和 ownership 验收。
 
 **Done Criteria**
 
 - 关键路径具备 targeted regression eval；
 - secret leakage、language isolation 与 state mutation boundary 有自动化验证；
 - timeout、retry、idempotency 与 failure recovery 按实际 Tool 风险覆盖；
+- Provider / Model 的 quality、latency、token 与 cost 结果可比较；
+- 关键 AI / Java path 完成 failure injection、concurrency、load / capacity 与 recovery 验证；
+- CI 执行 build、migration、test 与 required Eval gate；
 - Hosted / Self-hosted 使用同一核心业务代码并可重复部署；
 - Architecture Docs 与真实实现一致；
-- 核心调用链完成人工 Ownership Check。
+- 核心调用链完成人工 Ownership Check；
+- 可重复 demo 展示 adaptation、grounding、fallback、trace、replay 与 language isolation。
 
 ## 3. Current Phase: M0 Implementation Slices
 

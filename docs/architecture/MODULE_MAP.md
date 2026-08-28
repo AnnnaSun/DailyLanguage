@@ -114,7 +114,7 @@ V1 Scope 与 Implementation Status 是两个不同维度。
 - Structured Output；
 - Prompt / Rubric Version；
 - RAG（M3）；
-- Tool Gateway（首个真实 tool-using flow 获批后）；
+- Tool Gateway / Controlled Multi-role Agent Workflow（M3）；
 - Voice Provider；
 - Agent execution support。
 
@@ -1117,6 +1117,21 @@ Key Design:
 
 `READY_BASIC` 后即可部分学习。
 
+M3 AI Preparation Flow:
+
+    Content Retrieval Role
+      ↓
+    Grounded Source Chunks
+      ↓
+    Lesson Design Role
+      ↓
+    Quality Review Role
+      ↓
+    Java Validate / Publish
+
+该 Flow 使用 RAG 与 Tool Gateway，并保留 provenance、bounded revision、permission、timeout、
+idempotency、Trace 与 Eval evidence。
+
 Must Not:
 
 - 等全部 Embedding 完成才允许使用已经成功解析的内容；
@@ -1246,7 +1261,7 @@ Source Module:
 
 V1:
 
-`CONDITIONAL — first approved tool-using flow`
+`P1 / M3 — Controlled Multi-role Agent Workflow`
 
 Responsibility:
 
@@ -1273,10 +1288,14 @@ Agent-specific Tool Allowlist:
 - Planner；
 - Conversation；
 - Evaluator；
+- Content Retrieval Role；
+- Lesson Design Role；
+- Quality Review Role。
 
 必须最小授权。
 
 Planner、Evaluator 默认使用 bounded model task，不为其预建空 Tool Gateway 或 Agent Loop。
+M3 Content roles 只获得各自完成 retrieval / material preparation / review 所需的最小 Tool。
 
 Core Mutation Rule:
 
@@ -1633,7 +1652,9 @@ Initial targets:
 
 - Evaluator；
 - RAG；
-- Planner。
+- Planner；
+- Controlled Multi-role Agent Workflow；
+- Context token / quality strategy。
 
 V1 target:
 
@@ -1644,6 +1665,16 @@ Eval types:
 - Rule-based；
 - Reference-based；
 - limited LLM Judge。
+
+Required evidence may include:
+
+- groundedness / unsupported claim rate；
+- source turn / chunk citation correctness；
+- deterministic replay equality；
+- provider contract / fallback；
+- token / latency / cost comparison；
+- tool permission / injection / termination；
+- concurrency / idempotency / recovery。
 
 Must preserve versions:
 

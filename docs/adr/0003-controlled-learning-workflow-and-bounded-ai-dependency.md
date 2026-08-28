@@ -2,7 +2,8 @@
 
 - Status: ACCEPTED
 - Date: 2026-08-29
-- Scope: M1–M2 minimum practice and persistent adaptation architecture
+- Amended: 2026-08-29 — approved Engineering Evidence Track and M3 Controlled Multi-role Agent Workflow
+- Scope: V1 controlled learning workflow and engineering evidence architecture
 
 ## Context
 
@@ -119,11 +120,24 @@ one model request
 → terminate
 ```
 
-只有出现真实 model tool requirement 时，才引入 Tool Gateway 与 bounded tool loop。所有 loop
-必须具备 maximum turns、maximum tool calls、timeout、terminal success 与 terminal failure。
+Tool Gateway 与 bounded tool loop 只授予具有真实 tool requirement 的 Role。M3 Content / RAG 已批准
+一条 Controlled Multi-role Agent Workflow，作为首个正式 tool-using flow。所有 loop 必须具备 maximum turns、
+maximum tool calls、timeout、terminal success 与 terminal failure。
 
 RAG 继续按 V1 Scope 在 M3 进入 Content / Retrieval flow，不是 M1 Planner / Evaluator 的
 默认前置条件。M1 优先使用 role-specific structured context assembly。
+
+### Engineering Evidence Track
+
+`Bounded AI` 不表示弱化 Agent Engineering。V1 必须通过真实 Product Flow 形成可运行证据：
+
+- M1：Grounded Evaluator、hallucination regression、Provider contract 与最小 AI Trace；
+- M2：versioned Learning Memory、deterministic replay、idempotency / concurrency 与 mutation lineage；
+- M3：RAG、Tool Gateway、Controlled Multi-role Agent Workflow、prompt-injection defense 与 Context
+  token / quality / cost experiment；
+- M6：cross-provider comparison、failure injection、load / capacity、CI Eval gate 与可重复 interview demo。
+
+具体 evidence contract 见 `docs/planning/ENGINEERING_EVIDENCE_PLAN.md`。
 
 ### Model Availability Invariant
 
@@ -164,5 +178,7 @@ abstraction，并遮蔽 Java transaction、language isolation 与 Evidence quali
 - 测试必须覆盖 Model unavailable / invalid output 下的 fallback 与 Evidence isolation；
 - `EvaluationResult` 需要区分 deterministic assessment 与 semantic candidate provenance；
 - Learning Memory 可以在没有模型调用的情况下基于已有 Qualified Evidence 确定性重放；
-- 第一版不以 Tool Gateway、RAG、workflow DSL 或 dynamic plugin 证明 Agent Engineering；
-- 面试展示重点转向 state authority、bounded AI、failure isolation、replay 与可验证 adaptation。
+- M1 不把 Tool Gateway、RAG、workflow DSL 或 dynamic plugin 作为 Planner / Evaluator 的默认依赖；
+- M3 必须在真实 Content / Reading use case 中实现 RAG、Tool Gateway 与受控 Multi-role Agent handoff；
+- 面试展示必须同时覆盖 state authority、grounding、memory、context/token、tool safety、Eval、Trace、
+  failure isolation、replay 与可验证 adaptation。
