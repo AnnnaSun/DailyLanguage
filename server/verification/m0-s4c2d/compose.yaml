@@ -1,0 +1,63 @@
+name: daily-language-m0-s4c2d
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg18-bookworm
+    environment:
+      POSTGRES_DB: daily_language_verification
+      POSTGRES_USER: daily_language_verification
+      POSTGRES_PASSWORD: daily_language_verification_local
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7.2.15-alpine3.21
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
+  backend:
+    image: ${VERIFY_JAVA_IMAGE:-eclipse-temurin:25-jre}
+    init: true
+    cpus: ${VERIFY_BACKEND_CPUS:-1.0}
+    mem_limit: ${VERIFY_BACKEND_MEMORY:-512m}
+    pids_limit: 256
+    ports:
+      - "127.0.0.1:${VERIFY_BACKEND_PORT:-18080}:8080"
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: daily_language_verification
+      DATABASE_USER: daily_language_verification
+      DATABASE_PASSWORD: daily_language_verification_local
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REGISTRATION_ENABLED: "true"
+      SESSION_COOKIE_SECURE: "false"
+      PASSWORD_HASH_MAX_CONCURRENT: "1"
+      JAVA_TOOL_OPTIONS: >-
+        -XX:+UseContainerSupport
+        -Xms128m
+        -Xmx256m
+        -Xlog:gc*:file=/evidence/gc.log:time,uptime,level,tags
+    volumes:
+      - ${VERIFY_JAR_PATH:?VERIFY_JAR_PATH must point to the packaged server jar}:/app/daily-language-server.jar:ro
+      - ${VERIFY_EVIDENCE_DIR:?VERIFY_EVIDENCE_DIR must point to the run evidence directory}:/evidence
+    command: ["java", "-jar", "/app/daily-language-server.jar"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
