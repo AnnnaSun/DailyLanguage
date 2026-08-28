@@ -133,7 +133,7 @@ LLM availability 可以影响：
 - dynamic Conversation；
 - plan richness、scenario 与 explanation quality。
 
-LLM availability不得决定：
+LLM availability 不得决定：
 
 - persistence integrity；
 - multi-language isolation；
@@ -166,4 +166,3 @@ abstraction，并遮蔽 Java transaction、language isolation 与 Evidence quali
 - Learning Memory 可以在没有模型调用的情况下基于已有 Qualified Evidence 确定性重放；
 - 第一版不以 Tool Gateway、RAG、workflow DSL 或 dynamic plugin 证明 Agent Engineering；
 - 面试展示重点转向 state authority、bounded AI、failure isolation、replay 与可验证 adaptation。
-

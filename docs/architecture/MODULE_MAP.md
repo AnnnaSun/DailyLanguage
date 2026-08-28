@@ -56,11 +56,12 @@ V1 Scope 与 Implementation Status 是两个不同维度。
     Client / UX
         │
         ▼
-    Learning Domain
+    Learning Application / Domain
         │
         ├───────────────┐
         ▼               ▼
-    AI Runtime       Content System
+    Bounded AI       Content System
+    Capabilities
         │               │
         └───────┬───────┘
                 ▼
@@ -104,20 +105,21 @@ V1 Scope 与 Implementation Status 是两个不同维度。
 
 ---
 
-## C. AI Runtime
+## C. Bounded AI Capabilities
 
 负责：
 
-- Context Manager；
-- RAG；
-- Tool Gateway；
+- role-specific Context Assembly；
 - Model Gateway；
 - Structured Output；
 - Prompt / Rubric Version；
+- RAG（M3）；
+- Tool Gateway（首个真实 tool-using flow 获批后）；
 - Voice Provider；
 - Agent execution support。
 
-AI Runtime 为 Learning Domain 提供受控 AI 能力。
+AI capability 为 Learning Application / Domain 提供受控语义能力，不拥有 Learning Workflow、
+Practice lifecycle、Evidence aggregation 或长期状态。Model unavailable 不得破坏确定性状态处理与恢复。
 
 ---
 
@@ -282,7 +284,10 @@ Responsibility:
 - 为什么；
 - 难度；
 - 时间；
-  -训练约束。
+- 训练约束。
+
+Planner 是 hybrid component：Java 先生成 / 过滤合法 candidate，并持有 fallback priority；可选
+LLM 只在合法集合内完成 soft ranking、scenario 与 reason enrichment。
 
 Inputs:
 
@@ -317,8 +322,8 @@ Depends On:
 - Review；
 - Learning Preferences；
 - Learner-state read tools；
-- Context Manager；
-- Model Gateway。
+- role-specific structured Context Assembly；
+- Model Gateway（optional enrichment）。
 
 Must Not:
 
@@ -417,8 +422,9 @@ Conceptual states:
     PAUSED
     COMPLETED
     ABANDONED
-    WAITING_EVALUATION
-    EVALUATED
+
+EvaluationRun 使用独立 `PENDING / RUNNING / SUCCEEDED / FAILED` lifecycle，Evaluator failure 不修改
+已经完成的 PracticeSession 事实。
 
 Consumers:
 
@@ -740,7 +746,7 @@ V1:
 
 Responsibility:
 
-对一个 `PracticeSession` 产生结构化诊断。
+对一个 `PracticeSession` 组合 deterministic assessment 与可选 semantic diagnosis。
 
 Inputs:
 
@@ -751,7 +757,7 @@ Inputs:
 
 Outputs:
 
-- task completion；
+- deterministic task completion / duration / attempts / assistance / exact result；
 - strengths；
 - issue candidates；
 - vocabulary result；
@@ -762,8 +768,9 @@ Outputs:
 
 Depends On:
 
-- Context Manager；
-- Model Gateway；
+- trusted Practice event；
+- role-specific Context Assembly；
+- Model Gateway（semantic evaluation only）；
 - Structured Output Validation；
 - Prompt / Rubric Version。
 
@@ -773,6 +780,9 @@ Must Not:
 - change Level；
 - directly mark long-term Mastery；
 - 默认读取全部长期 Memory。
+
+Model failure 只阻止 model-derived Evidence，不抹掉由 trusted Practice event 独立确定的
+deterministic assessment / Evidence。
 
 Architecture Importance:
 
@@ -1128,7 +1138,7 @@ Source Module:
 
 V1:
 
-`P0`
+`P1 / M3`
 
 V1 Strategy:
 
@@ -1180,11 +1190,11 @@ Source Module:
 
 V1:
 
-`P0`
+`P0 minimal structured assembly / P1-M3 retrieved-context expansion`
 
 Responsibility:
 
-为每次模型调用选择：
+为需要模型的 bounded role 选择：
 
 **necessary and sufficient context**
 
@@ -1236,7 +1246,7 @@ Source Module:
 
 V1:
 
-`P0`
+`CONDITIONAL — first approved tool-using flow`
 
 Responsibility:
 
@@ -1265,6 +1275,8 @@ Agent-specific Tool Allowlist:
 - Evaluator；
 
 必须最小授权。
+
+Planner、Evaluator 默认使用 bounded model task，不为其预建空 Tool Gateway 或 Agent Loop。
 
 Core Mutation Rule:
 
@@ -1919,11 +1931,11 @@ PWA Push P1 / Backlog。
 
     UI
      ↓
-    Application / Learning Domain
+    Learning Application Workflow
      ↓
     Domain Services
      ↓
-    Persistence / AI Runtime / Infrastructure
+    Persistence / Bounded AI Capabilities / Infrastructure
 
 核心学习闭环：
 
@@ -1943,11 +1955,11 @@ PWA Push P1 / Backlog。
       ↓
     Planner
 
-AI 调用：
+AI 调用（只在需要 semantic capability 时）：
 
     Learning Domain
         ↓
-    Context Manager
+    Role-specific Context Assembly
         ↓
     Model Gateway
         ↓

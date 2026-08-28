@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.1
 > Approved: 2026-08-20  
-> Last updated: 2026-08-22
+> Last updated: 2026-08-29
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy

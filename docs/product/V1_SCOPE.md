@@ -3,6 +3,7 @@
 > Status: APPROVED  
 > Version: 1.3
 > Approved: 2026-08-21
+> Last updated: 2026-08-29 — ADR-0003 bounded AI dependency clarification
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
