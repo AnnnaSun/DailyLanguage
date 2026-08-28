@@ -93,6 +93,11 @@ AI Language Tutor 是一个：
     ┌─────────────────────────────────────────┐
     │          Spring Boot Application        │
     │                                         │
+    │  Controlled Learning Workflow           │
+    │  ├─ Task / Practice / Evaluation Run    │
+    │  ├─ Transition / Recovery / Fallback    │
+    │  └─ Java State Mutation Authority       │
+    │                                         │
     │  Learning Domain                        │
     │  ├─ Language Profile                    │
     │  ├─ Planner                             │
@@ -102,13 +107,13 @@ AI Language Tutor 是一个：
     │  ├─ Weakness / Skill / Vocabulary       │
     │  └─ Review / Progress                   │
     │                                         │
-    │  Agent Runtime                          │
-    │  ├─ Context Manager                     │
-    │  ├─ RAG / Retrieval                     │
-    │  ├─ Tool Gateway                        │
+    │  Bounded AI Capabilities                │
+    │  ├─ Role-specific Context Assembly      │
     │  ├─ Model Gateway                       │
-    │  ├─ Voice Gateway                       │
-    │  └─ Structured Output Validation        │
+    │  ├─ Structured Output Validation        │
+    │  ├─ RAG / Retrieval (M3)                │
+    │  ├─ Tool Gateway (when required)        │
+    │  └─ Voice Gateway (M5)                  │
     │                                         │
     │  Platform                               │
     │  ├─ Content Pipeline                    │
@@ -173,14 +178,16 @@ AI Language Tutor 是一个：
 系统展示真实的：
 
 - Persistent State；
-- Agent Planning；
+- Deterministic Workflow + Bounded AI Decision；
 - Structured Output；
 - Evidence Aggregation；
-- Tool Calling；
-- RAG；
+- Model failure isolation；
 - Context Engineering；
 - Eval；
 - Observability。
+
+Tool Calling、RAG 或 Voice 只有在对应已批准 Phase 产生真实产品需求时进入实现，不能作为
+所有 Learning Flow 的默认前置条件。
 
 ---
 
@@ -283,11 +290,18 @@ V1 架构中的主要 Practice 包括：
 
 ---
 
-## 8. Agent Runtime / Agent 运行层
+## 8. Bounded AI Runtime / 受控 AI 运行层
 
 AI 能力不直接等于 Domain Authority。
 
-主要 Agent Runtime 组件：
+Learning Workflow 与长期状态由 Java Application / Domain 控制。AI Runtime 只为需要语义能力的
+bounded role 提供 Context、Model、validation 和适用的 Tool / Retrieval capability。
+
+Model unavailable 可以降低 plan richness、semantic evaluation 或 dynamic Conversation 能力，
+但不得破坏 persistence integrity、language isolation、deterministic Evidence processing、state
+replay 或 session recovery。
+
+主要 bounded AI Runtime 组件：
 
 ### Context Manager
 
@@ -317,6 +331,8 @@ AI 能力不直接等于 Domain Authority。
 
 ### RAG / Retrieval
 
+V1 Scope：`P1 / M3`。M1 Planner / Evaluator 不以 RAG 为前置条件。
+
 负责语义检索：
 
 - Personal Memory；
@@ -339,6 +355,9 @@ RAG：
 ---
 
 ### Tool Gateway
+
+V1 conditional capability：只有首个已批准的真实 model tool call 出现时才实现，不为 Planner / 
+Evaluator 预建空的 generic tool loop。
 
 负责受控 Tool Execution。
 
@@ -912,21 +931,18 @@ Hosted / Self-hosted 共用核心业务代码。
 ### P0 / Core
 
 - Language Profile；
-- Planner；
+- Java candidate / hard constraint + optional LLM enrichment 的 Planner；
 - Vocabulary；
-- Reading；
-- Conversation；
-- Evaluator；
+- Text Practice / Conversation minimum loop；
+- deterministic assessment + validated semantic candidate 的 Evaluator；
 - Learning Memory；
 - Weakness / Skill State；
 - Review；
 - Today / Learning Hub；
-- Content Library；
-- Content Pipeline；
-- RAG / Retrieval；
-- Tool Gateway；
-- Context Manager；
+- role-specific structured Context Assembly；
 - Model / Provider / BYOK；
+- Structured Output Validation；
+- minimal Trace / Observability；
 - Language Management；
 - Security / Privacy / Permission；
 - Deployment / Infrastructure。
@@ -936,6 +952,9 @@ Hosted / Self-hosted 共用核心业务代码。
 包括部分：
 
 - Initial Assessment；
+- Reading / imported content；
+- Content Library / Content Pipeline；
+- RAG / Retrieval；
 - Listening；
 - Language Fundamentals；
 - Language Tools；
@@ -943,6 +962,11 @@ Hosted / Self-hosted 共用核心业务代码。
 - Learning Vault；
 - Product-facing Trace；
 - Product-facing Eval。
+
+### Conditional Capability
+
+- Tool Gateway / model tool loop：首个真实 tool-using flow 获得 Scope 后实现；
+- advanced Context ranking / compression：M3 Retrieval 数据与 Eval 证明需要后实现。
 
 ### Interface / Backlog
 
@@ -953,18 +977,16 @@ Hosted / Self-hosted 共用核心业务代码。
 - advanced multimodal；
 - advanced infrastructure。
 
-### Still Pending in Current V1 Scope Document
+### Finalized Cross-module Scope
 
-当前 Scope 文档仍明确存在尚未最终裁剪的模块：
+当前 Scope 文档已完成以下模块裁剪：
 
-- Progress；
-- Continuous Assessment + Milestone；
-- Practice Feedback；
-- Notifications / Learning Recall。
+- Progress：P1 / M2 read-only projection；
+- Continuous Assessment：M2 core assessment + M4 Milestone；
+- Practice Feedback：P1 / M2 lightweight feedback；
+- Notifications / Learning Recall：V1 之后 Backlog。
 
-因此在 Final Scope Map 完成前：
-
-**不得假设这些模块已经确定进入或退出 V1。**
+具体 authority 以 `docs/product/V1_SCOPE.md` 为准。
 
 ---
 
@@ -1191,13 +1213,19 @@ AI Language Tutor 的系统核心可以压缩为：
       ↓
     Isolated Language Profile
       ↓
-    Planner
+    Java Eligible Task Candidates
+      ↓
+    Optional LLM Plan Enrichment
+      ↓
+    Java Plan Validation
       ↓
     Real Practice
       ↓
-    Evaluator
+    Deterministic Assessment
+      +
+    Optional Semantic Evaluation
       ↓
-    Evidence
+    Java-qualified Evidence
       ↓
     Java-controlled Learning Memory
       ↓
@@ -1207,9 +1235,9 @@ AI Language Tutor 的系统核心可以压缩为：
 
 其 AI Engineering Runtime：
 
-    Agent
+    Bounded AI Role
       ↓
-    Context Manager
+    Role-specific Context
       ├─ Structured State
       ├─ RAG
       └─ Recent Context
@@ -1218,7 +1246,7 @@ AI Language Tutor 的系统核心可以压缩为：
       ↓
     Provider
 
-并通过：
+并按实际需求通过：
 
     Tool Gateway
     +
@@ -1232,4 +1260,4 @@ AI Language Tutor 的系统核心可以压缩为：
 
 最终系统价值来自：
 
-**Persistent Learner Model + Real Language Practice + Controlled Agent Runtime。**
+**Persistent Learner Model + Real Language Practice + Deterministic Workflow + Bounded AI。**

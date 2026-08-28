@@ -1438,8 +1438,8 @@ Hosted:
 
 Self-hosted:
 
-- `SINGLE_USER`
-- optional multi-user extension。
+- `REGISTRATION_ENABLED=false` 时 bootstrap / reuse persistent singleton User；
+- `REGISTRATION_ENABLED=true` 时复用 Hosted registration / login path。
 
 Core Rule:
 
@@ -2102,7 +2102,7 @@ RAG Result 返回 Context。
 | Model Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Security | `server/src/main/java/com/dailylanguage/security`, `server/src/main/java/com/dailylanguage/authentication` | `SecurityConfiguration`, `LocalAuthenticationRepository`, `LocalPasswordHasher` | `UserContext`, ownership access boundary, local email normalization, encoded-verifier persistence and versioned Argon2id hashing | `LanguageProfileSecurityTests`, `LocalAuthenticationRepositoryTests`, `LocalAuthenticationPersistenceIntegrationTests`, `LocalPasswordHasherTests` | PARTIAL — no registration, login, password policy or Session yet |
+| Security | `server/src/main/java/com/dailylanguage/security`, `server/src/main/java/com/dailylanguage/authentication` | `SecurityConfiguration`, `LocalRegistrationController`, `LocalAuthenticationRepository`, `LocalPasswordHasher`, `RedisAuthenticationAttemptRateLimiter`, `PersistentSingleUser` | trusted `UserContext`, ownership access boundary, local registration/login/logout/me, password policy and Argon2id, Redis Session, SPA CSRF, authentication throttling, hash concurrency gate and singleton bootstrap | `AuthenticationHttpContractTests`, `LocalRegistrationLoginIntegrationTests`, `RedisAuthenticationSessionIntegrationTests`, `PasswordHashConcurrencyGateTests`, `RedisAuthenticationAttemptRateLimiterIntegrationTests`, `SingleUserPersistenceIntegrationTests` | COMPLETE — M0-S4 authentication / UserContext foundation; Hosted capacity remains provisional until M6 |
 | Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements, auth identity and credential schema | `PersistenceIdentityIntegrationTests`, `LocalAuthenticationPersistenceIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity and local credential foundation |
 | Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL |
 

@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-26
+> Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S4C2 / DESIGN_PENDING
-> Production implementation: M0-S4C1 COMPLETE
+> Current Gate: M0-S5 / DESIGN_PENDING
+> Production implementation: M0-S4 COMPLETE
 
 ## Approved Decisions
 
@@ -21,7 +21,7 @@
 - M0-S4 采用 `ADR-0002`：Hosted V1 使用 Spring Security、Argon2id local credential、Redis-backed server-side Session、CSRF 与 authenticated `UserContext`；不使用 browser-stored JWT。
 - `app_user` 保持稳定 internal identity，login channel 通过 `auth_identity` 分离；multi-channel authentication 与 Account Linking 记录为 `IDEA-006`，不进入当前 M0-S4 implementation。
 - Argon2id security parameters 以 `argon2id-v1` 在 code 中版本化；password-hash concurrency 是 hardware-dependent capacity parameter，DEV / TEST 与 Self-hosted safe default 为 1，Hosted 必须显式配置。
-- M0-S4C2 必须实现 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 到 M6 在目标硬件确认。
+- M0-S4C2 已完成 Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 与 provisional restricted-Container verification；Hosted capacity 仍留到 M6 在目标硬件确认。
 - M0-S4B2b password policy 使用 12–64 printable ASCII characters（`U+0020`–`U+007E`，包括普通半角空格）；不做 composition rule、trim、字符替换或 Unicode normalization。该决定是 V1 usability / compatibility trade-off，低于当前 NIST password-only 15-character minimum 的 residual risk 必须明确保留。
 - M0-S4B2b offline blocklist 使用 pinned SecLists 2026.1 Top 250,000 prefix，经 12–64 printable ASCII exact filter 后生成 2,065 个 sorted binary SHA-256 fingerprints（baseline 66,080 bytes）；只在 registration / password change / reset 的 Argon2id 前检查，不进入 login path。
 - M0-S4B2c registration failure 只在 `LocalRegistrationService` 进行 structured safe logging；expected rejection 不记 ERROR，unexpected failure 只记录 stage、exception type 与已有 correlation ID，禁止 email、raw password、fingerprint、verifier、SQL parameter、database exception message 或完整 cause chain。
@@ -32,6 +32,8 @@
 - M0-S4C1 API contract 已确认：CSRF-protected `POST /api/auth/login`、CSRF-protected `POST /api/auth/logout`、authenticated `GET /api/auth/me`；成功分别返回 204 / 204 / `200 {"userId":"<uuid>"}`，credential / infrastructure / unauthenticated failure 使用固定 401 / 503 / 401 code，CSRF rejection 为 403。
 - M0-S4C1 Cookie contract 已确认：opaque `SESSION` cookie 使用 HttpOnly、SameSite=Lax、Path `/`、无 Domain、无 persistent Max-Age；Hosted Secure=true、local HTTP development 显式 Secure=false，Redis 24-hour idle TTL 是 validity authority。
 - M0-S4C1 feature plan 已确认：C1a Redis Session foundation → C1b local `AuthenticationProvider` → C1c login/logout/me HTTP lifecycle；一次只实现一个 slice。
+- M0-S4C2 已完成 SPA CSRF delivery、Login / Registration Redis Rate Limit、共享 Argon2 concurrency hard limit，以及 restricted local Container saturation / mixed workload / recovery `PROVISIONAL` verification。
+- M0-S4D 使用单一 `REGISTRATION_ENABLED` capability switch：默认 `false` 时持久化并复用 singleton User、隐藏 login 并关闭 public registration；显式 `true` 时开放 registration 并使用正常 Session login。两种路径产生相同可信 `UserContext`。
 - 最小 Account Profile 与 `display_name` 已记录为 `IDEA-007`，不修改当前 S4C1 schema、`UserContext` 或 `/api/auth/me` contract。
 
 ## Completed Review
@@ -52,28 +54,32 @@
 14. M0-S4C1a Boot-managed Redis Session、JSON / Security serialization allowlist、namespace、idle TTL、Cookie configuration、Redis restore / fail-closed Diff Review 与 Human Ownership Check。
 15. M0-S4C1b local `AuthenticationProvider`、unknown-account Argon2id、uniform credential rejection、infrastructure failure、safe logging、credential clearing Diff Review 与 Human Ownership Check。
 16. M0-S4C1c framework-managed login/logout/me HTTP lifecycle、Session rotation / restore / invalidation、Cookie lifecycle、fixed authentication error response、Redis unavailable fail-closed Diff Review 与 Human Ownership Check。
+17. M0-S4C2 SPA CSRF delivery、Rate Limit-before-Argon2、global hash concurrency hard limit、fail-fast / permit recovery Diff Review 与 Human Ownership Check。
+18. M0-S4C2 restricted-Container saturation、mixed login workload、authenticated Session continuity 与 recovery `PROVISIONAL` verification。
+19. M0-S4D public registration capability、persistent singleton bootstrap、login bypass / hiding、同一 `UserContext` contract 与 isolated PostgreSQL concurrency verification。
+20. M0-S4 phase closeout：implementation、verification、Architecture 与 Ownership PASS；Hosted capacity confirmation 明确延期到 M6。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S4C2
+Selected slice: M0-S5
 Gate: DESIGN_PENDING
-Phase scope: APPROVED
+M0 umbrella scope: APPROVED
 Detailed Design: PENDING
 Slice breakdown: PENDING
 Implementation Scope: NOT_APPROVED
 Implementation: NOT_STARTED
-Production baseline: M0-S4C1 COMPLETE (`5b191f7`)
-Current target: SPA CSRF delivery / authentication throttling / global hash concurrency / provisional resource verification
-Later slice: M0-S4D Self-hosted SINGLE_USER
+Production baseline: M0-S4 COMPLETE (`8326f8b`)
+Current target: Language workspace minimum use case — create / list / switch Language Profile
+Dependency: trusted `UserContext` and ownership-scoped Language Profile access from M0-S4
 ```
 
 ## Next Action
 
-进入 `M0-S4C2` A 类 Design：基于 ADR-0002 与当前 C1 implementation，明确 SPA CSRF delivery、
-Rate Limit-before-Argon2、global password-hash concurrency gate、fail-fast saturation 和 provisional
-restricted-Container verification 的职责边界与可 Review slices。Design 与 Scope 未批准前不得实现。
+进入 `M0-S5` Design 与 Scope：基于已完成的 trusted `UserContext` 和
+`languageProfileId + userId` ownership boundary，明确 create / list / switch Language Profile 的最小
+use case、multi-language isolation 与可 Review slices。Scope 未批准前不得实现。
 
 ## Blockers
 
-None. 本机端口 `5432` 已被其他服务占用，runtime verification 通过 `DATABASE_PORT=15432` 完成，配置 override 已验证。
+None. Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证，不阻塞 M0-S5。

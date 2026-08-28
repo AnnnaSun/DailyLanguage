@@ -61,8 +61,10 @@ Scope
 
 - Planner 生成最小 LearningTask；
 - 用户完成 text conversation / writing practice；
-- Evaluator 生成经过 validation 的结构化诊断；
-- Practice 与 Evaluation failure 被正确保存或隔离；
+- Practice 产生 trusted event 可确定的 deterministic assessment；
+- Model 可用时 Evaluator 生成经过 validation 的 semantic diagnosis；
+- Model failure 只隔离 model-derived result，Practice 与 deterministic assessment 被正确保存；
+- Planner 在 Model unavailable / invalid output 时仍能生成合法的 deterministic fallback task；
 - Evaluator 不直接改变 Weakness、Level 或 Mastery。
 
 ### M2 — Persistent Adaptation Loop
@@ -76,6 +78,8 @@ Scope
 - 正确与错误 Evidence 都被记录；
 - Aggregated Memory 综合 recency、frequency、confidence、scenario 与 independence；
 - Weakness / Skill State 由 Java 规则执行确定性 transition；
+- Aggregation、Weakness lifecycle 与 Profile projection 可以基于已有 Qualified Evidence
+  在不调用模型的情况下重放并得到相同结果；
 - Planner 使用 compact Profile、active state、due review 与 recent practice；
 - Progress 是现有长期状态的 read-only projection；
 - 支持 core continuous assessment 与 lightweight Practice Feedback；
@@ -330,8 +334,9 @@ Explicit non-goals：SPA CSRF token delivery、registration Controller、rate li
 concurrency gate、frontend、remember-me、device list、logout-all、maximum-session policy、external
 Provider、password reset、email verification，以及 `IDEA-007` Account Profile / `display_name`。
 
-Current implementation task：`M0-S4C1` 已完成并形成 C1a、C1b、C1c 独立 commit checkpoints。
-下一 task 是 `M0-S4C2`，必须先完成独立 A 类 Design 与 Scope，不得直接实现。
+Current implementation state：`M0-S4C1`、`M0-S4C2` 与 `M0-S4D` 均已完成独立 Design / Scope、
+implementation、verification、Review 与 Ownership。下一 task 是 `M0-S5`，必须先完成独立
+Design 与 Scope，不得直接实现 Language workspace use case。
 
 ##### M0-S4C1a Completed Task Contract
 
@@ -496,6 +501,21 @@ M0-S4C2 只在受限 Container profile 上形成 `PROVISIONAL` evidence。Hosted
 open-model login load、mixed workload、soak 与 recovery test 后，才能把 capacity 标记为
 `CONFIRMED`。
 
+M0-S4C2d 已在 `1 CPU / 512 MiB / JVM Xmx 256 MiB` 的本地受限 Container 中完成 saturation、
+mixed authentication workload 与 recovery verification，结果为 `PASS / PROVISIONAL`。实际 profile、
+latency、resource / GC observations 与限制记录在
+[`server/verification/m0-s4c2d/PROVISIONAL_RESULTS.md`](../../server/verification/m0-s4c2d/PROVISIONAL_RESULTS.md)。
+
+#### M0-S4D Final Registration Capability Decision
+
+最终实现使用 `REGISTRATION_ENABLED`，不新增独立 deployment-mode enum：
+
+- 默认 `false`：关闭 public registration，原子 bootstrap / reuse persistent singleton User，并通过
+  Security Filter 建立可信 `UserContext`；login 在 Rate Limit / Argon2 前隐藏；
+- 显式 `true`：开放 registration，使用正常 login 与 Redis Session；
+- 两条路径共用后续 Domain / authorization path；Hosted 应显式设置 `true`，Self-hosted 可以按需
+  选择 singleton 或 public multi-user registration。
+
 #### M0-S4 Exit Criteria
 
 - request identity 只能来自 authenticated `UserContext`；
@@ -506,6 +526,10 @@ open-model login load、mixed workload、soak 与 recovery test 后，才能把 
 - raw password / verifier / Session secret 不进入禁止的 persistence、Log 或 Trace boundary；
 - Hosted / Self-hosted 共用 Domain / authorization path；
 - 每个子 slice 完成 focused verification、Diff Review 与 Human Ownership Check。
+
+Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementation、自动 / 人工 flow、
+真实 PostgreSQL / Redis integration、restricted-Container provisional evidence 与 Human Ownership
+审计完成。Hosted capacity confirmation 仍是 M6 的明确 deferred item，不阻塞 M0-S5。
 
 ## 4. Later-phase Planning Rule
 
@@ -587,24 +611,31 @@ M0-S4C1c Review: COMPLETE
 M0-S4C1c Ownership Check: COMPLETE
 M0-S4C1c: COMPLETE
 M0-S4C1: COMPLETE
-M0-S4C2 Detailed Design: PENDING
-M0-S4C2 Scope: NOT_APPROVED
+M0-S4C2 Detailed Design: APPROVED
+M0-S4C2 Scope: APPROVED
+M0-S4C2a SPA CSRF: COMPLETE
+M0-S4C2b Password Hash Concurrency Gate: COMPLETE
+M0-S4C2c Authentication Throttling / Registration HTTP Completion: COMPLETE
+M0-S4C2d Restricted-Container Verification: PASS / PROVISIONAL
+M0-S4C2 Verification: COMPLETE
+M0-S4C2 Review: COMPLETE
+M0-S4C2 Ownership Check: COMPLETE
+M0-S4C2: COMPLETE
+M0-S4D Design: APPROVED
+M0-S4D Scope: APPROVED
+M0-S4D Implementation: COMPLETE
+M0-S4D Verification: COMPLETE
+M0-S4D Review: COMPLETE
+M0-S4D Ownership Check: COMPLETE
+M0-S4D: COMPLETE
+M0-S4 Closeout: PASS
+M0-S4: COMPLETE
+M0-S5 Design: PENDING
+M0-S5 Scope: NOT_APPROVED
 ```
 
-`M0-S3` 已完成 implementation、focused verification、Diff Review 与 Human Ownership Check。
-`M0-S4A` 已完成 implementation、focused verification、Review 与 Human Ownership Check。
-`M0-S4B1` persistence design、Scope、implementation、focused verification、Review 与 Human
-Ownership Check 已完成。ASCII validation order 问题已经修正并由 regression test 覆盖。
-`M0-S4B2` Design 与 `M0-S4B2a` Scope 已批准。Versioned Argon2id hasher 已完成
-implementation、focused verification、Review、Human Ownership Check 与人工 commit。当前进入
-`M0-S4B2b` password policy 与 offline blocklist Design、Scope、implementation、focused
-verification、Review、Human Ownership Check 与人工 commit 已完成。`M0-S4B2c` atomic
-registration 调用顺序、transaction boundary、duplicate identity、failure contract 与 safe
-logging Design 与 Scope 已确认。Implementation、service tests、PostgreSQL atomicity / concurrent
-duplicate integration tests、full backend regression、Diff Review 与 Human Ownership Check 已
-完成并由人工 commit / push。当前进入 `M0-S4C1` Login / Logout / Current User 与 Redis-backed
-Session Design 与 feature task breakdown 已确认。`M0-S4C1a` Redis Session foundation、
-`M0-S4C1b` local `AuthenticationProvider` 与 `M0-S4C1c` login / logout / me HTTP lifecycle 均已完成
-implementation、focused / integration verification、独立 Diff Review、Human Ownership Check 与人工
-commit / push。当前进入 `M0-S4C2` Detailed Design；Scope 获得人工批准前不得实现 SPA CSRF、
-authentication throttling、global password-hash concurrency gate 或 provisional resource verification。
+`M0-S4A` 至 `M0-S4D` 已完成 approved Design / Scope、implementation、focused / integration / manual
+verification、独立 Diff Review、Human Ownership Check 与人工 commit。C2d restricted local Container
+evidence 只标记为 `PROVISIONAL`；M6 仍需在真实或等价 Hosted hardware 完成 capacity confirmation。
+M0-S4 closeout 为 `PASS`，当前进入 `M0-S5` Design；Scope 获得人工批准前不得实现新的 Language
+workspace behavior。
