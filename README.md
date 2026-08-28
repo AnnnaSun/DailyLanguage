@@ -78,6 +78,9 @@ SCAN 0
 
 ## 后端
 
+Authentication endpoint、request 参数以及 `400/401/403/404/409/429/503` response `code`
+快速查询见 [Authentication API Contract](docs/features/AUTHENTICATION_API.md)。
+
 ```bash
 cd server
 ./mvnw test

@@ -144,7 +144,21 @@ V1 的成功不以功能数量为中心，而以以下能力为中心：
 - Agent 不得直接执行 `setLevel`、`setWeakness` 或 mastery mutation；
 - Java 负责 validation、qualification、aggregation、state transition 与 persistence decision。
 
-### 4.3 BYOK Credential Boundary
+### 4.3 Bounded AI Dependency
+
+Learning Workflow 与长期学习状态正确性不能把 LLM availability 作为前提：
+
+- Planner 先由 Java 产生并过滤合法 candidate，再由可选 LLM 完成 soft ranking、scenario 与
+  reason enrichment；Model 不可用时必须存在合法的 deterministic fallback；
+- Practice evaluation 区分 trusted event 产生的 deterministic assessment，与 LLM 产生并需经过
+  validation 的 semantic candidate；
+- Model failure 只阻止 model-derived Evidence，不删除已确认的 deterministic assessment / Evidence；
+- persistence integrity、language isolation、Evidence processing、state replay 与 session recovery
+  不依赖 LLM availability。
+
+详细决策见 `ADR-0003`。
+
+### 4.4 BYOK Credential Boundary
 
 Hosted Mode 的 Credential 路径固定为：
 
@@ -157,7 +171,7 @@ Browser local/session storage
 
 API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 
-### 4.4 Documentation Drift Resolution
+### 4.5 Documentation Drift Resolution
 
 早期 PRD / User Flow 中与当前边界不一致的描述，由以下当前基线约束：
 
@@ -186,9 +200,9 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - 多目标语言学习状态硬隔离；
 - provider-agnostic Model Gateway；
 - BYOK transient credential handling；
-- Planner 的最小训练意图与约束输出；
+- Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
 - Text Practice / Conversation 的最小闭环；
-- Evaluator 的结构化 Session-level Evidence；
+- deterministic assessment + validated semantic candidate 的 Session-level Evaluation；
 - Raw Evidence、Aggregated Memory 与 Long-term State 的最小链路；
 - Weakness / Skill State 的确定性 qualification 与 lifecycle；
 - 基础 Review State 与 re-planning；

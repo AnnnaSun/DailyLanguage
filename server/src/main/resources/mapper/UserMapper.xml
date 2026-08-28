@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dailylanguage.user.UserMapper">
+<mapper namespace="com.dailylanguage.user.infrastructure.UserMapper">
 
     <select id="insertReturningId"
             resultType="java.util.UUID"
@@ -11,4 +11,18 @@
         INSERT INTO app_user DEFAULT VALUES
         RETURNING id
     </select>
+
+    <select id="lockSingleUserId" resultType="java.util.UUID">
+        SELECT user_id
+        FROM single_user_instance
+        WHERE singleton_key = TRUE
+        FOR UPDATE
+    </select>
+
+    <update id="assignSingleUser">
+        UPDATE single_user_instance
+        SET user_id = #{userId}
+        WHERE singleton_key = TRUE
+          AND user_id IS NULL
+    </update>
 </mapper>

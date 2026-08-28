@@ -1,0 +1,4 @@
+app:
+  security:
+    password-hashing:
+      max-concurrent: ${PASSWORD_HASH_MAX_CONCURRENT}

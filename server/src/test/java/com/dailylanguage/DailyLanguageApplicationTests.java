@@ -7,11 +7,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
-import com.dailylanguage.authentication.LocalPasswordAuthenticationProvider;
+import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "spring.flyway.enabled=false")
+@SpringBootTest(properties = {
+        "spring.flyway.enabled=false",
+        "app.registration-enabled=true"
+})
 class DailyLanguageApplicationTests {
 
     @Autowired

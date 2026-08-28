@@ -9,9 +9,9 @@ import java.util.UUID;
 
 import javax.sql.DataSource;
 
-import com.dailylanguage.languageprofile.LanguageProfileIdentity;
-import com.dailylanguage.languageprofile.LanguageProfileRepository;
-import com.dailylanguage.user.UserRepository;
+import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
+import com.dailylanguage.languageprofile.infrastructure.LanguageProfileRepository;
+import com.dailylanguage.user.infrastructure.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.registration-enabled=true")
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class PersistenceIdentityIntegrationTests {

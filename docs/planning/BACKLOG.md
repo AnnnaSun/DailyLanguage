@@ -297,3 +297,33 @@ V1 获得足够 dogfooding 与 longitudinal data 后执行离线评估：
 - 复杂算法相对简单规则是否产生足够的真实 Product Value。
 
 本条目只批准未来评估，不批准引入 FSRS、BKT、Knowledge Graph 或新的 mastery authority。
+
+## IDEA-013 — Explanation, rule-boundary, and alternative-expression practice
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: FUTURE_PRACTICE
+
+### Context
+
+AI 直接给出正确答案或更自然的改写，可以改善一次输出，却不一定让学习者理解原因、识别规则边界，或在新场景中独立表达。未来可以评估一种反馈后练习闭环：学习者先解释自己的选择，系统再提供 correction / short rule；随后改变时间、语境或交际条件，要求学习者重新作答，并生成、比较 2–3 种自然表达。候选交互包括 `Explain Before Reveal`、`Rule Boundary Challenge`、`Alternative Expression` 与 `Compare and Choose`。
+
+该能力必须服务于 Communication、Natural Expression 与 Transfer，而不是把 Conversation 变成逐句 Grammar correction。这里的“要求解释”是可按能力分级的 Practice flow：初学者可以选择理由或判断对比，高阶学习者可以自由解释；用户仍应能够 Skip、Easier 或回到真实场景。Grammar 相关步骤只作为真实使用后、重复且高置信问题的短 `Grammar Repair`，不能成为默认主学习路径。
+
+解释、规则边界判断和替代表达的表现只形成 Session-level Evidence / Candidate。单次解释正确、micro practice 成功或模型给出答案，不得直接 activate Weakness、标记 MASTERED 或修改 Level。后续 Conversation / Writing 中的独立 `Transfer Success` 应具有更高 Evidence 价值，并继续经过 language-specific Evidence qualification 与 Learning Memory aggregation。
+
+### Follow-up
+
+在进入正式 Scope 前决定并验证：
+
+- 哪些 Practice、task intent 和 Evidence 条件触发该闭环，避免对每次回答机械追问；
+- 初学者的 reason selection、提示强度与高阶学习者自由解释之间的 difficulty progression；
+- `Explain Before Reveal → correction → boundary challenge → alternative expression → compare and choose → real-world transfer` 的最小交互，以及如何控制时长和中断感；
+- Conversation 中应在何种 checkpoint 或 Session 后反馈，避免破坏自然交流与 fluency；
+- LLM 负责生成 semantic feedback、counterexample 和 expression candidates 时，Java 如何执行 Schema / Enum / semantic validation、hard constraint 与 persistence authority；
+- explanation、assisted repair、alternative generation、comparison 和 independent transfer 的统一 Evidence contract，以及 correct / incorrect Evidence 的平衡；
+- 不同语言的 rule taxonomy、writing system、register 与 prompt 差异如何集中配置，并始终通过 `languageProfileId` 隔离；
+- 用 Eval 检查 correction correctness、counterexample validity、表达自然度与多样性、难度适配、交互负担和后续 Transfer，而不是只统计完成步骤数。
+
+本条目只保存候选 Practice enhancement，不代表进入 V1、当前 Phase，或批准新增 Agent、production dependency、长期状态类型与 Architecture Change。

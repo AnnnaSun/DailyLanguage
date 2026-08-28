@@ -3,7 +3,7 @@
 - Status: ACCEPTED
 - Date: 2026-08-22
 - Scope: M0-S4 authentication and `UserContext` foundation
-- Implementation: S4A–S4C1a COMPLETE; S4C1b READY_TO_COMMIT; S4C1c–S4D NOT STARTED
+- Implementation: S4A–S4D COMPLETE; restricted-Container capacity PROVISIONAL; Hosted capacity confirmation deferred to M6
 
 ## Context
 
@@ -350,9 +350,18 @@ soak 与 recovery test，然后记录：
 
 Hosted 使用正式 Account/Auth、Redis Session、HTTPS 与 explicit hash concurrency config。
 
-Self-hosted `SINGLE_USER` 通过 server-side bootstrap 建立一个 User，public registration
-默认关闭；仍经过 Spring Security 并生成相同 `UserContext`。不得以关闭复杂 Auth 为理由
-引入 request-provided identity。Hosted / Self-hosted 共享后续 Domain Service。
+最终实现不引入独立 deployment-mode enum，而使用单一 trusted server configuration
+`REGISTRATION_ENABLED` 控制身份入口：
+
+- `true`：开放 public registration，使用正常 login / Redis Session authentication；
+- `false`（默认）：关闭 public registration，由 server-side bootstrap 在数据库中原子创建或复用
+  一个 persistent singleton User；`SingleUserAuthenticationFilter` 为请求建立相同的可信
+  `UserContext`，并在 Rate Limit 与 Argon2 前隐藏不适用的 login endpoint；
+- 非 boolean 配置导致 application startup 失败；切换到 `true` 不删除已存在的 singleton row，
+  再次切回 `false` 时复用同一 identity。
+
+该 capability switch 不改变后续 Domain / authorization path，也不允许 request-provided identity。
+Hosted deployment 应显式设为 `true`；Self-hosted 默认 `false`，但可以显式开放多用户注册。
 
 ## Alternatives
 
@@ -403,6 +412,10 @@ M0-S4 必须覆盖：
 - capacity saturation fail fast、无 unbounded queue、无 password leakage；
 - restricted Container 下的 provisional benchmark、mixed workload 与 recovery evidence；
 - Hosted / Self-hosted 均产生同一 `UserContext` contract。
+
+M0-S4 restricted-Container saturation、mixed workload 与 recovery 的实际结果记录在
+[`server/verification/m0-s4c2d/PROVISIONAL_RESULTS.md`](../../server/verification/m0-s4c2d/PROVISIONAL_RESULTS.md)。
+该结果只确认机制在受限本地 Container 中保持有界，不确认 Hosted production capacity。
 
 ## References
 
