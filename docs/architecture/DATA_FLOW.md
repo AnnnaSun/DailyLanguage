@@ -112,7 +112,8 @@ IndexedDB 不是 Hosted Mode 下长期学习状态的唯一 Source of Truth。
 |---|---|---|---|
 | User Input | 用户输入 | message、answer、feedback | User |
 | Session Data | 单次会话数据 | PracticeSession | Application |
-| AI Judgment | AI 判断 | EvaluationResult、CandidateIssue | LLM + Java Validation |
+| Deterministic Assessment | 确定性评估 | completion、attempt、assistance、exact result | Java + trusted Practice Event |
+| Semantic Candidate | AI 语义候选 | naturalness、semantic issue、communication quality | LLM + Java Validation |
 | Evidence | 学习证据 | ErrorEvent、Success Evidence | Java-qualified |
 | Long-term State | 长期状态 | WeaknessState、SkillState | Java Domain Rules |
 
@@ -233,17 +234,13 @@ LearningTask 表示：
 - userFeedback；
 - status。
 
-状态：
+PracticeSession 状态：
 
     CREATED
         ↓
     IN_PROGRESS
         ↓
     COMPLETED
-        ↓
-    WAITING_EVALUATION
-        ↓
-    EVALUATED
 
 其他可能状态：
 
@@ -254,15 +251,38 @@ PracticeSession 保存：
 
 > 这次实际发生了什么。
 
+Evaluation 使用独立 lifecycle：
+
+    PENDING
+        ↓
+    RUNNING
+        ↓
+    SUCCEEDED / FAILED
+
+Evaluation failure 不改变已完成 PracticeSession 的事实。
+
 ---
 
 ## 4.4 EvaluationResult / 单次评估结果
 
-Evaluator 对单个 PracticeSession 的结构化判断。
+一次 EvaluationResult 由两个具有不同 provenance 的部分组成。
+
+### DeterministicAssessment
+
+由 trusted Practice event 和 Java rule 产生：
+
+- taskCompletion；
+- duration；
+- attempts；
+- assistance usage；
+- exact / rule-verifiable result。
+
+### SemanticEvaluationCandidate
+
+由可选 LLM 产生并经过 validation：
 
 典型内容：
 
-- taskCompletion；
 - strengths；
 - detectedIssues；
 - vocabularyResults；
@@ -279,6 +299,9 @@ EvaluationResult 是：
 它不是：
 
 **Long-term Learner State。**
+
+Model failure 只令 `SemanticEvaluationCandidate` unavailable / failed，不抹掉独立成立的
+`DeterministicAssessment`。
 
 ---
 
@@ -344,7 +367,11 @@ Evidence 需要保留适当：
       ↓
     Load LanguageProfile
       ↓
-    Planner
+    Java Eligible Task Candidates
+      ↓
+    Optional LLM Plan Enrichment
+      ↓
+    Java Plan Validation
       ↓
     LearningTask
       ↓
@@ -352,11 +379,11 @@ Evidence 需要保留适当：
       ↓
     PracticeSession
       ↓
-    Evaluator
+    Deterministic Assessment
+      +
+    Optional Semantic Evaluation
       ↓
-    EvaluationResult
-      ↓
-    Validation
+    Qualification by Provenance
       ↓
     Qualified Evidence
       ↓
@@ -393,13 +420,13 @@ Planner 主要是：
           ├─ Preferences
           └─ Available Time
           ↓
-    Context Manager
+    Java Eligible Candidate Generation
           ↓
-    Planner Model Call
+    Java Hard Constraint Filtering
           ↓
-    Structured Output
+    Optional Planner Model Enrichment
           ↓
-    Java Validation
+    Java Final Validation / Fallback
           ↓
     LearningTask
 
@@ -428,6 +455,8 @@ Soft decision：
 - 哪个训练目标更值得优先；
 - 如何解释推荐原因。
 
+Soft decision 必须限制在 Java 已确认合法的 candidate set 内。
+
 Hard constraint：
 
     Java
@@ -439,6 +468,9 @@ Hard constraint：
 - duration 是否超过可用时间；
 - enum 是否合法；
 - task type 是否受支持。
+
+Model unavailable、timeout 或最终 output invalid 时，Java 使用 deterministic fallback priority
+生成合法 LearningTask。
 
 ---
 
@@ -465,12 +497,14 @@ Hard constraint：
         └─ assistance usage
         ↓
     COMPLETED
+
+EvaluationRun 独立执行：
+
+    PENDING
         ↓
-    WAITING_EVALUATION
+    RUNNING
         ↓
-    Evaluator
-        ↓
-    EVALUATED
+    SUCCEEDED / FAILED
 
 如果用户退出：
 
@@ -504,7 +538,11 @@ Evaluator 输入：
     +
     Task-specific Rubric
 
-然后：
+先从 trusted Practice event 计算：
+
+    DeterministicAssessment
+
+需要语义判断时再运行：
 
     Context Manager
         ↓
@@ -522,11 +560,12 @@ Evaluator 输入：
 
 输出：
 
-    EvaluationResult
+    SemanticEvaluationCandidate
 
-再由 Java 判断：
+两类结果分别由 Java 判断：
 
-    Candidate
+    DeterministicAssessment /
+    SemanticEvaluationCandidate
         ↓
     Qualified Evidence
 
@@ -554,17 +593,19 @@ Evaluator 不直接访问整个长期 Memory。
 
     PracticeSession
         ↓
-    EvaluationStatus = FAILED
+    SemanticEvaluationStatus = FAILED
 
 结果：
 
     Practice remains
     +
-    No long-term state mutation
+    DeterministicAssessment remains
+    +
+    No model-derived Evidence mutation
 
 禁止：
 
-    Evaluation Failure
+    Semantic Evaluation Failure
         ↓
     partial invalid data
         ↓
@@ -576,7 +617,7 @@ Evaluator 不直接访问整个长期 Memory。
 
 LLM Output 不能自动成为 Evidence。
 
-流程：
+Model-derived Evidence 流程：
 
     Evaluation Candidate
         ↓
@@ -593,6 +634,9 @@ LLM Output 不能自动成为 Evidence。
     Java Qualification
         ↓
     Qualified Evidence
+
+Trusted Practice event 可以通过独立 deterministic qualification 形成 Evidence，不经过 LLM
+confidence 或 semantic schema。两条路径都必须保留 source、languageProfileId 与 provenance。
 
 低置信信息可以保留为：
 
@@ -1147,6 +1191,42 @@ RAG Failure：
 
 ---
 
+## 18.3 M3 Controlled Multi-role Agent Content Preparation
+
+M3 Content preparation 数据流：
+
+    Imported / Curated Content
+        ↓
+    Retrieval Query + UserContext + languageProfileId
+        ↓
+    Permission-filtered Source Chunks
+        + provenance / retrieval metadata
+        ↓
+    Lesson Design Candidate
+        + referenced source IDs / spans
+        ↓
+    Quality Review Result
+        ↓
+    ACCEPT / REVISE_ONCE / REJECT
+        ↓
+    Java Validation + Idempotent Publish
+        ↓
+    Learning Material
+
+Java 保存独立 workflow / job state、attempt、model / prompt / context version、selected source IDs、
+tool calls、terminal status 与 sanitized Trace metadata。
+
+禁止：
+
+    Model-generated unsupported claim
+        ↓
+    published material
+
+也禁止 Agent 因内容生成结果直接修改 Learning Memory。后续用户 Practice 才能通过统一
+Evaluation / Evidence 流进入长期状态。
+
+---
+
 # 19. Context Assembly Flow / 上下文组装流
 
 Context Manager 数据来源：
@@ -1584,6 +1664,16 @@ Eval Result：
 - Weakness；
 - Vocabulary Mastery。
 
+Required V1 metrics 按 capability 选择：
+
+- groundedness / unsupported claim rate；
+- issue false positive / false negative；
+- retrieval relevance / permission isolation；
+- task completion / constraint satisfaction；
+- token、latency 与 cost；
+- retry / fallback / recovery result；
+- deterministic replay equality。
+
 ---
 
 # 27. Background Job Data Flow / 后台任务流
@@ -1631,7 +1721,10 @@ V1：
         ↓
     no valid output
         ↓
-    no Evidence mutation
+    no model-derived Evidence mutation
+
+Planner 使用合法 deterministic fallback；Practice、deterministic assessment、已存在 Qualified
+Evidence、state replay 与 recovery 不受影响。
 
 ### Structured Output Failure
 
@@ -1647,9 +1740,11 @@ V1：
 
     Practice preserved
         ↓
-    Evaluation FAILED
+    Semantic Evaluation FAILED
         ↓
-    no long-term update
+    deterministic assessment preserved
+        ↓
+    no model-derived long-term update
 
 ### RAG Failure
 
@@ -1683,7 +1778,8 @@ V1：
 | Planner | Yes | No | LearningTask | No | No |
 | Practice Runtime | Limited | Yes | No | Raw interaction only | No |
 | Conversation Agent | Limited | Yes | AI response | No direct | No |
-| Evaluator | Limited | No | Yes | Candidate only | No |
+| Deterministic Assessment | Limited | No | Rule-derived result | Yes, after deterministic qualification | No |
+| Semantic Evaluator | Limited | No | Yes | Candidate only | No |
 | Java Validation | Yes | No | No | Yes | No |
 | Learning Memory | Yes | No | No | Consume | Yes, via rules |
 | RAG | Retrieval only | No | Context | No | No |

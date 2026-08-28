@@ -117,11 +117,12 @@ Agent 不等于：
 
 ---
 
-# 3. Shared Agent Runtime / 通用 Agent Runtime
+# 3. Bounded AI Execution / 受控 AI 执行
 
-不同 Agent 的业务职责不同，但底层运行模式尽可能共享。
+不同 AI Role 的业务职责不同。Planner、Evaluator 等默认是 bounded model task，不自动拥有
+Tool 或多轮 Agent Loop。
 
-通用调用链：
+默认调用链：
 
     Application Request
         ↓
@@ -131,27 +132,19 @@ Agent 不等于：
         ↓
     Agent-specific Input
         ↓
-    Context Manager
+    Role-specific Context Assembly
         ├─ Structured State
         ├─ Session Context
-        ├─ RAG Context
+        ├─ RAG Context (only when approved)
         └─ Static Instructions
         ↓
     Prompt Resolution
-        ↓
-    Tool Allowlist
         ↓
     Model Gateway
         ↓
     Provider Adapter
         ↓
     LLM
-        ↓
-    Model Response
-        ↓
-    Tool Call ?
-      ├─ Yes → Tool Gateway → Tool Result → Agent Loop
-      └─ No
         ↓
     Structured Output / Response
         ↓
@@ -160,6 +153,21 @@ Agent 不等于：
     Application / Domain
         ↓
     Trace / Usage / Eval Hooks
+
+只有某个 Role 获得已批准的真实 tool requirement 后，才扩展为。M3 Content / Reading Flow 已批准为
+首个正式 use case：
+
+    Bounded Model Task
+        ↓
+    Tool Request
+        ↓
+    Tool Gateway
+        ↓
+    Tool Result
+        ↓
+    Bounded Next Model Turn
+
+Tool Gateway、Tool Allowlist 与 Agent Loop 不是所有 AI 调用的默认层。
 
 不同 Agent 主要变化在：
 
@@ -349,21 +357,14 @@ Planner 回答：
         ├─ Available Time
         └─ Evidence Sufficiency
         ↓
-    Context Manager
+    Java Eligible Candidate Generation
         ↓
-    Planner Context
+    Java Hard Constraint Filtering
         ↓
-    Planner Prompt
+    Optional LLM Ranking /
+    Scenario / Reason Enrichment
         ↓
-    Model Gateway
-        ↓
-    LLM
-        ↓
-    Planner Structured Output
-        ↓
-    Java Validation
-        ↓
-    Hard Constraint Check
+    Java Final Validation
         ↓
     LearningTask
         ↓
@@ -383,6 +384,9 @@ Planner 回答：
 - 哪种场景适合训练 Communication Goal；
 - 推荐理由如何表达。
 
+LLM 只能在 Java 已确认合法的候选与边界内做 soft decision。它不是合法候选集合、duration、
+Practice availability 或 final persistence validity 的 authority。
+
 ---
 
 ## 7.2 Planner Hard Decisions
@@ -397,6 +401,9 @@ Planner 回答：
 - content 是否存在；
 - Tool permission；
 - final persisted task validity。
+
+Java 还负责生成 deterministic fallback priority。Model unavailable、timeout 或最终 candidate 无效时，
+Planner 必须能够返回合法但可能较弱的 fallback LearningTask。
 
 ---
 
@@ -700,7 +707,16 @@ Evaluator 在 Practice 完成后运行。
         +
     Task-specific Rubric
 
-然后：
+先从 trusted Practice event 形成：
+
+    Deterministic Assessment
+        ├─ task completion
+        ├─ duration
+        ├─ attempts
+        ├─ assistance usage
+        └─ exact / rule-verifiable result
+
+需要语义判断时再运行：
 
     Context Manager
         ↓
@@ -722,9 +738,15 @@ Evaluator 在 Practice 完成后运行。
         ↓
     Semantic Qualification
         ↓
-    EvaluationResult
-        ↓
-    Candidate Evidence
+    Validated Semantic Candidate
+
+最终 Session-level Evaluation 由：
+
+    Deterministic Assessment
+        +
+    Validated Semantic Candidate (if available)
+
+组成。两类结果分别保留 provenance，并经过相应 Java qualification 后才形成 Evidence。
 
 ---
 
@@ -759,9 +781,15 @@ Evaluator 判断应优先根据：
 
 # 17. Evaluator Output / Evaluator 输出
 
-典型输出：
+Deterministic Assessment 典型输出：
 
 - taskCompletion；
+- duration / attempts；
+- assistance usage；
+- exact / rule-verifiable results。
+
+Semantic Evaluation Candidate 典型输出：
+
 - strengths；
 - detectedIssues；
 - vocabularyResults；
@@ -826,7 +854,7 @@ Pronunciation Issue 后续随 Pronunciation Assessment 扩展。
 
 执行：
 
-    EvaluationStatus = FAILED
+    SemanticEvaluationStatus = FAILED
 
 并保持：
 
@@ -835,10 +863,14 @@ Pronunciation Issue 后续随 Pronunciation Assessment 扩展。
 
 同时：
 
-    No Qualified Evidence
-    → No Long-term State Mutation
+    No model-derived Qualified Evidence
+    → No model-derived State Mutation
 
-禁止“尽量保存半个模型结果”进入长期 Memory。
+已经由 trusted Practice event 确定的 deterministic assessment / Evidence 保留并可继续按 Java
+规则处理。Model failure 不得将其删除、降级为模型失败或重复生成。
+
+禁止“尽量保存半个模型结果”进入长期 Memory，也禁止因 semantic evaluation 失败而抹掉独立
+成立的 deterministic result。
 
 ---
 
@@ -930,6 +962,41 @@ Agent 不应随意扩大 Retrieval Scope。
 
 ---
 
+## 21.1 M3 Controlled Multi-role Agent Workflow
+
+M3 正式实现一条由 Java 控制的 Multi-role Agent handoff：
+
+    Content Retrieval Role
+        ↓
+    Source Chunks + Provenance
+        ↓
+    Lesson Design Role
+        ↓
+    Structured Lesson Candidate
+        ↓
+    Quality Review Role
+        ↓
+    Accept / One Bounded Revision / Reject
+        ↓
+    Java Validation / Publish
+
+这条 Flow 用于展示真实 Agent Engineering，而不是让 Agent 自治管理系统。Java 控制：
+
+- workflow state；
+- maximum model turns / tool calls；
+- `UserContext`、language / content permission；
+- timeout、retry、idempotency 与 terminal failure；
+- provenance / schema / semantic validation；
+- final publish authority。
+
+Quality Review 至少检查 groundedness、difficulty、language quality 与 unsafe / unsupported claim。
+Agent 输出必须引用 source / chunk ID；缺少合法 provenance 的 material candidate 不得发布。
+三个 Role 具有独立 contract、Context Budget、Tool Allowlist 与 Trace span，只通过 typed artifact
+handoff，不共享可变 Prompt State。每次 Role invocation 是 bounded Agent execution，但整体不是
+autonomous Multi-agent System。
+
+---
+
 # 22. Context Manager Flow / Context Manager
 
 Context Manager 负责：
@@ -971,6 +1038,17 @@ Context Item 可以具有：
     Optional LLM Compression
 
 不得首先裁掉业务必需 Hard Constraint。
+
+每个 Role 需要定义：
+
+- input token budget；
+- reserved output budget；
+- truncation / summary order；
+- selected context IDs；
+- actual token、latency 与 cost metadata。
+
+M3 必须比较 Full Context baseline 与 budgeted strategy，不能只凭 token 减少声明优化成功；质量、
+groundedness 与任务完成率不得出现未经接受的 regression。
 
 ---
 
@@ -1319,7 +1397,10 @@ Repair 次数应受 Runtime Policy 控制。
 
 # 32. Agent Loop Termination / Agent 循环终止
 
-任何存在 Tool Calling 的 Agent Loop 必须具备显式终止策略。
+只有存在真实 Tool Calling 的 AI Role 才进入 Agent Loop。Planner、Evaluator 默认是单次 bounded
+model task，不应为了展示 Agent 而创建循环。
+
+任何实际存在的 Tool Calling Agent Loop 必须具备显式终止策略。
 
 逻辑状态：
 
@@ -1363,7 +1444,8 @@ Repair 次数应受 Runtime Policy 控制。
         ↓
     Final Failure
 
-不得污染 Domain State。
+不得污染 Domain State。Planner 应使用 Java fallback；Evaluator 只隔离 model-derived candidate；
+Practice、deterministic assessment、state replay 与 recovery 继续保持有效。
 
 ---
 
@@ -1494,7 +1576,10 @@ Eval 回答：
 - false positive；
 - confidence；
 - schema correctness；
-- historical bias。
+- historical bias；
+- source turn / span grounding；
+- unsupported claim rate；
+- false-positive long-term issue risk。
 
 ---
 
@@ -1683,9 +1768,11 @@ Agent Architecture 应由任务需要驱动。
 
     Complete Practice
         ↓
-    Invoke Evaluator
+    Deterministic Assessment
         ↓
-    Validate
+    Optional Semantic Evaluator
+        ↓
+    Validate by Provenance
         ↓
     Create Evidence
         ↓
@@ -1711,6 +1798,9 @@ Evaluator 内部：
 而不是：
 
     LLM decides entire application workflow
+
+Learning Workflow、Practice lifecycle 和 Evidence aggregation 不属于 Agent Runtime；它们即使在
+Model unavailable 时也必须保持正确、可恢复和可重放。
 
 ---
 
@@ -1838,18 +1928,22 @@ Context 边界失效。
 
 V1 应重点展示：
 
-- Planner structured decision；
+- Java candidate / constraint + optional LLM enrichment 的 hybrid Planner；
 - Conversation Agent；
-- Evaluator；
-- Agent-specific Context；
-- Tool Allowlist；
-- Tool Gateway；
-- RAG；
+- deterministic assessment + optional semantic candidate 的 hybrid Evaluator；
+- role-specific structured Context；
 - Structured Output；
 - Model Gateway；
 - Trace；
 - Prompt / Rubric / Context Version；
 - Basic Eval。
+
+V1 planned later-phase capability：
+
+- Tool Allowlist / Tool Gateway：M3 Controlled Multi-role Agent Workflow；
+- RAG：M3 Content / Retrieval grounding；
+- bounded Agent handoff / review loop：M3；
+- advanced Context ranking / compression：由 M3 quality / token / latency / cost Eval 驱动。
 
 V1 暂不需要为了完整性引入：
 
@@ -1909,6 +2003,7 @@ Optimization / Self-improvement 当前保持受控：
 - Agent 真正需要哪些 Context？
 - 是否读取过多？
 - 是否保持 language isolation？
+- 是否定义 token budget、裁剪顺序与质量对照？
 
 ### Tools
 
@@ -1925,6 +2020,7 @@ Optimization / Self-improvement 当前保持受控：
 
 - 是否有明确 Contract？
 - Structured Output 是否验证？
+- semantic claim 是否引用可验证 source turn / chunk？
 
 ### State
 
@@ -1942,6 +2038,7 @@ Optimization / Self-improvement 当前保持受控：
 ### Eval
 
 - 这个 Agent 行为以后如何验证没有回归？
+- 是否同时检查 groundedness、quality、token、latency、cost 与适用的 failure path？
 
 ---
 
@@ -1974,9 +2071,11 @@ Optimization / Self-improvement 当前保持受控：
 
 # 47. Final Agent Runtime Summary / 最终摘要
 
-Language Tutor 的核心 Agent Runtime 可以压缩为：
+Language Tutor 的核心 Learning / AI relationship 可以压缩为：
 
     Java Application
+        ↓
+    Deterministic Workflow / Candidate Boundary
         ↓
     Bounded Agent Role
         ↓
@@ -2016,7 +2115,9 @@ Language Tutor 的核心 Agent Runtime 可以压缩为：
 
     Practice
         ↓
-    Evaluator
+    Deterministic Assessment
+        +
+    Optional Semantic Evaluation
         ↓
     Candidate Evidence
         ↓
@@ -2031,6 +2132,8 @@ Language Tutor 的核心 Agent Runtime 可以压缩为：
 **Agent decides soft behavior.**
 
 **Java controls hard rules.**
+
+**Model failure does not erase deterministic learning evidence.**
 
 **Context is task-specific.**
 
