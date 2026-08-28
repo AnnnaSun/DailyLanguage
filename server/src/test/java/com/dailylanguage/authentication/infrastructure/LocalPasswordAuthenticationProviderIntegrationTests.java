@@ -15,7 +15,7 @@ import com.dailylanguage.user.infrastructure.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.registration-enabled=true")
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class LocalPasswordAuthenticationProviderIntegrationTests {

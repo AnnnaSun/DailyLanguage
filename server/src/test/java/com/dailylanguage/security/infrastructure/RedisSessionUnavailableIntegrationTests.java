@@ -16,6 +16,7 @@ import org.springframework.session.SessionRepository;
 import org.springframework.session.data.redis.RedisSessionRepository;
 
 @SpringBootTest(properties = {
+        "app.registration-enabled=true",
         "spring.flyway.enabled=false",
         "spring.data.redis.host=127.0.0.1",
         "spring.data.redis.port=1",

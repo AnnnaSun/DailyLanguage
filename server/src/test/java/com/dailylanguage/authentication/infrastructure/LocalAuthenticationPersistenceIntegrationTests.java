@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dailylanguage.user.infrastructure.UserRepository;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.registration-enabled=true")
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class LocalAuthenticationPersistenceIntegrationTests {

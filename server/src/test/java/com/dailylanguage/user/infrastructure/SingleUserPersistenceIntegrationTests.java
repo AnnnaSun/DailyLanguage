@@ -22,7 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@SpringBootTest
+// 禁止 application startup 提前占用 slot；本测试直接驱动 repository bootstrap。
+@SpringBootTest(properties = "app.registration-enabled=true")
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class SingleUserPersistenceIntegrationTests {

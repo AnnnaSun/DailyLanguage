@@ -20,7 +20,10 @@ import com.dailylanguage.authentication.application.LocalRegistrationService;
 import static com.dailylanguage.authentication.application.LocalRegistrationException.FailureReason.IDENTITY_UNAVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "app.security.password-hashing.max-concurrent=2")
+@SpringBootTest(properties = {
+        "app.registration-enabled=true",
+        "app.security.password-hashing.max-concurrent=2"
+})
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class LocalRegistrationPersistenceIntegrationTests {
 

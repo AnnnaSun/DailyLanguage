@@ -24,6 +24,7 @@ import org.springframework.session.data.redis.RedisSessionRepository;
 import com.dailylanguage.security.domain.UserContext;
 
 @SpringBootTest(properties = {
+        "app.registration-enabled=true",
         "spring.flyway.enabled=false",
         "SESSION_COOKIE_SECURE=true"
 })

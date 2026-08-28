@@ -17,7 +17,7 @@ spring:
         repository-type: default
 
 app:
-  registration-enabled: ${REGISTRATION_ENABLED:true}
+  registration-enabled: ${REGISTRATION_ENABLED:false}
   security:
     password-hashing:
       max-concurrent: ${PASSWORD_HASH_MAX_CONCURRENT:1}

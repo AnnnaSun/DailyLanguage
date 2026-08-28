@@ -35,7 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.session.cookie.secure=false")
+        properties = {
+                "app.registration-enabled=true",
+                "server.servlet.session.cookie.secure=false"
+        })
 @AutoConfigureMockMvc
 @EnabledIf("integrationDependenciesEnabled")
 class RedisAuthenticationSessionIntegrationTests {

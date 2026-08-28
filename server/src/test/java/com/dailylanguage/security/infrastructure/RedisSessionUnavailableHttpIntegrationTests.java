@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "app.registration-enabled=true",
         "spring.flyway.enabled=false",
         "spring.data.redis.host=127.0.0.1",
         "spring.data.redis.port=1",

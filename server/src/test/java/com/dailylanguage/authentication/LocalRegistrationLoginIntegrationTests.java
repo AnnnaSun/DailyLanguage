@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
+                "app.registration-enabled=true",
                 "server.servlet.session.cookie.secure=false",
                 "app.security.login-rate-limit.key-prefix=daily-language:test:c3a-login-rate-limit",
                 "app.security.registration-rate-limit.key-prefix=daily-language:test:c3a-registration-rate-limit"
