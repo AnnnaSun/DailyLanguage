@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6C / READY_TO_COMMIT
-> Production implementation: M0-S6C COMPLETE
+> Current Gate: M0-S6D / REVIEW_PENDING
+> Production implementation: M0-S6D COMPLETE
 
 ## Approved Decisions
 
@@ -46,6 +46,8 @@
   `docs/features/MODEL_GATEWAY.md`。
 - M0-S6C 使用 `INSTRUCTION` / `USER` / `MODEL` 内部 message role、sealed Text output specification、
   portable response / finish reason 与 optional token usage；不引入 Provider-specific option Map。
+- M0-S6D runtime route 通过 Composition 绑定 ProviderId、ModelId 与 operation-specific Adapter；
+  V1 fixed mapping 不引入 Adapter Registry、dynamic router、retry 或 fallback。
 
 ## Completed Review
 
@@ -79,25 +81,25 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S6C
-Gate: READY_TO_COMMIT
+Selected slice: M0-S6D
+Gate: REVIEW_PENDING
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
 Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
 Implementation Scope: APPROVED
 Implementation: COMPLETE
 Verification: COMPLETE
-Code Review: PASS
-Ownership Check: COMPLETE (contract boundary only)
-Production baseline: M0-S6B COMPLETE (`666e2e6`)
-Current target: provider-neutral Text Generation typed request / response / port
+Code Review: PENDING
+Ownership Check: NOT_STARTED
+Production baseline: M0-S6C COMPLETE (`1a5fcbc`)
+Current target: fixed Text Generation route and Provider Adapter seam
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S6C 等待人工 Commit Decision。当前 Ownership 只覆盖 typed contract 与尚未实现的边界，不代表
-完整 Provider invocation ownership；`READY_TO_COMMIT` 不授权开始 `M0-S6D`。
+M0-S6D 等待基于真实 Diff 的 Code Review。Review 与 Ownership 完成前不得 commit，也不得开始
+`M0-S6E` timeout / safe failure translation。
 
 ## Blockers
 

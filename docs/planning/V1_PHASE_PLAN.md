@@ -591,7 +591,7 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
-| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | PENDING |
+| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | REVIEW_PENDING |
 | M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
 | M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
 
@@ -696,6 +696,42 @@ Explicitly Out of Scope:
   Structured Output schema；Tool Calling；sampling options；Trace implementation；Workflow / Learning State mutation。
 Verification:
 - focused S6C tests；S6A + S6B + S6C contract regression；server compile；targeted Diff review。
+```
+
+#### Approved M0-S6D Current Slice Contract
+
+```text
+Task / Slice: M0-S6D — Fixed route and Provider Adapter seam
+Goal: 让 TextGenerationPort 通过 fixed Purpose + TEXT_GENERATION route 选择 Provider / Model，并只调用
+对应的 operation-specific Adapter 一次。
+Expected Behavior:
+- TextGenerationRoute 将 ProviderId、ModelId 与 TextGenerationProviderAdapter 组合为可执行 runtime route；
+- FixedTextGenerationRoutes defensive-copy route map，只接受 TEXT_GENERATION key，不实现自动 routing；
+- RoutedTextGenerationPort 使用 request purpose + TEXT_GENERATION 查找 route；
+- route 缺失返回无 Provider / Model identity 的 CAPABILITY_UNAVAILABLE；
+- route 存在时只调用绑定 Adapter 一次，并原样传播合法 ModelResult；
+- Adapter 返回 null，或 Success / Failure route identity 与 selected route 不一致，视为 programming / wiring
+  bug 并 fail fast，不转换为普通 Provider failure。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationRoute.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutes.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutesTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPortTests.java
+Architecture / Data / API / Security Impact:
+- 新增 approved fixed routing 与 operation-specific external Adapter seam；无 schema、HTTP API、Credential、
+  Provider SDK、Spring wiring 或 dependency 变化。
+Critical Code Expected:
+- immutable route mapping 与 TEXT_GENERATION-only invariant；
+- no-route CAPABILITY_UNAVAILABLE；
+- exactly-once Adapter delegation 与 returned route identity validation。
+Explicitly Out of Scope:
+- concrete Provider / HTTP / SDK call；external configuration binding；Credential；timeout；exception translation；
+  retry / fallback；Trace；Workflow / Learning State mutation。
+Verification:
+- focused S6D tests；S6A-S6D Model Gateway regression；server compile；targeted Diff review。
 ```
 
 ## 4. Later-phase Planning Rule
@@ -817,7 +853,13 @@ M0-S6C Implementation: COMPLETE
 M0-S6C Verification: COMPLETE
 M0-S6C Review: COMPLETE
 M0-S6C Ownership Check: COMPLETE (contract boundary only)
-M0-S6C: COMPLETE / READY_TO_COMMIT
+M0-S6C: COMPLETE (`1a5fcbc`)
+M0-S6D Scope: APPROVED
+M0-S6D Implementation: COMPLETE
+M0-S6D Verification: COMPLETE
+M0-S6D Review: PENDING
+M0-S6D Ownership Check: NOT_STARTED
+M0-S6D: REVIEW_PENDING
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
@@ -827,5 +869,6 @@ Scope 完成 typed result / failure contract、focused regression、server compi
 Human Ownership Check 已确认用户理解 sealed result 的互斥状态、route identity pairing，以及
 `retryAfter` 是 metadata 而不是 retry execution，并已提交为 `666e2e6`。`M0-S6C` 已完成 typed
 Text Generation request / response / port、focused verification 与 Diff Review。Ownership 明确限制在当前
-typed contract，以及识别 route resolution / Provider execution 尚未实现；当前等待人工 Commit Decision，
-不得自动进入 `M0-S6D` fixed route / Provider Adapter seam。
+typed contract，以及识别 route resolution / Provider execution 尚未实现，并已提交为 `1a5fcbc`。
+`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation 与 focused verification，
+当前等待真实 Diff Review；不得自动进入 `M0-S6E` timeout / safe failure translation。
