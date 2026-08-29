@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.4
+> Version: 1.5
 > Approved: 2026-08-21
-> Last updated: 2026-08-29 — Engineering Evidence Track and M3 Controlled Multi-role Agent Workflow
+> Last updated: 2026-08-29 — Provider-free Learning Baseline
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -40,6 +40,11 @@
 - 所有路径最终都以在真实场景中更独立地理解、回应并持续沟通为目标。
 
 本节定义长期一致的 Product Audience 与学习模型原则，不自动授权 V1 完整实现零基础课程体系。V1 支持的具体起始能力范围、Bootstrap 深度以及 Listening 进入哪个 Phase，仍需通过后续 Delivery Scope Decision 明确。
+
+V1 已批准 `Provider-free Learning Baseline`：用户未提供 Model Provider 时，仍可通过经过验证的
+Built-in Content 完成最小 Practice，并产生与 deterministic source 相符的 Assessment / Evidence。
+首个 Content Pack 使用 `targetLanguage=en`、`supportLanguage=zh-CN`；起始能力范围和内容数量留到
+M1 Scope Decision。详细 Contract 见 `docs/features/PROVIDER_FREE_LEARNING.md`。
 
 ### 3.2 Product North Star and Success Model
 
@@ -174,6 +179,8 @@ Learning Workflow 与长期学习状态正确性不能把 LLM availability 作�
 - Model failure 只阻止 model-derived Evidence，不删除已确认的 deterministic assessment / Evidence；
 - persistence integrity、language isolation、Evidence processing、state replay 与 session recovery
   不依赖 LLM availability。
+- 无 Provider 时，合法 fallback 必须能够解析到当前目标语言可执行的 Built-in Practice；当前语言没有
+  经过验证的 Built-in Content 时应明确 unavailable，不得跨语言借用内容或伪装成可启动任务。
 
 详细决策见 `ADR-0003`。
 
@@ -219,6 +226,7 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - 多目标语言学习状态硬隔离；
 - provider-agnostic Model Gateway；
 - BYOK transient credential handling；
+- Provider-free Built-in Text Practice baseline；
 - Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
 - Text Practice / Conversation 的最小闭环；
 - deterministic assessment + validated semantic candidate 的 Session-level Evaluation；
@@ -247,6 +255,8 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - advanced assessment mechanisms；
 - advanced feedback dispute / appeal；
 - realtime full-duplex voice；
+- 完整零基础课程、全语言 Built-in Content 与大规模通用词库；
+- System-managed Provider 与 bundled local Model；
 - 由 LLM 直接修改长期 Level、Weakness 或 Mastery；
 - 业务模块直接依赖具体 Model Provider SDK；
 - 为 Hosted 与 Self-hosted 分叉两套核心业务代码；
