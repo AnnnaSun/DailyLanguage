@@ -753,6 +753,26 @@ Ownership 仍为 `L1`：S6B 增强了 contract understanding，但尚不存在�
 Ownership 保持 `L1`：已经能够定位并质疑 contract boundary，但没有真实 Port implementation、route
 resolver、Adapter 或 external call evidence，不能提升为 L2。
 
+### M0-S6D confirmed evidence
+
+- `RoutedTextGenerationPort` 根据 request purpose 查询固定的 `Purpose + TEXT_GENERATION` route；route 缺失时
+  返回不带 route identity 的 `CAPABILITY_UNAVAILABLE`，且不调用 Adapter；
+- `TextGenerationRoute` 使用 Composition 将 `ProviderId`、`ModelId` 与 operation-specific
+  `TextGenerationProviderAdapter` 绑定为可执行 route，不引入 Registry、dynamic router 或万能 Provider；
+- route 存在时，Port 将选中的 Provider / Model identity 和原 request 只传给 Adapter 一次；Adapter 返回的
+  success / failure identity 必须与所选 route 一致；
+- identity 缺失或不一致表示 Adapter wiring / attribution invariant 被破坏，因此 fail fast，而不是伪装成
+  `PROVIDER_FAILURE`；Provider 实际解析出的 raw model version 未来属于 Trace metadata，不替换业务 contract
+  中的 selected route model；
+- 用户能够区分正常 operational failure 与低概率 internal mismatch，并解释 mismatch 校验对自定义 Provider、
+  fallback、费用和 Trace attribution 的保护作用；
+- focused S6D tests、S6A-S6D Model Gateway regression、server compile、Diff Review 与 Explain Back 已通过，
+  commit 为 `1e32ff7`。
+
+Ownership 提升为 `L2`：已经能够追踪 Request → fixed route → selected Adapter → validated ModelResult 的
+真实调用链。尚无 concrete Provider、timeout / exception translation 与真实外部调用 evidence，因此不提升为
+L3。
+
 ---
 
 ## 11.9 Trace & Eval

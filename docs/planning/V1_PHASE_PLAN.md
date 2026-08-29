@@ -591,12 +591,12 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
-| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | REVIEW_PENDING |
+| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | COMPLETE |
 | M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
 | M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
 
-以上是已批准 Design 下的 implementation slices。`M0-S6A` 与 `M0-S6B` 已完成并提交；`M0-S6C`
-已完成 implementation 与 verification，当前停在独立 Diff Review Gate。
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 至 `M0-S6D` 已完成并提交；下一 Gate 是
+`M0-S6E` timeout / safe failure translation 的 Design / Scope，不自动开始 implementation。
 
 #### Proposed M0-S6A Current Slice Contract
 
@@ -857,9 +857,11 @@ M0-S6C: COMPLETE (`1a5fcbc`)
 M0-S6D Scope: APPROVED
 M0-S6D Implementation: COMPLETE
 M0-S6D Verification: COMPLETE
-M0-S6D Review: PENDING
-M0-S6D Ownership Check: NOT_STARTED
-M0-S6D: REVIEW_PENDING
+M0-S6D Review: COMPLETE
+M0-S6D Ownership Check: COMPLETE (L2 traceable route / Adapter path)
+M0-S6D: COMPLETE (`1e32ff7`)
+M0-S6E Design: PENDING
+M0-S6E Scope: NOT_APPROVED
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
@@ -870,5 +872,7 @@ Human Ownership Check 已确认用户理解 sealed result 的互斥状态、rout
 `retryAfter` 是 metadata 而不是 retry execution，并已提交为 `666e2e6`。`M0-S6C` 已完成 typed
 Text Generation request / response / port、focused verification 与 Diff Review。Ownership 明确限制在当前
 typed contract，以及识别 route resolution / Provider execution 尚未实现，并已提交为 `1a5fcbc`。
-`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation 与 focused verification，
-当前等待真实 Diff Review；不得自动进入 `M0-S6E` timeout / safe failure translation。
+`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation、route identity invariant、
+focused verification、Diff Review 与 Human Ownership Check，并已提交为 `1e32ff7`。Ownership 已具备真实
+Request → route → Adapter → result 调用链的 L2 traceable evidence；concrete Provider、timeout 与 exception
+translation 尚未实现，因此不提升为 L3。下一 Gate 是 `M0-S6E` Design / Scope。

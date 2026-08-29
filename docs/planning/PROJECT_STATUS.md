@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6D / REVIEW_PENDING
-> Production implementation: M0-S6D COMPLETE
+> Current Gate: M0-S6E / DESIGN_PENDING
+> Production baseline: M0-S6D COMPLETE (`1e32ff7`)
 
 ## Approved Decisions
 
@@ -77,29 +77,31 @@
     S6A + S6B focused regression、server compile 与 targeted Diff Review。
 24. M0-S6C provider-neutral Text Generation request / response / port、focused contract regression、
     server compile、Diff Review 与 scope-limited Ownership Check。
+25. M0-S6D fixed Text Generation route、operation-specific Adapter seam、single delegation、route identity
+    invariant、focused regression、Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S6D
-Gate: REVIEW_PENDING
+Selected slice: M0-S6E
+Gate: DESIGN_PENDING
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
 Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-Implementation Scope: APPROVED
-Implementation: COMPLETE
-Verification: COMPLETE
-Code Review: PENDING
+Implementation Scope: NOT_APPROVED
+Implementation: NOT_STARTED
+Verification: NOT_STARTED
+Code Review: NOT_STARTED
 Ownership Check: NOT_STARTED
-Production baseline: M0-S6C COMPLETE (`1a5fcbc`)
-Current target: fixed Text Generation route and Provider Adapter seam
+Production baseline: M0-S6D COMPLETE (`1e32ff7`)
+Current target: timeout and safe failure translation design
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S6D 等待基于真实 Diff 的 Code Review。Review 与 Ownership 完成前不得 commit，也不得开始
-`M0-S6E` timeout / safe failure translation。
+进入 M0-S6E Design / Scope Gate：先明确 timeout execution boundary、可安全归一化的 Adapter failure、
+programming bug 的 fail-fast boundary，以及一次调用、无 retry / fallback 的验证方式；Scope 批准前不实现。
 
 ## Blockers
 
