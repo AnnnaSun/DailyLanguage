@@ -1329,17 +1329,19 @@ V1:
 
 Responsibility:
 
-统一 Provider 接入。
+统一 Provider 接入，并以 Typed Operation Port 隔离不同 Model API shape。
 
 Conceptual structure:
 
-    Domain / Agent
-         ↓
-    Model Gateway
-         ↓
+    Application Use Case
+             ↓
+    Typed Model Operation Port
+             ↓
+    Purpose + Operation Route
+             ↓
     Provider Adapter
-         ↓
-    External Provider
+             ↓
+    External Provider / Model
 
 Possible providers:
 
@@ -1354,13 +1356,19 @@ Provides:
 - capability check；
 - model invocation；
 - structured output support；
-- retry；
+- timeout / safe failure translation；
+- 在明确 policy 下可扩展的 bounded retry；
 - usage；
 - trace。
 
 Must Not:
 
 - 让 Planner / Evaluator 等直接依赖具体 Provider SDK。
+- 使用万能 Request / Response 承载 Text、Speech、Image 与 Embedding；
+- 自行编排多个 Operation 或决定 Learning Workflow degradation；
+- 默认静默 retry 或 cross-provider fallback。
+
+M0-S6 approved design：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
 Architecture Importance:
 

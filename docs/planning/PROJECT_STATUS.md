@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S5 / DESIGN_PENDING
-> Production implementation: M0-S4 COMPLETE
+> Current Gate: M0-S6A / SCOPE_REVIEW_PENDING
+> Production implementation: M0-S5 COMPLETE
 
 ## Approved Decisions
 
@@ -38,6 +38,12 @@
 - M0-S4C2 已完成 SPA CSRF delivery、Login / Registration Redis Rate Limit、共享 Argon2 concurrency hard limit，以及 restricted local Container saturation / mixed workload / recovery `PROVISIONAL` verification。
 - M0-S4D 使用单一 `REGISTRATION_ENABLED` capability switch：默认 `false` 时持久化并复用 singleton User、隐藏 login 并关闭 public registration；显式 `true` 时开放 registration 并使用正常 Session login。两种路径产生相同可信 `UserContext`。
 - 最小 Account Profile 与 `display_name` 已记录为 `IDEA-007`，不修改当前 S4C1 schema、`UserContext` 或 `/api/auth/me` contract。
+- M0-S6 Model Gateway Detailed Design 已批准：logical module 下按 Typed Operation Port 拆分，fixed route
+  使用 `ModelPurpose + ModelOperation`；Gateway 只执行单 Operation 并归一化 timeout / failure，具体
+  Application Workflow 负责 multi-operation ordering、REQUIRED / OPTIONAL、partial success 与 degradation。
+- M0-S6 默认不自动 retry 或静默 cross-provider fallback；后者只有在用户配置、transient Credential、
+  capability compatibility 与明确 policy 共同授权后才能进入后续 Scope。完整 Contract 见
+  `docs/features/MODEL_GATEWAY.md`。
 
 ## Completed Review
 
@@ -61,28 +67,29 @@
 18. M0-S4C2 restricted-Container saturation、mixed login workload、authenticated Session continuity 与 recovery `PROVISIONAL` verification。
 19. M0-S4D public registration capability、persistent singleton bootstrap、login bypass / hiding、同一 `UserContext` contract 与 isolated PostgreSQL concurrency verification。
 20. M0-S4 phase closeout：implementation、verification、Architecture 与 Ownership PASS；Hosted capacity confirmation 明确延期到 M6。
+21. M0-S5 Language Profile create / list / switch minimum use case、ownership boundary 与 multi-language isolation。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S5
-Gate: DESIGN_PENDING
+Selected slice: M0-S6A
+Gate: SCOPE_REVIEW_PENDING
 M0 umbrella scope: APPROVED
-Detailed Design: PENDING
-Slice breakdown: PENDING
+Detailed Design: APPROVED
+Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
 Implementation Scope: NOT_APPROVED
 Implementation: NOT_STARTED
-Production baseline: M0-S4 COMPLETE (`8326f8b`)
-Current target: Language workspace minimum use case — create / list / switch Language Profile
-Dependency: trusted `UserContext` and ownership-scoped Language Profile access from M0-S4
+Production baseline: M0-S5 COMPLETE (`4d7bd54`)
+Current target: portable route vocabulary for the provider-agnostic Model Gateway
+Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-进入 `M0-S5` Design 与 Scope：基于已完成的 trusted `UserContext` 和
-`languageProfileId + userId` ownership boundary，明确 create / list / switch Language Profile 的最小
-use case、multi-language isolation 与可 Review slices。Scope 未批准前不得实现。
+Review 并批准 `M0-S6A` Current Slice Contract：只建立 `ModelPurpose`、`ModelOperation`、
+`ModelRouteKey`、`ProviderId` 与 `ModelId`，不引入 Model Result / Failure、Provider Adapter、Spring AI /
+Provider SDK、BYOK、Structured Output、Trace、retry、fallback 或 Learning Workflow。Scope 未批准前不得实现。
 
 ## Blockers
 
-None. Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证，不阻塞 M0-S5。
+None. Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证，不阻塞 M0-S6。

@@ -549,6 +549,65 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 真实 PostgreSQL / Redis integration、restricted-Container provisional evidence 与 Human Ownership
 审计完成。Hosted capacity confirmation 仍是 M6 的明确 deferred item，不阻塞 M0-S5。
 
+### M0-S6 Approved Detailed Design
+
+`M0-S6` 是 A 类核心 AI infrastructure slice。2026-08-29 已批准
+[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md) 中的 Detailed Design：
+
+- Model Gateway 是 provider-agnostic logical module boundary，不是万能 Java interface；
+- 每次调用只执行一个明确 `ModelOperation`；
+- fixed route key 使用 `ModelPurpose + ModelOperation`；
+- 不同 Operation 使用独立 Typed Port 与 Request / Response；
+- M0-S6 只实现第一个 Text Generation Port，不提前实现 Speech / Vision / Image / Embedding；
+- Gateway 负责 capability check、timeout 与 safe failure translation；
+- Application Workflow 负责多 Operation 的顺序、REQUIRED / OPTIONAL、partial success 与 degradation；
+- 默认不自动 retry，也不静默 cross-provider fallback；
+- Model infrastructure failure 不产生 Learning Evidence 或长期学习状态变化；
+- Credential、Structured Output validation 与 minimal Trace 分别留在 M0-S7 / M0-S8；
+- S6 不新增 Spring AI 或 concrete Provider SDK dependency。
+
+#### Proposed M0-S6 implementation slices
+
+| Slice | Goal | Observable behavior | Status |
+| --- | --- | --- | --- |
+| M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | SCOPE_REVIEW_PENDING |
+| M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | PENDING |
+| M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | PENDING |
+| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | PENDING |
+| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
+| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
+
+以上只是已批准 Design 下的 implementation proposal。当前只允许 review `M0-S6A` Scope；未经人工批准
+不得实现 S6A，也不得自动进入 S6B。
+
+#### Proposed M0-S6A Current Slice Contract
+
+```text
+Task / Slice: M0-S6A — Portable route vocabulary
+Goal: 建立 Provider-neutral 的 Purpose、Operation、route key 与 Provider / Model identity。
+Expected Behavior:
+- ModelPurpose 与 ModelOperation 是两个独立受控维度；
+- 相同 Purpose 的不同 Operation 形成不同 route key；
+- ProviderId / ModelId 接受外部可配置 identifier，但拒绝 null、blank 与未规范化外围空白；
+- 所有类型均不依赖 Spring AI、Provider SDK、HTTP 或 Credential。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelPurpose.java
+- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelOperation.java
+- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelRouteKey.java
+- server/src/main/java/com/dailylanguage/modelgateway/domain/ProviderId.java
+- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelId.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/domain/ModelRouteKeyTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/domain/ProviderModelIdentityTests.java
+Architecture / Data / API / Security Impact:
+- 实现已批准的 Model Gateway contract；无 schema、public HTTP API、Credential 或 dependency 变化。
+Explicitly Out of Scope:
+- ModelResult / ModelFailure；Text Generation Port；route configuration；Provider Adapter；
+  timeout；retry；fallback；BYOK；Structured Output；Trace；任何 Workflow 或 Learning State mutation。
+Verification:
+- focused unit tests；server compile；targeted Diff review。
+```
+
 ## 4. Later-phase Planning Rule
 
 M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 implementation tasks。
@@ -648,12 +707,12 @@ M0-S4D Ownership Check: COMPLETE
 M0-S4D: COMPLETE
 M0-S4 Closeout: PASS
 M0-S4: COMPLETE
-M0-S5 Design: PENDING
-M0-S5 Scope: NOT_APPROVED
+M0-S5: COMPLETE
+M0-S6 Detailed Design: APPROVED
+M0-S6 Slice Breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
+M0-S6A Scope: NOT_APPROVED
+M0-S6 Implementation: NOT_STARTED
 ```
 
-`M0-S4A` 至 `M0-S4D` 已完成 approved Design / Scope、implementation、focused / integration / manual
-verification、独立 Diff Review、Human Ownership Check 与人工 commit。C2d restricted local Container
-evidence 只标记为 `PROVISIONAL`；M6 仍需在真实或等价 Hosted hardware 完成 capacity confirmation。
-M0-S4 closeout 为 `PASS`，当前进入 `M0-S5` Design；Scope 获得人工批准前不得实现新的 Language
-workspace behavior。
+`M0-S5` 已在当前分支完成，当前进入 `M0-S6A` Scope Review。S6 Detailed Design 已批准，但 S6A
+具体 file / behavior / verification scope 获得人工批准前不得实现 Model Gateway production code。
