@@ -720,6 +720,22 @@ Target:
 当前 Ownership 为 `L1`：已定位并理解 route vocabulary；真实 invocation、failure、Credential 与
 Provider Adapter path 尚未实现，不能把本次 evidence 解释为完整 Model Gateway Ownership。
 
+### M0-S6B confirmed evidence
+
+- sealed `ModelResult<T>` 只允许 Success 或 Failure，排除 nullable response + error 的 both / neither
+  非法状态；
+- `ModelFailureKind` 表示为什么失败，ProviderId + ModelId 表示在哪条 route 失败；route identity
+  必须同时存在或同时缺失；
+- partial route identity 是对象 invariant 被破坏，不是需要新增的一种 Provider failure；
+- `retryAfter` 只保存 Rate Limit / Temporary Unavailable 的正 Duration metadata，不执行 scheduler、
+  sleep、第二次 Provider call、retry counter 或 fallback；
+- route vocabulary 与 invocation result contract 分别位于 `modelgateway.routing` 和
+  `modelgateway.result`，避免后续 Typed Port 继续堆入宽泛 `domain` package；
+- S6A + S6B focused regression、server compile、Diff Review 与 Explain Back 已通过。
+
+Ownership 仍为 `L1`：S6B 增强了 contract understanding，但尚不存在可追踪的 invocation call chain，
+不满足 L2 的真实 Entry → Call → Result evidence。
+
 ---
 
 ## 11.9 Trace & Eval

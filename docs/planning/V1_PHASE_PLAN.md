@@ -571,7 +571,7 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | Slice | Goal | Observable behavior | Status |
 | --- | --- | --- | --- |
 | M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
-| M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | PENDING |
+| M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | PENDING |
 | M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | PENDING |
 | M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
@@ -591,14 +591,14 @@ Expected Behavior:
 - ProviderId / ModelId 接受外部可配置 identifier，但拒绝 null、blank 与未规范化外围空白；
 - 所有类型均不依赖 Spring AI、Provider SDK、HTTP 或 Credential。
 Expected Production Files:
-- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelPurpose.java
-- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelOperation.java
-- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelRouteKey.java
-- server/src/main/java/com/dailylanguage/modelgateway/domain/ProviderId.java
-- server/src/main/java/com/dailylanguage/modelgateway/domain/ModelId.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelPurpose.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelOperation.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelRouteKey.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ProviderId.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelId.java
 Expected Tests:
-- server/src/test/java/com/dailylanguage/modelgateway/domain/ModelRouteKeyTests.java
-- server/src/test/java/com/dailylanguage/modelgateway/domain/ProviderModelIdentityTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/routing/ModelRouteKeyTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/routing/ProviderModelIdentityTests.java
 Architecture / Data / API / Security Impact:
 - 实现已批准的 Model Gateway contract；无 schema、public HTTP API、Credential 或 dependency 变化。
 Explicitly Out of Scope:
@@ -606,6 +606,39 @@ Explicitly Out of Scope:
   timeout；retry；fallback；BYOK；Structured Output；Trace；任何 Workflow 或 Learning State mutation。
 Verification:
 - focused unit tests；server compile；targeted Diff review。
+```
+
+#### Proposed M0-S6B Current Slice Contract
+
+```text
+Task / Slice: M0-S6B — Typed result / failure contract
+Goal: 建立调用方必须显式处理的 success / normalized operational failure contract。
+Expected Behavior:
+- ModelResult<T> 是 sealed result，只允许非 null Success<T> 或非 null Failure<T>；
+- ModelFailureKind 固化 S6 approved taxonomy：CAPABILITY_UNAVAILABLE、REQUEST_REJECTED、
+  AUTHENTICATION_FAILED、RATE_LIMITED、TIMEOUT、TEMPORARY_UNAVAILABLE、PROVIDER_FAILURE；
+- ModelFailure 必须包含 kind，可以不含 route identity，也可以同时包含 ProviderId + ModelId；
+- ProviderId / ModelId 必须同时存在或同时缺失，不允许 partial route identity；
+- retryAfter 是 optional positive Duration，只允许 RATE_LIMITED / TEMPORARY_UNAVAILABLE 使用；
+- retryAfter 存在时必须同时存在 ProviderId + ModelId；
+- Failure 不提供 raw response、exception message、stack trace、Prompt、Credential 或 arbitrary metadata。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelResult.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailure.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailureKind.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/result/ModelResultTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/result/ModelFailureTests.java
+Architecture / Data / API / Security Impact:
+- 实现已批准的 explicit failure contract；无 schema、public HTTP API、Credential 或 dependency 变化。
+Critical Code Expected:
+- ModelResult 的 success / failure exclusivity 与 null rejection；
+- ModelFailure 的 route identity pairing 与 retryAfter invariant。
+Explicitly Out of Scope:
+- Text Generation Request / Response / Port；route configuration；Provider Adapter / exception translation；
+  timeout execution；retry；fallback；BYOK；Structured Output；Trace；Workflow / Learning State mutation。
+Verification:
+- focused unit tests；S6A + S6B domain regression；server compile；targeted Diff review。
 ```
 
 ## 4. Later-phase Planning Rule
@@ -715,11 +748,20 @@ M0-S6A Implementation: COMPLETE
 M0-S6A Verification: COMPLETE
 M0-S6A Review: COMPLETE
 M0-S6A Ownership Check: COMPLETE
-M0-S6A: COMPLETE / READY_TO_COMMIT
-M0-S6B: NOT_STARTED
+M0-S6A: COMPLETE (`e6e163a`)
+M0-S6B Scope: APPROVED
+M0-S6B Implementation: COMPLETE
+M0-S6B Verification: COMPLETE
+M0-S6B Review: COMPLETE
+M0-S6B Ownership Check: COMPLETE
+M0-S6B: COMPLETE / READY_TO_COMMIT
+M0-S6C: NOT_STARTED
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
 targeted Diff Review。Human Ownership Check 已确认用户理解 Purpose / Operation 分离、外部 identity
-value type 与 enum vocabulary 不等于 runtime capability。当前等待人工 Commit Decision；不得自动进入
-`M0-S6B` typed result / failure contract。
+value type 与 enum vocabulary 不等于 runtime capability，并已提交为 `e6e163a`。`M0-S6B` 已按批准
+Scope 完成 typed result / failure contract、focused regression、server compile 与 targeted Diff Review；
+Human Ownership Check 已确认用户理解 sealed result 的互斥状态、route identity pairing，以及
+`retryAfter` 是 metadata 而不是 retry execution。当前等待人工 Commit Decision；不得自动进入
+`M0-S6C` Text Generation Typed Port。

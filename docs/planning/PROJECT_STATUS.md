@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6A / READY_TO_COMMIT
-> Production implementation: M0-S6A COMPLETE
+> Current Gate: M0-S6B / READY_TO_COMMIT
+> Production implementation: M0-S6B COMPLETE
 
 ## Approved Decisions
 
@@ -69,11 +69,13 @@
 20. M0-S4 phase closeout：implementation、verification、Architecture 与 Ownership PASS；Hosted capacity confirmation 明确延期到 M6。
 21. M0-S5 Language Profile create / list / switch minimum use case、ownership boundary 与 multi-language isolation。
 22. M0-S6A portable route vocabulary Scope、implementation、focused verification 与 targeted Diff Review。
+23. M0-S6B typed result / failure Scope、implementation、`routing` / `result` contract package separation、
+    S6A + S6B focused regression、server compile 与 targeted Diff Review。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S6A
+Selected slice: M0-S6B
 Gate: READY_TO_COMMIT
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
@@ -83,15 +85,15 @@ Implementation: COMPLETE
 Verification: COMPLETE
 Code Review: PASS
 Ownership Check: COMPLETE
-Production baseline: M0-S5 COMPLETE (`4d7bd54`)
-Current target: portable route vocabulary for the provider-agnostic Model Gateway
+Production baseline: M0-S6A COMPLETE (`e6e163a`)
+Current target: typed success / normalized operational failure contract
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S6A 等待人工 Commit Decision。`READY_TO_COMMIT` 不授权 Codex 自动 commit，也不授权开始
-`M0-S6B`；下一 slice 仍需独立 Scope Decision。
+M0-S6B 等待人工 Commit Decision。`READY_TO_COMMIT` 不授权 Codex 自动 commit，也不授权开始
+`M0-S6C`；下一 slice 仍需独立 Scope Decision。
 
 ## Blockers
 

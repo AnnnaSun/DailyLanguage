@@ -1,4 +1,4 @@
-package com.dailylanguage.modelgateway.domain;
+package com.dailylanguage.modelgateway.routing;
 
 import java.util.Objects;
 

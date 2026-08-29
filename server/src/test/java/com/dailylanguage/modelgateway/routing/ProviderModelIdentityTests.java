@@ -1,4 +1,4 @@
-package com.dailylanguage.modelgateway.domain;
+package com.dailylanguage.modelgateway.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
