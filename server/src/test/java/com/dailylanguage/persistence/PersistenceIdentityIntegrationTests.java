@@ -37,7 +37,8 @@ class PersistenceIdentityIntegrationTests {
     void createsUuidV7UserAndNormalizedLanguageProfileIdentity() {
         UUID userId = userRepository.create();
 
-        LanguageProfileIdentity profile = languageProfileRepository.create(userId, " zh-Hans ");
+        LanguageProfileIdentity profile = languageProfileRepository.create(userId, " zh-Hans ")
+                .orElseThrow();
 
         assertThat(userId.version()).isEqualTo(7);
         assertThat(profile.id().version()).isEqualTo(7);
@@ -49,7 +50,8 @@ class PersistenceIdentityIntegrationTests {
     void scopesProfileLookupToItsOwner() {
         UUID ownerId = userRepository.create();
         UUID otherUserId = userRepository.create();
-        LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "ja");
+        LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "ja")
+                .orElseThrow();
 
         assertThat(languageProfileRepository.findByIdAndUserId(profile.id(), ownerId))
                 .contains(profile);
@@ -61,9 +63,12 @@ class PersistenceIdentityIntegrationTests {
     void listsOnlyProfilesOwnedByUserInDeterministicOrder() {
         UUID ownerId = userRepository.create();
         UUID otherUserId = userRepository.create();
-        LanguageProfileIdentity japaneseProfile = languageProfileRepository.create(ownerId, "ja");
-        LanguageProfileIdentity englishProfile = languageProfileRepository.create(ownerId, "en");
-        LanguageProfileIdentity otherUsersProfile = languageProfileRepository.create(otherUserId, "de");
+        LanguageProfileIdentity japaneseProfile = languageProfileRepository.create(ownerId, "ja")
+                .orElseThrow();
+        LanguageProfileIdentity englishProfile = languageProfileRepository.create(ownerId, "en")
+                .orElseThrow();
+        LanguageProfileIdentity otherUsersProfile = languageProfileRepository.create(otherUserId, "de")
+                .orElseThrow();
 
         assertThat(languageProfileRepository.listByUserId(ownerId))
                 .containsExactly(englishProfile, japaneseProfile);
@@ -74,10 +79,24 @@ class PersistenceIdentityIntegrationTests {
     @Test
     void rejectsDuplicateLanguageWithinOneUser() {
         UUID userId = userRepository.create();
-        languageProfileRepository.create(userId, "EN");
+        languageProfileRepository.create(userId, "EN").orElseThrow();
 
-        assertThatThrownBy(() -> languageProfileRepository.create(userId, "en"))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(languageProfileRepository.create(userId, "en")).isEmpty();
+    }
+
+    @Test
+    void allowsSameLanguageForDifferentUsers() {
+        UUID firstUserId = userRepository.create();
+        UUID secondUserId = userRepository.create();
+
+        LanguageProfileIdentity firstProfile = languageProfileRepository.create(firstUserId, "en")
+                .orElseThrow();
+        LanguageProfileIdentity secondProfile = languageProfileRepository.create(secondUserId, "en")
+                .orElseThrow();
+
+        assertThat(firstProfile.userId()).isEqualTo(firstUserId);
+        assertThat(secondProfile.userId()).isEqualTo(secondUserId);
+        assertThat(secondProfile.id()).isNotEqualTo(firstProfile.id());
     }
 
     @Test
@@ -105,7 +124,8 @@ class PersistenceIdentityIntegrationTests {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("languageCode must be a well-formed BCP 47 language tag");
 
-        LanguageProfileIdentity validProfile = languageProfileRepository.create(userId, "en");
+        LanguageProfileIdentity validProfile = languageProfileRepository.create(userId, "en")
+                .orElseThrow();
         assertThat(languageProfileRepository.findByIdAndUserId(validProfile.id(), userId))
                 .contains(validProfile);
     }

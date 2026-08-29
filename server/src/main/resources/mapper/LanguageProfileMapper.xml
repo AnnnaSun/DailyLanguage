@@ -23,6 +23,7 @@
             flushCache="true">
         INSERT INTO language_profile (user_id, language_code)
         VALUES (#{userId, jdbcType=OTHER}, #{languageCode, jdbcType=VARCHAR})
+        ON CONFLICT (user_id, language_code) DO NOTHING
         RETURNING id, user_id, language_code
     </select>
 

@@ -5,7 +5,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -70,6 +75,118 @@ class LanguageProfileSecurityTests {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(languageProfileRepository);
+    }
+
+    @Test
+    void rejectsUnauthenticatedCreateAccess() throws Exception {
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"languageCode":"en"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(languageProfileRepository);
+    }
+
+    @Test
+    void createsProfileForAuthenticatedUserAndReturnsItsResourceLocation() throws Exception {
+        UUID requestedUserId = UUID.randomUUID();
+        UUID authenticatedUserId = UUID.randomUUID();
+        LanguageProfileIdentity createdProfile =
+                new LanguageProfileIdentity(UUID.randomUUID(), authenticatedUserId, "en-us");
+        when(languageProfileRepository.create(authenticatedUserId, " en-US "))
+                .thenReturn(Optional.of(createdProfile));
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(authenticatedAs(authenticatedUserId))
+                        .with(csrf())
+                        .header("X-User-Id", requestedUserId)
+                        .param("userId", requestedUserId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":"%s","languageCode":" en-US "}
+                                """.formatted(requestedUserId)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/language-profiles/" + createdProfile.id()))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value(createdProfile.id().toString()))
+                .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
+                .andExpect(jsonPath("$.languageCode").value("en-us"));
+
+        verify(languageProfileRepository).create(authenticatedUserId, " en-US ");
+        verify(languageProfileRepository, never()).create(requestedUserId, " en-US ");
+    }
+
+    @Test
+    void missingCsrfStopsBeforeCreatingProfile() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(authenticatedAs(authenticatedUserId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"languageCode":"en"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(languageProfileRepository);
+    }
+
+    @Test
+    void rejectsMalformedLanguageCodeWithStableErrorCode() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+        when(languageProfileRepository.create(authenticatedUserId, "not a tag"))
+                .thenThrow(new IllegalArgumentException("persistence validation detail"));
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(authenticatedAs(authenticatedUserId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"languageCode":"not a tag"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LANGUAGE_CODE"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("persistence validation detail"))));
+    }
+
+    @Test
+    void rejectsMissingLanguageCodeWithStableErrorCode() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+        when(languageProfileRepository.create(authenticatedUserId, null))
+                .thenThrow(new IllegalArgumentException("languageCode must not be null"));
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(authenticatedAs(authenticatedUserId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LANGUAGE_CODE"));
+    }
+
+    @Test
+    void duplicateLanguageForAuthenticatedUserReturnsConflict() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+        when(languageProfileRepository.create(authenticatedUserId, "EN"))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(authenticatedAs(authenticatedUserId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"languageCode":"EN"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LANGUAGE_PROFILE_ALREADY_EXISTS"));
+
+        verify(languageProfileRepository).create(authenticatedUserId, "EN");
     }
 
     @Test
@@ -194,6 +311,30 @@ class LanguageProfileSecurityTests {
                 .andExpect(jsonPath("$[0].languageCode").value("en"));
 
         verify(languageProfileRepository).listByUserId(singleUserId);
+    }
+
+    @Test
+    void singleUserModeCreatesProfileThroughTheSameDomainAuthorizationPath() throws Exception {
+        UUID requestedUserId = UUID.randomUUID();
+        UUID singleUserId = UUID.randomUUID();
+        LanguageProfileIdentity createdProfile =
+                new LanguageProfileIdentity(UUID.randomUUID(), singleUserId, "ja");
+        when(persistentSingleUser.userContext()).thenReturn(Optional.of(new UserContext(singleUserId)));
+        when(languageProfileRepository.create(singleUserId, "ja"))
+                .thenReturn(Optional.of(createdProfile));
+
+        mockMvc.perform(post("/api/language-profiles")
+                        .with(csrf())
+                        .param("userId", requestedUserId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"languageCode":"ja"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(singleUserId.toString()));
+
+        verify(languageProfileRepository).create(singleUserId, "ja");
+        verify(languageProfileRepository, never()).create(requestedUserId, "ja");
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor authenticatedAs(UUID userId) {

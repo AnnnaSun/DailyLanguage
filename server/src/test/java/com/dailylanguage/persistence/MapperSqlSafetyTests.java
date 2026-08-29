@@ -37,7 +37,8 @@ class MapperSqlSafetyTests {
         assertThat(readResource(languageProfileMapper))
                 .contains("#{userId, jdbcType=OTHER}")
                 .contains("#{languageCode, jdbcType=VARCHAR}")
-                .contains("#{languageProfileId, jdbcType=OTHER}");
+                .contains("#{languageProfileId, jdbcType=OTHER}")
+                .contains("ON CONFLICT (user_id, language_code) DO NOTHING");
         assertThat(readResource(localAuthenticationMapper))
                 .contains("#{userId, jdbcType=OTHER}")
                 .contains("#{provider, jdbcType=VARCHAR}")
