@@ -43,6 +43,7 @@ public class LanguageProfileRepository {
     }
 
     private static String normalizeLanguageCode(String languageCode) {
+        // languageCode 参与 workspace 唯一性判断，入库前必须收敛为稳定的 BCP 47 lowercase 表示。
         if (languageCode == null) {
             throw new IllegalArgumentException("languageCode must not be null");
         }

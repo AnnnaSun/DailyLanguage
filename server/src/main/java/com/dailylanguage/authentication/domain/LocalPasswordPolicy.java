@@ -19,14 +19,14 @@ public final class LocalPasswordPolicy {
     }
 
     /**
-     * Validates a submitted password for an application-managed password credential.
-     * Upstream provider passwords and phone OTP values must never be passed into this policy.
+     * 校验应用管理 password credential 的 submitted password。
+     * Upstream provider password 与 phone OTP value 不得进入该 policy。
      */
     public ValidationResult validate(String submittedPassword, String normalizedEmail) {
         if (submittedPassword == null) {
             return ValidationResult.INVALID_LENGTH;
         }
-        // Unsupported characters take precedence so callers can return the actionable ASCII-only error.
+        // Unsupported character 优先于长度判断，使调用方返回更可操作的 ASCII-only 错误。
         if (!containsOnlyPrintableAscii(submittedPassword)) {
             return ValidationResult.INVALID_CHARACTER;
         }
@@ -53,7 +53,7 @@ public final class LocalPasswordPolicy {
     }
 
     private static boolean matchesLoginIdentity(String submittedPassword, String normalizedEmail) {
-        // Identity normalization must not case-fold, trim, or otherwise change the submitted password.
+        // Identity normalization 不能反向用于 password；不得 case-fold、trim 或改写 submitted password。
         if (submittedPassword.equals(normalizedEmail)) {
             return true;
         }

@@ -20,6 +20,10 @@ import com.dailylanguage.languageprofile.application.LanguageProfileAccessServic
 import com.dailylanguage.languageprofile.domain.LanguageProfileIdentity;
 import com.dailylanguage.security.domain.UserContext;
 
+/**
+ * Language Profile 的 HTTP 入口。资源归属只接受 Spring Security 建立的 UserContext，
+ * request body、query parameter 或 header 中的 userId 都不参与授权判断。
+ */
 @RestController
 @RequestMapping("/api/language-profiles")
 public class LanguageProfileController {
@@ -42,6 +46,7 @@ public class LanguageProfileController {
                     .body(createdProfile);
         }
         catch (LanguageProfileCreationException exception) {
+            // 对外只暴露稳定的业务错误码，不返回 validation 或 persistence exception detail。
             HttpStatus status = switch (exception.failureReason()) {
                 case INVALID_LANGUAGE_CODE -> HttpStatus.BAD_REQUEST;
                 case LANGUAGE_PROFILE_ALREADY_EXISTS -> HttpStatus.CONFLICT;

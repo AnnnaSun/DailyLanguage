@@ -13,6 +13,10 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * 只拦截 login POST，并在进入 AuthenticationProvider / Argon2 前执行 Redis Rate Limit。
+ * Redis 不可用时 fail closed，避免绕过资源保护继续做 password verification。
+ */
 final class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginRateLimitFilter.class);
@@ -50,6 +54,7 @@ final class LoginRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         if (!decision.allowed()) {
+            // Filter 在此终止调用链，确保被限流请求不会触发后续 Argon2 工作。
             authenticationHttpResponseWriter.writeTooManyLoginAttempts(
                     response,
                     decision.retryAfterSeconds());

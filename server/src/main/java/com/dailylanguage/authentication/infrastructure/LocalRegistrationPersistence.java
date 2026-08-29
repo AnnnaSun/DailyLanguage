@@ -24,8 +24,8 @@ public class LocalRegistrationPersistence {
     }
 
     /**
-     * Atomically persists the User, LOCAL_EMAIL identity, and application-managed password credential.
-     * External provider identities do not enter this password-credential transaction.
+     * 在同一 transaction 中原子写入 User、LOCAL_EMAIL identity 与应用管理的 password credential。
+     * External provider identity 不进入这条 password-credential transaction。
      */
     @Transactional
     public UUID createLocalAccount(String normalizedEmail, String encodedPasswordHash) {

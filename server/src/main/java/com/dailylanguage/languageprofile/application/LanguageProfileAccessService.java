@@ -27,6 +27,7 @@ public class LanguageProfileAccessService {
         Objects.requireNonNull(userContext, "userContext must not be null");
 
         try {
+            // 空结果表示数据库唯一约束已裁决为重复 workspace，由 Application 层转换成 409 语义。
             return languageProfileRepository.create(userContext.userId(), languageCode)
                     .orElseThrow(() -> new LanguageProfileCreationException(
                             LANGUAGE_PROFILE_ALREADY_EXISTS));
@@ -46,6 +47,7 @@ public class LanguageProfileAccessService {
             UserContext userContext
     ) {
         Objects.requireNonNull(userContext, "userContext must not be null");
+        // Profile id 与认证 userId 必须同时命中；只按 profile id 查询会绕过 ownership boundary。
         return languageProfileRepository.findByIdAndUserId(languageProfileId, userContext.userId());
     }
 }

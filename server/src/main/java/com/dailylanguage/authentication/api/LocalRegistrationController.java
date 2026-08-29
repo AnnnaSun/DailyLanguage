@@ -21,6 +21,10 @@ import com.dailylanguage.authentication.application.RegistrationCapability;
 import com.dailylanguage.authentication.application.RegistrationCapability.State;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
 
+/**
+ * LOCAL_EMAIL registration 的 HTTP 入口。先判定 deployment capability，再执行 Rate Limit，
+ * 最后才进入 password policy、Argon2 与原子 persistence。
+ */
 @RestController
 @RequestMapping("/api/auth/registration")
 public final class LocalRegistrationController {
@@ -51,6 +55,7 @@ public final class LocalRegistrationController {
             @RequestParam(required = false) String password,
             HttpServletRequest request) {
         if (registrationCapability.state() != State.PUBLIC) {
+            // registration 关闭时在任何 Redis、password policy 或 Argon2 工作前终止。
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new RegistrationErrorResponse("REGISTRATION_DISABLED"));
         }
@@ -62,6 +67,7 @@ public final class LocalRegistrationController {
                     email);
         }
         catch (DataAccessException exception) {
+            // Rate Limit state 不可信时 fail closed，不能降级为绕过限流继续注册。
             LOGGER.error(
                     "Registration rate-limit storage failed stage=REGISTRATION_RATE_LIMIT exceptionType={}",
                     exception.getClass().getName());

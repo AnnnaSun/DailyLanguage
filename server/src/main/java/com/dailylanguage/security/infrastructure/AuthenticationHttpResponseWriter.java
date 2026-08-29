@@ -12,6 +12,10 @@ import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * 统一 Security Filter / Handler 的 JSON failure contract，避免返回 framework HTML
+ * 或泄露底层 authentication、Redis 与 credential detail。
+ */
 @Component
 public final class AuthenticationHttpResponseWriter {
 
