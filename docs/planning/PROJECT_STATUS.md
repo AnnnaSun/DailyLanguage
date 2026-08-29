@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6A / SCOPE_REVIEW_PENDING
-> Production implementation: M0-S5 COMPLETE
+> Current Gate: M0-S6A / READY_TO_COMMIT
+> Production implementation: M0-S6A COMPLETE
 
 ## Approved Decisions
 
@@ -68,17 +68,21 @@
 19. M0-S4D public registration capability、persistent singleton bootstrap、login bypass / hiding、同一 `UserContext` contract 与 isolated PostgreSQL concurrency verification。
 20. M0-S4 phase closeout：implementation、verification、Architecture 与 Ownership PASS；Hosted capacity confirmation 明确延期到 M6。
 21. M0-S5 Language Profile create / list / switch minimum use case、ownership boundary 与 multi-language isolation。
+22. M0-S6A portable route vocabulary Scope、implementation、focused verification 与 targeted Diff Review。
 
 ## Current Slice
 
 ```text
 Selected slice: M0-S6A
-Gate: SCOPE_REVIEW_PENDING
+Gate: READY_TO_COMMIT
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
 Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-Implementation Scope: NOT_APPROVED
-Implementation: NOT_STARTED
+Implementation Scope: APPROVED
+Implementation: COMPLETE
+Verification: COMPLETE
+Code Review: PASS
+Ownership Check: COMPLETE
 Production baseline: M0-S5 COMPLETE (`4d7bd54`)
 Current target: portable route vocabulary for the provider-agnostic Model Gateway
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
@@ -86,9 +90,8 @@ Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 
 ## Next Action
 
-Review 并批准 `M0-S6A` Current Slice Contract：只建立 `ModelPurpose`、`ModelOperation`、
-`ModelRouteKey`、`ProviderId` 与 `ModelId`，不引入 Model Result / Failure、Provider Adapter、Spring AI /
-Provider SDK、BYOK、Structured Output、Trace、retry、fallback 或 Learning Workflow。Scope 未批准前不得实现。
+M0-S6A 等待人工 Commit Decision。`READY_TO_COMMIT` 不授权 Codex 自动 commit，也不授权开始
+`M0-S6B`；下一 slice 仍需独立 Scope Decision。
 
 ## Blockers
 

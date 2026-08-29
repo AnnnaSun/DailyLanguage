@@ -570,15 +570,15 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 
 | Slice | Goal | Observable behavior | Status |
 | --- | --- | --- | --- |
-| M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | SCOPE_REVIEW_PENDING |
+| M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | PENDING |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | PENDING |
 | M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | PENDING |
 | M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
 | M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
 
-以上只是已批准 Design 下的 implementation proposal。当前只允许 review `M0-S6A` Scope；未经人工批准
-不得实现 S6A，也不得自动进入 S6B。
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 已完成 implementation、verification、
+Diff Review 与 Human Ownership Check；不得自动进入 S6B。
 
 #### Proposed M0-S6A Current Slice Contract
 
@@ -710,9 +710,16 @@ M0-S4: COMPLETE
 M0-S5: COMPLETE
 M0-S6 Detailed Design: APPROVED
 M0-S6 Slice Breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-M0-S6A Scope: NOT_APPROVED
-M0-S6 Implementation: NOT_STARTED
+M0-S6A Scope: APPROVED
+M0-S6A Implementation: COMPLETE
+M0-S6A Verification: COMPLETE
+M0-S6A Review: COMPLETE
+M0-S6A Ownership Check: COMPLETE
+M0-S6A: COMPLETE / READY_TO_COMMIT
+M0-S6B: NOT_STARTED
 ```
 
-`M0-S5` 已在当前分支完成，当前进入 `M0-S6A` Scope Review。S6 Detailed Design 已批准，但 S6A
-具体 file / behavior / verification scope 获得人工批准前不得实现 Model Gateway production code。
+`M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
+targeted Diff Review。Human Ownership Check 已确认用户理解 Purpose / Operation 分离、外部 identity
+value type 与 enum vocabulary 不等于 runtime capability。当前等待人工 Commit Decision；不得自动进入
+`M0-S6B` typed result / failure contract。

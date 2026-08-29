@@ -2150,7 +2150,7 @@ RAG Result 返回 Context。
 | RAG | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Context Manager | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Tool Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Model Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Model Gateway | `server/src/main/java/com/dailylanguage/modelgateway` | N/A — S6A 只有 route vocabulary | `ModelPurpose`, `ModelOperation`, `ModelRouteKey`, `ProviderId`, `ModelId` | `ModelRouteKeyTests`, `ProviderModelIdentityTests` | PARTIAL — M0-S6A COMPLETE；无 invocation Port 或 Provider Adapter |
 | Trace | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Security | `server/src/main/java/com/dailylanguage/security`, `server/src/main/java/com/dailylanguage/authentication` | `SecurityConfiguration`, `LocalRegistrationController`, `LocalAuthenticationRepository`, `LocalPasswordHasher`, `RedisAuthenticationAttemptRateLimiter`, `PersistentSingleUser` | trusted `UserContext`, ownership access boundary, local registration/login/logout/me, password policy and Argon2id, Redis Session, SPA CSRF, authentication throttling, hash concurrency gate and singleton bootstrap | `AuthenticationHttpContractTests`, `LocalRegistrationLoginIntegrationTests`, `RedisAuthenticationSessionIntegrationTests`, `PasswordHashConcurrencyGateTests`, `RedisAuthenticationAttemptRateLimiterIntegrationTests`, `SingleUserPersistenceIntegrationTests` | COMPLETE — M0-S4 authentication / UserContext foundation; Hosted capacity remains provisional until M6 |

@@ -709,6 +709,17 @@ Target:
 
 `OPERATED`
 
+### M0-S6A confirmed evidence
+
+- `ModelPurpose` 表示业务为什么调用，`ModelOperation` 表示执行哪种技术操作；两者共同组成 route key；
+- `ProviderId` / `ModelId` 是外部可配置 value object，不使用无法覆盖用户自定义名称的 enum；
+- identifier 在边界拒绝外围空白，使错误配置 fail fast，不通过静默 trim 隐藏 identity mismatch；
+- Operation enum 建立编译期受控 vocabulary，不代表对应 Typed Port、Adapter 或 runtime capability 已实现；
+- focused tests、server compile、Diff Review 与 Explain Back 已通过。
+
+当前 Ownership 为 `L1`：已定位并理解 route vocabulary；真实 invocation、failure、Credential 与
+Provider Adapter path 尚未实现，不能把本次 evidence 解释为完整 Model Gateway Ownership。
+
 ---
 
 ## 11.9 Trace & Eval
