@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-29
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6B / READY_TO_COMMIT
-> Production implementation: M0-S6B COMPLETE
+> Current Gate: M0-S6C / READY_TO_COMMIT
+> Production implementation: M0-S6C COMPLETE
 
 ## Approved Decisions
 
@@ -44,6 +44,8 @@
 - M0-S6 默认不自动 retry 或静默 cross-provider fallback；后者只有在用户配置、transient Credential、
   capability compatibility 与明确 policy 共同授权后才能进入后续 Scope。完整 Contract 见
   `docs/features/MODEL_GATEWAY.md`。
+- M0-S6C 使用 `INSTRUCTION` / `USER` / `MODEL` 内部 message role、sealed Text output specification、
+  portable response / finish reason 与 optional token usage；不引入 Provider-specific option Map。
 
 ## Completed Review
 
@@ -71,11 +73,13 @@
 22. M0-S6A portable route vocabulary Scope、implementation、focused verification 与 targeted Diff Review。
 23. M0-S6B typed result / failure Scope、implementation、`routing` / `result` contract package separation、
     S6A + S6B focused regression、server compile 与 targeted Diff Review。
+24. M0-S6C provider-neutral Text Generation request / response / port、focused contract regression、
+    server compile、Diff Review 与 scope-limited Ownership Check。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S6B
+Selected slice: M0-S6C
 Gate: READY_TO_COMMIT
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
@@ -84,16 +88,16 @@ Implementation Scope: APPROVED
 Implementation: COMPLETE
 Verification: COMPLETE
 Code Review: PASS
-Ownership Check: COMPLETE
-Production baseline: M0-S6A COMPLETE (`e6e163a`)
-Current target: typed success / normalized operational failure contract
+Ownership Check: COMPLETE (contract boundary only)
+Production baseline: M0-S6B COMPLETE (`666e2e6`)
+Current target: provider-neutral Text Generation typed request / response / port
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S6B 等待人工 Commit Decision。`READY_TO_COMMIT` 不授权 Codex 自动 commit，也不授权开始
-`M0-S6C`；下一 slice 仍需独立 Scope Decision。
+M0-S6C 等待人工 Commit Decision。当前 Ownership 只覆盖 typed contract 与尚未实现的边界，不代表
+完整 Provider invocation ownership；`READY_TO_COMMIT` 不授权开始 `M0-S6D`。
 
 ## Blockers
 

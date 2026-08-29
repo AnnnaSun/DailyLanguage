@@ -736,6 +736,23 @@ Provider Adapter path 尚未实现，不能把本次 evidence 解释为完整 Mo
 Ownership 仍为 `L1`：S6B 增强了 contract understanding，但尚不存在可追踪的 invocation call chain，
 不满足 L2 的真实 Entry → Call → Result evidence。
 
+### M0-S6C confirmed evidence
+
+- `TextGenerationRequest` 只描述 Purpose、ordered messages 与 output specification，不让业务调用方选择
+  Provider / Model；实际 route selection 与 Provider execution 明确留给 S6D / S6E；
+- `INSTRUCTION` / `USER` / `MODEL` 是单次 Model request 内的 message semantics，不是 Planner、
+  Conversation、Evaluator 等 Agent role；Memory / RAG data 也不自动获得 instruction authority；
+- sealed `TextOutputSpecification` 当前只有 Plain Text，但为已确认的 S8 typed Structured Output
+  specification 保留携带 schema 的受控扩展点，不使用 enum + nullable fields 或 arbitrary Map；
+- `TextGenerationResponse` 只汇总实际 Provider / Model、text、normalized finish reason 与 optional token
+  usage；Provider raw response 与 raw finish reason 不进入业务 contract；
+- 用户在 Ownership 讨论中明确指出当前只有 Port contract，完整 routing / Adapter / Provider invocation
+  尚未出现；因此本次 Ownership Check 只覆盖 typed contract，不要求解释未来调用链；
+- focused Model Gateway regression、server compile 与 Diff Review 已通过。
+
+Ownership 保持 `L1`：已经能够定位并质疑 contract boundary，但没有真实 Port implementation、route
+resolver、Adapter 或 external call evidence，不能提升为 L2。
+
 ---
 
 ## 11.9 Trace & Eval

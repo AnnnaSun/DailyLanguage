@@ -171,7 +171,25 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 | M0-S5 | Language workspace minimum use case | create/list/switch profile；语言状态硬隔离 |
 | M0-S6 | Model Gateway contract | 业务代码不依赖 concrete provider；timeout/error contract 明确 |
 | M0-S7 | BYOK transient credential path | Credential 不持久化、不进入 logs/traces/exceptions |
-| M0-S8 | Structured Output 与 minimal Trace walking skeleton | invalid output 不落长期状态；metadata 可追踪 |
+| M0-S8 | Structured Output 与 minimal Trace walking skeleton | invalid output 不落长期状态；metadata 可追踪；unknown Provider finish reason 具有受控诊断策略 |
+
+#### M0-S8 Reserved Observability Decision
+
+M0-S8 设计 minimal Trace 时，必须显式处理 Provider raw finish reason：
+
+- 业务 `TextGenerationResponse` 与持久化 Trace 只保存 normalized finish reason；
+- 无法可靠映射时返回 `UNKNOWN`，并产生 rate-limited structured warning，记录安全的
+  `ProviderId`、`ModelId`、Adapter version 与 Trace ID；
+- raw value 符合受限 token allowlist 和长度上限时，warning 可以记录经过结构化转义的值，以便定位
+  Provider 新增枚举、Adapter 映射遗漏或响应解析 Bug；
+- raw value 不符合 allowlist、包含控制字符或超过长度上限时，不直接记录内容，只记录 missing / invalid
+  分类、原始长度与安全 digest，必要时再通过显式启用的受控 Debug 复现；
+- 正常、已知的 finish reason 不重复记录 raw value；raw value 不得写入持久化 Trace 或 metric label；
+- 受控 Debug 必须定义环境开关、访问控制与保留期限；
+- 即使开启受控诊断，也不得记录完整 Provider raw response、Prompt、Conversation、Credential 或其他 Secret。
+
+以上只保留 S8 的设计约束；具体 allowlist、长度、rate limit、digest、日志级别与 Debug 开关留到 S8
+Scope / Architecture Decision，不在 S6C 实现。
 
 ### M0 Slice Control
 
@@ -572,13 +590,13 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | --- | --- | --- | --- |
 | M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
-| M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | PENDING |
+| M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
 | M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | PENDING |
 | M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
 | M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
 
-以上是已批准 Design 下的 implementation slices。`M0-S6A` 已完成 implementation、verification、
-Diff Review 与 Human Ownership Check；不得自动进入 S6B。
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 与 `M0-S6B` 已完成并提交；`M0-S6C`
+已完成 implementation 与 verification，当前停在独立 Diff Review Gate。
 
 #### Proposed M0-S6A Current Slice Contract
 
@@ -639,6 +657,45 @@ Explicitly Out of Scope:
   timeout execution；retry；fallback；BYOK；Structured Output；Trace；Workflow / Learning State mutation。
 Verification:
 - focused unit tests；S6A + S6B domain regression；server compile；targeted Diff review。
+```
+
+#### Approved M0-S6C Current Slice Contract
+
+```text
+Task / Slice: M0-S6C — Text Generation Typed Port
+Goal: 让业务调用方只通过 provider-neutral typed request / response 发起单次 Text Generation。
+Expected Behavior:
+- TextGenerationPort 只接受 TextGenerationRequest，并返回 ModelResult<TextGenerationResponse>；
+- Request 包含 ModelPurpose、非空有序 messages 与 TextOutputSpecification，不包含 Provider / Model、
+  Credential、Domain identity、timeout、Trace detail 或 arbitrary options；
+- TextMessage 使用内部 INSTRUCTION / USER / MODEL role；content 拒绝 null / blank，但不自动 trim；
+- TextOutputSpecification 是为已确认 S8 Structured Output change axis 保留的 sealed typed boundary，
+  S6C 只实现 PlainText；
+- Response 包含 selected ProviderId / ModelId、非 null text、normalized finish reason 与 optional ModelUsage；
+- finish reason 固化为 COMPLETED、LENGTH_LIMIT、CONTENT_FILTERED、UNKNOWN；
+- ModelUsage 只保存非负 inputTokens / outputTokens，不估算、不包含 cost 或 Provider-specific usage。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationRequest.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextMessage.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextOutputSpecification.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationResponse.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelUsage.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationRequestTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationResponseTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationPortTests.java
+Architecture / Data / API / Security Impact:
+- 新增第一个 Typed Operation Port；无 schema、HTTP API、Credential、Provider SDK 或 dependency 变化。
+Critical Code Expected:
+- messages defensive copy、顺序保持与 null / blank rejection；
+- ModelResult<TextGenerationResponse> 的显式 success / failure；
+- Response portable fields 与 token usage invariant。
+Explicitly Out of Scope:
+- route resolution；Provider Adapter / actual call；Credential；timeout；failure translation；retry / fallback；
+  Structured Output schema；Tool Calling；sampling options；Trace implementation；Workflow / Learning State mutation。
+Verification:
+- focused S6C tests；S6A + S6B + S6C contract regression；server compile；targeted Diff review。
 ```
 
 ## 4. Later-phase Planning Rule
@@ -754,8 +811,13 @@ M0-S6B Implementation: COMPLETE
 M0-S6B Verification: COMPLETE
 M0-S6B Review: COMPLETE
 M0-S6B Ownership Check: COMPLETE
-M0-S6B: COMPLETE / READY_TO_COMMIT
-M0-S6C: NOT_STARTED
+M0-S6B: COMPLETE (`666e2e6`)
+M0-S6C Scope: APPROVED
+M0-S6C Implementation: COMPLETE
+M0-S6C Verification: COMPLETE
+M0-S6C Review: COMPLETE
+M0-S6C Ownership Check: COMPLETE (contract boundary only)
+M0-S6C: COMPLETE / READY_TO_COMMIT
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
@@ -763,5 +825,7 @@ targeted Diff Review。Human Ownership Check 已确认用户理解 Purpose / Ope
 value type 与 enum vocabulary 不等于 runtime capability，并已提交为 `e6e163a`。`M0-S6B` 已按批准
 Scope 完成 typed result / failure contract、focused regression、server compile 与 targeted Diff Review；
 Human Ownership Check 已确认用户理解 sealed result 的互斥状态、route identity pairing，以及
-`retryAfter` 是 metadata 而不是 retry execution。当前等待人工 Commit Decision；不得自动进入
-`M0-S6C` Text Generation Typed Port。
+`retryAfter` 是 metadata 而不是 retry execution，并已提交为 `666e2e6`。`M0-S6C` 已完成 typed
+Text Generation request / response / port、focused verification 与 Diff Review。Ownership 明确限制在当前
+typed contract，以及识别 route resolution / Provider execution 尚未实现；当前等待人工 Commit Decision，
+不得自动进入 `M0-S6D` fixed route / Provider Adapter seam。
