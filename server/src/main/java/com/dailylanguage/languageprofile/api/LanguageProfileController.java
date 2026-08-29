@@ -1,5 +1,6 @@
 package com.dailylanguage.languageprofile.api;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -23,10 +24,17 @@ public class LanguageProfileController {
         this.languageProfileAccessService = languageProfileAccessService;
     }
 
+    @GetMapping
+    List<LanguageProfileIdentity> listLanguageProfiles(
+            @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext
+    ) {
+        return languageProfileAccessService.listProfilesOwnedByUser(userContext);
+    }
+
     @GetMapping("/{languageProfileId}")
     ResponseEntity<LanguageProfileIdentity> getLanguageProfile(
             @PathVariable UUID languageProfileId,
-            @AuthenticationPrincipal UserContext userContext
+            @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext
     ) {
         return ResponseEntity.of(
                 languageProfileAccessService.findProfileOwnedByUser(languageProfileId, userContext));

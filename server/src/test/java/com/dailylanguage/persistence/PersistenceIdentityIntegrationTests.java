@@ -58,6 +58,20 @@ class PersistenceIdentityIntegrationTests {
     }
 
     @Test
+    void listsOnlyProfilesOwnedByUserInDeterministicOrder() {
+        UUID ownerId = userRepository.create();
+        UUID otherUserId = userRepository.create();
+        LanguageProfileIdentity japaneseProfile = languageProfileRepository.create(ownerId, "ja");
+        LanguageProfileIdentity englishProfile = languageProfileRepository.create(ownerId, "en");
+        LanguageProfileIdentity otherUsersProfile = languageProfileRepository.create(otherUserId, "de");
+
+        assertThat(languageProfileRepository.listByUserId(ownerId))
+                .containsExactly(englishProfile, japaneseProfile);
+        assertThat(languageProfileRepository.listByUserId(otherUserId))
+                .containsExactly(otherUsersProfile);
+    }
+
+    @Test
     void rejectsDuplicateLanguageWithinOneUser() {
         UUID userId = userRepository.create();
         languageProfileRepository.create(userId, "EN");

@@ -65,6 +65,54 @@ class LanguageProfileSecurityTests {
     }
 
     @Test
+    void rejectsUnauthenticatedListAccess() throws Exception {
+        mockMvc.perform(get("/api/language-profiles"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(languageProfileRepository);
+    }
+
+    @Test
+    void listsProfilesOwnedByAuthenticatedUser() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        LanguageProfileIdentity englishProfile =
+                new LanguageProfileIdentity(UUID.randomUUID(), ownerId, "en");
+        LanguageProfileIdentity japaneseProfile =
+                new LanguageProfileIdentity(UUID.randomUUID(), ownerId, "ja");
+        when(languageProfileRepository.listByUserId(ownerId))
+                .thenReturn(List.of(englishProfile, japaneseProfile));
+
+        mockMvc.perform(get("/api/language-profiles")
+                        .with(authenticatedAs(ownerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(englishProfile.id().toString()))
+                .andExpect(jsonPath("$[0].userId").value(ownerId.toString()))
+                .andExpect(jsonPath("$[0].languageCode").value("en"))
+                .andExpect(jsonPath("$[1].id").value(japaneseProfile.id().toString()))
+                .andExpect(jsonPath("$[1].userId").value(ownerId.toString()))
+                .andExpect(jsonPath("$[1].languageCode").value("ja"));
+
+        verify(languageProfileRepository).listByUserId(ownerId);
+    }
+
+    @Test
+    void listIgnoresUserIdSuppliedByTheRequest() throws Exception {
+        UUID requestedUserId = UUID.randomUUID();
+        UUID authenticatedUserId = UUID.randomUUID();
+        when(languageProfileRepository.listByUserId(authenticatedUserId)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/language-profiles")
+                        .param("userId", requestedUserId.toString())
+                        .header("X-User-Id", requestedUserId)
+                        .with(authenticatedAs(authenticatedUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        verify(languageProfileRepository).listByUserId(authenticatedUserId);
+        verify(languageProfileRepository, never()).listByUserId(requestedUserId);
+    }
+
+    @Test
     void returnsProfileOwnedByAuthenticatedUser() throws Exception {
         UUID ownerId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
@@ -127,6 +175,25 @@ class LanguageProfileSecurityTests {
                 .andExpect(jsonPath("$.userId").value(singleUserId.toString()));
 
         verify(languageProfileRepository).findByIdAndUserId(profileId, singleUserId);
+    }
+
+    @Test
+    void singleUserModeListsProfilesThroughTheSameDomainAuthorizationPath() throws Exception {
+        UUID singleUserId = UUID.randomUUID();
+        LanguageProfileIdentity profile =
+                new LanguageProfileIdentity(UUID.randomUUID(), singleUserId, "en");
+        when(persistentSingleUser.userContext())
+                .thenReturn(Optional.of(new UserContext(singleUserId)));
+        when(languageProfileRepository.listByUserId(singleUserId)).thenReturn(List.of(profile));
+
+        mockMvc.perform(get("/api/language-profiles")
+                        .param("userId", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(profile.id().toString()))
+                .andExpect(jsonPath("$[0].userId").value(singleUserId.toString()))
+                .andExpect(jsonPath("$[0].languageCode").value("en"));
+
+        verify(languageProfileRepository).listByUserId(singleUserId);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor authenticatedAs(UUID userId) {

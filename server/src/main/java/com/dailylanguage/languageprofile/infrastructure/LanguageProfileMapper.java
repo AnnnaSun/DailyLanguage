@@ -1,5 +1,6 @@
 package com.dailylanguage.languageprofile.infrastructure;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +19,6 @@ interface LanguageProfileMapper {
     Optional<LanguageProfileIdentity> findByIdAndUserId(
             @Param("languageProfileId") UUID languageProfileId,
             @Param("userId") UUID userId);
+
+    List<LanguageProfileIdentity> findAllByUserId(@Param("userId") UUID userId);
 }

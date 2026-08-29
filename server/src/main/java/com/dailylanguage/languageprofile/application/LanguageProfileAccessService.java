@@ -1,5 +1,6 @@
 package com.dailylanguage.languageprofile.application;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,11 @@ public class LanguageProfileAccessService {
 
     public LanguageProfileAccessService(LanguageProfileRepository languageProfileRepository) {
         this.languageProfileRepository = languageProfileRepository;
+    }
+
+    public List<LanguageProfileIdentity> listProfilesOwnedByUser(UserContext userContext) {
+        Objects.requireNonNull(userContext, "userContext must not be null");
+        return languageProfileRepository.listByUserId(userContext.userId());
     }
 
     public Optional<LanguageProfileIdentity> findProfileOwnedByUser(

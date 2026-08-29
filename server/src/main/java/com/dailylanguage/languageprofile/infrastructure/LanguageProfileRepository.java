@@ -1,6 +1,7 @@
 package com.dailylanguage.languageprofile.infrastructure;
 
 import java.util.IllformedLocaleException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,6 +34,11 @@ public class LanguageProfileRepository {
         Objects.requireNonNull(userId, "userId must not be null");
 
         return languageProfileMapper.findByIdAndUserId(languageProfileId, userId);
+    }
+
+    public List<LanguageProfileIdentity> listByUserId(UUID userId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        return languageProfileMapper.findAllByUserId(userId);
     }
 
     private static String normalizeLanguageCode(String languageCode) {

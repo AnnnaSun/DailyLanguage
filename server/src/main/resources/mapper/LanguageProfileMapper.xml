@@ -32,4 +32,11 @@
         WHERE id = #{languageProfileId, jdbcType=OTHER}
           AND user_id = #{userId, jdbcType=OTHER}
     </select>
+
+    <select id="findAllByUserId" resultMap="languageProfileIdentityResult">
+        SELECT id, user_id, language_code
+        FROM language_profile
+        WHERE user_id = #{userId, jdbcType=OTHER}
+        ORDER BY language_code ASC, id ASC
+    </select>
 </mapper>
