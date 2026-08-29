@@ -42,11 +42,12 @@ public final class LocalRegistrationService {
     }
 
     /**
-     * Registers a LOCAL_EMAIL identity whose password credential is managed by this application.
-     * Apple/OIDC credentials and phone OTP secrets must use provider-specific flows instead.
+     * 注册由本应用管理 password credential 的 LOCAL_EMAIL identity。
+     * Apple / OIDC credential 与 phone OTP secret 必须进入各自的 provider-specific flow。
      */
     public UUID register(String submittedEmail, String submittedPassword) {
         String normalizedEmail = normalizeEmail(submittedEmail);
+        // 先做低成本 deterministic policy，再占用受限的 Argon2 capacity。
         validatePassword(submittedPassword, normalizedEmail);
         String encodedPasswordHash = hashPassword(submittedPassword);
 
@@ -106,7 +107,7 @@ public final class LocalRegistrationService {
     }
 
     private static void logUnexpectedFailure(String failureStage, RuntimeException exception) {
-        // Database exception messages and throwable chains can contain the submitted email.
+        // Database exception message 与 throwable chain 可能包含提交的 email，日志只保留 stage 和类型。
         LOGGER.error(
                 "Local registration failed stage={} exceptionType={}",
                 failureStage,

@@ -16,9 +16,14 @@ import org.springframework.stereotype.Component;
 
 import com.dailylanguage.authentication.domain.LocalEmailNormalizer;
 
+/**
+ * 同时按 client address 与 normalized email 计数，任一维度超限都会拒绝请求。
+ * Redis key 只保存维度值的 SHA-256，不直接持久化提交的邮箱或地址文本。
+ */
 @Component
 public final class RedisAuthenticationAttemptRateLimiter {
 
+    // Lua 将 INCR、首次 TTL 与超限判断放在一次 Redis 原子执行中，避免并发请求丢失窗口。
     private static final DefaultRedisScript<Long> RECORD_ATTEMPT_SCRIPT = new DefaultRedisScript<>("""
             local attempts = redis.call('INCR', KEYS[1])
             if attempts == 1 then
@@ -92,6 +97,7 @@ public final class RedisAuthenticationAttemptRateLimiter {
             AttemptPolicy policy,
             String clientAddress,
             String submittedEmail) {
+        // 两个 bucket 都必须记录，防止攻击者只轮换 email 或只轮换 client address 绕过限制。
         AttemptDecision clientAddressDecision = recordBucketAttempt(
                 policy,
                 "client-address",
@@ -116,6 +122,7 @@ public final class RedisAuthenticationAttemptRateLimiter {
             String dimension,
             String bucketValue,
             int maxAttempts) {
+        // hash 后的 bucket key 避免把原始 login identity 写入 Redis keyspace。
         String bucketKey = policy.keyPrefix() + ':' + dimension + ':' + sha256(bucketValue);
         Long remainingWindowMillis = redisTemplate.execute(
                 RECORD_ATTEMPT_SCRIPT,

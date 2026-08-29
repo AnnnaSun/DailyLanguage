@@ -23,6 +23,8 @@
             flushCache="true">
         INSERT INTO language_profile (user_id, language_code)
         VALUES (#{userId, jdbcType=OTHER}, #{languageCode, jdbcType=VARCHAR})
+        <!-- 依赖数据库唯一约束原子裁决并发重复创建，避免 check-then-insert race。 -->
+        ON CONFLICT (user_id, language_code) DO NOTHING
         RETURNING id, user_id, language_code
     </select>
 
@@ -31,5 +33,12 @@
         FROM language_profile
         WHERE id = #{languageProfileId, jdbcType=OTHER}
           AND user_id = #{userId, jdbcType=OTHER}
+    </select>
+
+    <select id="findAllByUserId" resultMap="languageProfileIdentityResult">
+        SELECT id, user_id, language_code
+        FROM language_profile
+        WHERE user_id = #{userId, jdbcType=OTHER}
+        ORDER BY language_code ASC, id ASC
     </select>
 </mapper>

@@ -12,6 +12,10 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
+/**
+ * Authentication / authorization 的组合入口。Filter 顺序本身属于安全语义，
+ * 决定 CSRF、singleton identity、Rate Limit 与 Argon2 verification 谁先执行。
+ */
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
@@ -35,7 +39,7 @@ public class SecurityConfiguration {
                         .permitAll()
                         .anyRequest().authenticated())
                 .formLogin(formLogin -> formLogin
-                        // Marking this as custom suppresses Spring Security's generated HTML login page.
+                        // 显式声明自定义 login page，阻止 Spring Security 生成 HTML 登录页。
                         .loginPage("/api/auth/login")
                         .loginProcessingUrl("/api/auth/login")
                         .usernameParameter("email")
@@ -68,7 +72,7 @@ public class SecurityConfiguration {
                 .addFilterAfter(
                         new SingleUserAuthenticationFilter(persistentSingleUser),
                         CsrfFilter.class)
-                // Invalid CSRF requests stop first; single-user mode stops login before Redis and Argon2 work.
+                // 非法 CSRF 最先终止；singleton mode 随后在 Redis Rate Limit 和 Argon2 前隐藏 login。
                 .addFilterAfter(
                         new LoginRateLimitFilter(
                                 authenticationAttemptRateLimiter,
@@ -78,6 +82,7 @@ public class SecurityConfiguration {
     }
 
     private static CookieCsrfTokenRepository spaCsrfTokenRepository(boolean secureCookie) {
+        // SPA 需要读取 XSRF-TOKEN 并回传 header；认证 Session cookie 仍保持 HttpOnly。
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");

@@ -42,12 +42,12 @@ public final class LocalPasswordBlocklist {
     }
 
     /**
-     * Checks only a submitted password for an application-managed password credential.
-     * External provider passwords and phone OTP values do not enter this blocklist.
+     * 只检查应用管理 password credential 的 submitted password。
+     * External provider password 与 phone OTP value 不进入该 blocklist。
      */
     boolean contains(String submittedPassword) {
         Objects.requireNonNull(submittedPassword, "submittedPassword must not be null");
-        // SHA-256 is only a public blocklist lookup key; stored credentials continue to use Argon2id.
+        // SHA-256 只作为公开 blocklist lookup key；stored credential 仍必须使用 Argon2id。
         byte[] submittedPasswordFingerprint = sha256(submittedPassword.getBytes(StandardCharsets.UTF_8));
 
         int low = 0;
@@ -117,7 +117,7 @@ public final class LocalPasswordBlocklist {
             throw new IllegalStateException("Local password blocklist entry count is unexpected");
         }
         String actualResourceSha256 = HexFormat.of().formatHex(sha256(blockedPasswordFingerprints));
-        // A resource update must not silently change the registration security policy.
+        // resource 更新不得静默改变 registration security policy。
         if (!EXPECTED_RESOURCE_SHA256.equals(actualResourceSha256)) {
             throw new IllegalStateException("Local password blocklist checksum is unexpected");
         }

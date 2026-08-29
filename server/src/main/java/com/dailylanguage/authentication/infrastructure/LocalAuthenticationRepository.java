@@ -23,8 +23,8 @@ public class LocalAuthenticationRepository {
     }
 
     /**
-     * Attaches an application-managed LOCAL_EMAIL credential to an existing User.
-     * Provider-issued subjects such as Apple {@code sub} values require their own persistence flow.
+     * 为已有 User 绑定由本应用管理的 LOCAL_EMAIL credential。
+     * Apple {@code sub} 等 provider-issued subject 必须使用独立 persistence flow。
      */
     @Transactional
     public UUID createLocalEmailIdentity(
@@ -46,7 +46,7 @@ public class LocalAuthenticationRepository {
     }
 
     /**
-     * Loads only the application-managed LOCAL_EMAIL credential used for password authentication.
+     * 只读取 password authentication 所需的应用管理 LOCAL_EMAIL credential。
      */
     public Optional<StoredLocalPasswordCredential> findByEmail(String submittedEmail) {
         return localAuthenticationMapper.findLocalPasswordCredential(
@@ -72,6 +72,7 @@ record StoredLocalPasswordCredential(
 
     @Override
     public String toString() {
+        // credential object 可能进入诊断日志，任何情况下都不能展开 stored password hash。
         return "StoredLocalPasswordCredential[authenticationIdentityId=" + authenticationIdentityId
                 + ", userId=" + userId
                 + ", normalizedEmail=" + normalizedEmail

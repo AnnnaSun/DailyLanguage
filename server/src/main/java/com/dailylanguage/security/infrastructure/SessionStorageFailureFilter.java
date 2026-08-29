@@ -15,6 +15,10 @@ import org.springframework.session.web.http.SessionRepositoryFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * 位于 Spring Session Filter 之前，把认证端点上的 Redis Session 故障收敛为稳定的 503。
+ * Session storage 不可用时必须 fail closed，不能把请求当成无状态认证继续处理。
+ */
 @Component
 @Order(SessionRepositoryFilter.DEFAULT_ORDER - 1)
 public final class SessionStorageFailureFilter extends OncePerRequestFilter {
@@ -39,6 +43,7 @@ public final class SessionStorageFailureFilter extends OncePerRequestFilter {
         }
         catch (RedisConnectionFailureException exception) {
             if (response.isCommitted()) {
+                // 已提交的响应不能安全改写；继续抛出以避免伪装成完整、成功的认证响应。
                 throw exception;
             }
 

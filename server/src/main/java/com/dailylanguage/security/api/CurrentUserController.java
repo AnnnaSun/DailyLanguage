@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.dailylanguage.security.domain.UserContext;
 
+/**
+ * 返回当前 SecurityContext 中已经认证的用户身份，不接受客户端指定查询目标。
+ */
 @RestController
 @RequestMapping("/api/auth")
 public final class CurrentUserController {

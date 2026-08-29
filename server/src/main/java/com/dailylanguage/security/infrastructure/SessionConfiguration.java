@@ -21,9 +21,10 @@ public class SessionConfiguration implements BeanClassLoaderAware {
 
     private ClassLoader beanClassLoader = SessionConfiguration.class.getClassLoader();
 
-    // Spring Session discovers a serializer override through this exact infrastructure bean name.
+    // Spring Session 通过这个固定 infrastructure bean name 发现 serializer override。
     @Bean(name = SPRING_SESSION_SERIALIZER_BEAN)
     RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+        // Session polymorphic deserialization 只允许 Security types 与本项目 UserContext，避免宽泛反序列化。
         BasicPolymorphicTypeValidator.Builder allowedSessionTypes = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType(UserContext.class);
         JsonMapper sessionJsonMapper = JsonMapper.builder()

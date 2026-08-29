@@ -49,9 +49,9 @@ public final class LocalPasswordHasher {
     }
 
     /**
-     * Encodes application-managed local password material with the current password-hash version.
-     * Registration persists the result; unknown-account password hashes remain in memory.
-     * Passwords owned by Apple/OIDC providers must never reach this boundary.
+     * 使用当前 password-hash version 编码应用管理的 local password material。
+     * Registration 只持久化正常结果；unknown-account hash 仅保留在内存。
+     * Apple / OIDC provider 管理的密码不得进入该边界。
      */
     public String hash(CharSequence submittedPassword) {
         Objects.requireNonNull(submittedPassword, "submittedPassword must not be null");
@@ -64,7 +64,7 @@ public final class LocalPasswordHasher {
     }
 
     /**
-     * Verifies only an application-managed local password against its stored password hash.
+     * 只验证应用管理的 local password 与对应 stored password hash。
      */
     public boolean matches(CharSequence submittedPassword, String encodedPasswordHash) {
         if (submittedPassword == null || !isCurrentPasswordHash(encodedPasswordHash)) {
@@ -80,7 +80,7 @@ public final class LocalPasswordHasher {
     }
 
     /**
-     * Creates a non-persistent password hash so unknown-account login follows the current Argon2id path.
+     * 创建非持久化 placeholder hash，使 unknown-account login 也执行当前 Argon2id verification path。
      */
     String createUnknownAccountPasswordHash() {
         return hash(UNKNOWN_ACCOUNT_PLACEHOLDER_PASSWORD);
@@ -90,7 +90,7 @@ public final class LocalPasswordHasher {
         if (encodedPasswordHash == null) {
             return false;
         }
-        // An encoded password hash must not be allowed to select unexpected Argon2 resource parameters.
+        // encoded hash 不得自行选择未批准的 Argon2 resource parameter。
         Matcher matcher = CURRENT_PASSWORD_HASH_PATTERN.matcher(encodedPasswordHash);
         if (!matcher.matches()) {
             return false;

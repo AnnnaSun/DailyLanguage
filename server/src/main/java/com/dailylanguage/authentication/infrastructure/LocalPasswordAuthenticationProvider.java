@@ -16,6 +16,11 @@ import org.springframework.stereotype.Component;
 
 import com.dailylanguage.security.domain.UserContext;
 
+/**
+ * LOCAL_EMAIL password login 的认证边界。成功时只把 UserContext 放入 principal；
+ * credential rejection 使用无差别响应；infrastructure failure 单独收敛为 unavailable，
+ * 并确保 unknown account 仍执行一次受控 Argon2 verification。
+ */
 @Component
 public final class LocalPasswordAuthenticationProvider implements AuthenticationProvider {
 
@@ -49,6 +54,7 @@ public final class LocalPasswordAuthenticationProvider implements Authentication
         try {
             Optional<StoredLocalPasswordCredential> storedPasswordCredential =
                     lookupStoredCredential(loginRequest);
+            // unknown account 使用预生成的合法 hash，缩小“账号不存在”和“密码错误”的 timing 差异。
             String passwordHashToCheck = storedPasswordCredential
                     .map(StoredLocalPasswordCredential::storedPasswordHash)
                     .orElse(this.unknownAccountPasswordHash);
@@ -67,7 +73,7 @@ public final class LocalPasswordAuthenticationProvider implements Authentication
                     List.of());
         }
         finally {
-            // ProviderManager retains failed authentication requests on exceptions in Spring Security 7.1.
+            // Spring Security 7.1 的 ProviderManager 在异常时会保留 request，因此必须在此主动清除 credential。
             loginRequest.eraseCredentials();
         }
     }
@@ -88,7 +94,7 @@ public final class LocalPasswordAuthenticationProvider implements Authentication
             return localAuthenticationRepository.findByEmail(submittedEmail);
         }
         catch (IllegalArgumentException exception) {
-            // A malformed email is an expected credential rejection, not an infrastructure failure.
+            // 非法 email 属于预期的 credential rejection，不应伪装成 infrastructure failure。
             return Optional.empty();
         }
         catch (RuntimeException exception) {
@@ -116,7 +122,7 @@ public final class LocalPasswordAuthenticationProvider implements Authentication
     private static AuthenticationServiceException authenticationUnavailable(
             String failureStage,
             RuntimeException exception) {
-        // Throwable messages and chains may contain submitted identity or credential material.
+        // Throwable message 与 chain 可能包含 identity / credential material，日志只保留 stage 和类型。
         LOGGER.error(
                 "Local authentication failed stage={} exceptionType={}",
                 failureStage,
