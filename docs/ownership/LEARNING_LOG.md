@@ -709,6 +709,50 @@ Target:
 
 `OPERATED`
 
+### M0-S6A confirmed evidence
+
+- `ModelPurpose` 表示业务为什么调用，`ModelOperation` 表示执行哪种技术操作；两者共同组成 route key；
+- `ProviderId` / `ModelId` 是外部可配置 value object，不使用无法覆盖用户自定义名称的 enum；
+- identifier 在边界拒绝外围空白，使错误配置 fail fast，不通过静默 trim 隐藏 identity mismatch；
+- Operation enum 建立编译期受控 vocabulary，不代表对应 Typed Port、Adapter 或 runtime capability 已实现；
+- focused tests、server compile、Diff Review 与 Explain Back 已通过。
+
+当前 Ownership 为 `L1`：已定位并理解 route vocabulary；真实 invocation、failure、Credential 与
+Provider Adapter path 尚未实现，不能把本次 evidence 解释为完整 Model Gateway Ownership。
+
+### M0-S6B confirmed evidence
+
+- sealed `ModelResult<T>` 只允许 Success 或 Failure，排除 nullable response + error 的 both / neither
+  非法状态；
+- `ModelFailureKind` 表示为什么失败，ProviderId + ModelId 表示在哪条 route 失败；route identity
+  必须同时存在或同时缺失；
+- partial route identity 是对象 invariant 被破坏，不是需要新增的一种 Provider failure；
+- `retryAfter` 只保存 Rate Limit / Temporary Unavailable 的正 Duration metadata，不执行 scheduler、
+  sleep、第二次 Provider call、retry counter 或 fallback；
+- route vocabulary 与 invocation result contract 分别位于 `modelgateway.routing` 和
+  `modelgateway.result`，避免后续 Typed Port 继续堆入宽泛 `domain` package；
+- S6A + S6B focused regression、server compile、Diff Review 与 Explain Back 已通过。
+
+Ownership 仍为 `L1`：S6B 增强了 contract understanding，但尚不存在可追踪的 invocation call chain，
+不满足 L2 的真实 Entry → Call → Result evidence。
+
+### M0-S6C confirmed evidence
+
+- `TextGenerationRequest` 只描述 Purpose、ordered messages 与 output specification，不让业务调用方选择
+  Provider / Model；实际 route selection 与 Provider execution 明确留给 S6D / S6E；
+- `INSTRUCTION` / `USER` / `MODEL` 是单次 Model request 内的 message semantics，不是 Planner、
+  Conversation、Evaluator 等 Agent role；Memory / RAG data 也不自动获得 instruction authority；
+- sealed `TextOutputSpecification` 当前只有 Plain Text，但为已确认的 S8 typed Structured Output
+  specification 保留携带 schema 的受控扩展点，不使用 enum + nullable fields 或 arbitrary Map；
+- `TextGenerationResponse` 只汇总实际 Provider / Model、text、normalized finish reason 与 optional token
+  usage；Provider raw response 与 raw finish reason 不进入业务 contract；
+- 用户在 Ownership 讨论中明确指出当前只有 Port contract，完整 routing / Adapter / Provider invocation
+  尚未出现；因此本次 Ownership Check 只覆盖 typed contract，不要求解释未来调用链；
+- focused Model Gateway regression、server compile 与 Diff Review 已通过。
+
+Ownership 保持 `L1`：已经能够定位并质疑 contract boundary，但没有真实 Port implementation、route
+resolver、Adapter 或 external call evidence，不能提升为 L2。
+
 ---
 
 ## 11.9 Trace & Eval

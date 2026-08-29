@@ -171,7 +171,25 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 | M0-S5 | Language workspace minimum use case | create/list/switch profile；语言状态硬隔离 |
 | M0-S6 | Model Gateway contract | 业务代码不依赖 concrete provider；timeout/error contract 明确 |
 | M0-S7 | BYOK transient credential path | Credential 不持久化、不进入 logs/traces/exceptions |
-| M0-S8 | Structured Output 与 minimal Trace walking skeleton | invalid output 不落长期状态；metadata 可追踪 |
+| M0-S8 | Structured Output 与 minimal Trace walking skeleton | invalid output 不落长期状态；metadata 可追踪；unknown Provider finish reason 具有受控诊断策略 |
+
+#### M0-S8 Reserved Observability Decision
+
+M0-S8 设计 minimal Trace 时，必须显式处理 Provider raw finish reason：
+
+- 业务 `TextGenerationResponse` 与持久化 Trace 只保存 normalized finish reason；
+- 无法可靠映射时返回 `UNKNOWN`，并产生 rate-limited structured warning，记录安全的
+  `ProviderId`、`ModelId`、Adapter version 与 Trace ID；
+- raw value 符合受限 token allowlist 和长度上限时，warning 可以记录经过结构化转义的值，以便定位
+  Provider 新增枚举、Adapter 映射遗漏或响应解析 Bug；
+- raw value 不符合 allowlist、包含控制字符或超过长度上限时，不直接记录内容，只记录 missing / invalid
+  分类、原始长度与安全 digest，必要时再通过显式启用的受控 Debug 复现；
+- 正常、已知的 finish reason 不重复记录 raw value；raw value 不得写入持久化 Trace 或 metric label；
+- 受控 Debug 必须定义环境开关、访问控制与保留期限；
+- 即使开启受控诊断，也不得记录完整 Provider raw response、Prompt、Conversation、Credential 或其他 Secret。
+
+以上只保留 S8 的设计约束；具体 allowlist、长度、rate limit、digest、日志级别与 Debug 开关留到 S8
+Scope / Architecture Decision，不在 S6C 实现。
 
 ### M0 Slice Control
 
@@ -549,6 +567,173 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 真实 PostgreSQL / Redis integration、restricted-Container provisional evidence 与 Human Ownership
 审计完成。Hosted capacity confirmation 仍是 M6 的明确 deferred item，不阻塞 M0-S5。
 
+### M0-S6 Approved Detailed Design
+
+`M0-S6` 是 A 类核心 AI infrastructure slice。2026-08-29 已批准
+[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md) 中的 Detailed Design：
+
+- Model Gateway 是 provider-agnostic logical module boundary，不是万能 Java interface；
+- 每次调用只执行一个明确 `ModelOperation`；
+- fixed route key 使用 `ModelPurpose + ModelOperation`；
+- 不同 Operation 使用独立 Typed Port 与 Request / Response；
+- M0-S6 只实现第一个 Text Generation Port，不提前实现 Speech / Vision / Image / Embedding；
+- Gateway 负责 capability check、timeout 与 safe failure translation；
+- Application Workflow 负责多 Operation 的顺序、REQUIRED / OPTIONAL、partial success 与 degradation；
+- 默认不自动 retry，也不静默 cross-provider fallback；
+- Model infrastructure failure 不产生 Learning Evidence 或长期学习状态变化；
+- Credential、Structured Output validation 与 minimal Trace 分别留在 M0-S7 / M0-S8；
+- S6 不新增 Spring AI 或 concrete Provider SDK dependency。
+
+#### Proposed M0-S6 implementation slices
+
+| Slice | Goal | Observable behavior | Status |
+| --- | --- | --- | --- |
+| M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
+| M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
+| M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
+| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | REVIEW_PENDING |
+| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
+| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
+
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 与 `M0-S6B` 已完成并提交；`M0-S6C`
+已完成 implementation 与 verification，当前停在独立 Diff Review Gate。
+
+#### Proposed M0-S6A Current Slice Contract
+
+```text
+Task / Slice: M0-S6A — Portable route vocabulary
+Goal: 建立 Provider-neutral 的 Purpose、Operation、route key 与 Provider / Model identity。
+Expected Behavior:
+- ModelPurpose 与 ModelOperation 是两个独立受控维度；
+- 相同 Purpose 的不同 Operation 形成不同 route key；
+- ProviderId / ModelId 接受外部可配置 identifier，但拒绝 null、blank 与未规范化外围空白；
+- 所有类型均不依赖 Spring AI、Provider SDK、HTTP 或 Credential。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelPurpose.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelOperation.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelRouteKey.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ProviderId.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelId.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/routing/ModelRouteKeyTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/routing/ProviderModelIdentityTests.java
+Architecture / Data / API / Security Impact:
+- 实现已批准的 Model Gateway contract；无 schema、public HTTP API、Credential 或 dependency 变化。
+Explicitly Out of Scope:
+- ModelResult / ModelFailure；Text Generation Port；route configuration；Provider Adapter；
+  timeout；retry；fallback；BYOK；Structured Output；Trace；任何 Workflow 或 Learning State mutation。
+Verification:
+- focused unit tests；server compile；targeted Diff review。
+```
+
+#### Proposed M0-S6B Current Slice Contract
+
+```text
+Task / Slice: M0-S6B — Typed result / failure contract
+Goal: 建立调用方必须显式处理的 success / normalized operational failure contract。
+Expected Behavior:
+- ModelResult<T> 是 sealed result，只允许非 null Success<T> 或非 null Failure<T>；
+- ModelFailureKind 固化 S6 approved taxonomy：CAPABILITY_UNAVAILABLE、REQUEST_REJECTED、
+  AUTHENTICATION_FAILED、RATE_LIMITED、TIMEOUT、TEMPORARY_UNAVAILABLE、PROVIDER_FAILURE；
+- ModelFailure 必须包含 kind，可以不含 route identity，也可以同时包含 ProviderId + ModelId；
+- ProviderId / ModelId 必须同时存在或同时缺失，不允许 partial route identity；
+- retryAfter 是 optional positive Duration，只允许 RATE_LIMITED / TEMPORARY_UNAVAILABLE 使用；
+- retryAfter 存在时必须同时存在 ProviderId + ModelId；
+- Failure 不提供 raw response、exception message、stack trace、Prompt、Credential 或 arbitrary metadata。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelResult.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailure.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailureKind.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/result/ModelResultTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/result/ModelFailureTests.java
+Architecture / Data / API / Security Impact:
+- 实现已批准的 explicit failure contract；无 schema、public HTTP API、Credential 或 dependency 变化。
+Critical Code Expected:
+- ModelResult 的 success / failure exclusivity 与 null rejection；
+- ModelFailure 的 route identity pairing 与 retryAfter invariant。
+Explicitly Out of Scope:
+- Text Generation Request / Response / Port；route configuration；Provider Adapter / exception translation；
+  timeout execution；retry；fallback；BYOK；Structured Output；Trace；Workflow / Learning State mutation。
+Verification:
+- focused unit tests；S6A + S6B domain regression；server compile；targeted Diff review。
+```
+
+#### Approved M0-S6C Current Slice Contract
+
+```text
+Task / Slice: M0-S6C — Text Generation Typed Port
+Goal: 让业务调用方只通过 provider-neutral typed request / response 发起单次 Text Generation。
+Expected Behavior:
+- TextGenerationPort 只接受 TextGenerationRequest，并返回 ModelResult<TextGenerationResponse>；
+- Request 包含 ModelPurpose、非空有序 messages 与 TextOutputSpecification，不包含 Provider / Model、
+  Credential、Domain identity、timeout、Trace detail 或 arbitrary options；
+- TextMessage 使用内部 INSTRUCTION / USER / MODEL role；content 拒绝 null / blank，但不自动 trim；
+- TextOutputSpecification 是为已确认 S8 Structured Output change axis 保留的 sealed typed boundary，
+  S6C 只实现 PlainText；
+- Response 包含 selected ProviderId / ModelId、非 null text、normalized finish reason 与 optional ModelUsage；
+- finish reason 固化为 COMPLETED、LENGTH_LIMIT、CONTENT_FILTERED、UNKNOWN；
+- ModelUsage 只保存非负 inputTokens / outputTokens，不估算、不包含 cost 或 Provider-specific usage。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationRequest.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextMessage.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextOutputSpecification.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationResponse.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelUsage.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationRequestTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationResponseTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationPortTests.java
+Architecture / Data / API / Security Impact:
+- 新增第一个 Typed Operation Port；无 schema、HTTP API、Credential、Provider SDK 或 dependency 变化。
+Critical Code Expected:
+- messages defensive copy、顺序保持与 null / blank rejection；
+- ModelResult<TextGenerationResponse> 的显式 success / failure；
+- Response portable fields 与 token usage invariant。
+Explicitly Out of Scope:
+- route resolution；Provider Adapter / actual call；Credential；timeout；failure translation；retry / fallback；
+  Structured Output schema；Tool Calling；sampling options；Trace implementation；Workflow / Learning State mutation。
+Verification:
+- focused S6C tests；S6A + S6B + S6C contract regression；server compile；targeted Diff review。
+```
+
+#### Approved M0-S6D Current Slice Contract
+
+```text
+Task / Slice: M0-S6D — Fixed route and Provider Adapter seam
+Goal: 让 TextGenerationPort 通过 fixed Purpose + TEXT_GENERATION route 选择 Provider / Model，并只调用
+对应的 operation-specific Adapter 一次。
+Expected Behavior:
+- TextGenerationRoute 将 ProviderId、ModelId 与 TextGenerationProviderAdapter 组合为可执行 runtime route；
+- FixedTextGenerationRoutes defensive-copy route map，只接受 TEXT_GENERATION key，不实现自动 routing；
+- RoutedTextGenerationPort 使用 request purpose + TEXT_GENERATION 查找 route；
+- route 缺失返回无 Provider / Model identity 的 CAPABILITY_UNAVAILABLE；
+- route 存在时只调用绑定 Adapter 一次，并原样传播合法 ModelResult；
+- Adapter 返回 null，或 Success / Failure route identity 与 selected route 不一致，视为 programming / wiring
+  bug 并 fail fast，不转换为普通 Provider failure。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationRoute.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutes.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutesTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPortTests.java
+Architecture / Data / API / Security Impact:
+- 新增 approved fixed routing 与 operation-specific external Adapter seam；无 schema、HTTP API、Credential、
+  Provider SDK、Spring wiring 或 dependency 变化。
+Critical Code Expected:
+- immutable route mapping 与 TEXT_GENERATION-only invariant；
+- no-route CAPABILITY_UNAVAILABLE；
+- exactly-once Adapter delegation 与 returned route identity validation。
+Explicitly Out of Scope:
+- concrete Provider / HTTP / SDK call；external configuration binding；Credential；timeout；exception translation；
+  retry / fallback；Trace；Workflow / Learning State mutation。
+Verification:
+- focused S6D tests；S6A-S6D Model Gateway regression；server compile；targeted Diff review。
+```
+
 ## 4. Later-phase Planning Rule
 
 M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 implementation tasks。
@@ -648,12 +833,42 @@ M0-S4D Ownership Check: COMPLETE
 M0-S4D: COMPLETE
 M0-S4 Closeout: PASS
 M0-S4: COMPLETE
-M0-S5 Design: PENDING
-M0-S5 Scope: NOT_APPROVED
+M0-S5: COMPLETE
+M0-S6 Detailed Design: APPROVED
+M0-S6 Slice Breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
+M0-S6A Scope: APPROVED
+M0-S6A Implementation: COMPLETE
+M0-S6A Verification: COMPLETE
+M0-S6A Review: COMPLETE
+M0-S6A Ownership Check: COMPLETE
+M0-S6A: COMPLETE (`e6e163a`)
+M0-S6B Scope: APPROVED
+M0-S6B Implementation: COMPLETE
+M0-S6B Verification: COMPLETE
+M0-S6B Review: COMPLETE
+M0-S6B Ownership Check: COMPLETE
+M0-S6B: COMPLETE (`666e2e6`)
+M0-S6C Scope: APPROVED
+M0-S6C Implementation: COMPLETE
+M0-S6C Verification: COMPLETE
+M0-S6C Review: COMPLETE
+M0-S6C Ownership Check: COMPLETE (contract boundary only)
+M0-S6C: COMPLETE (`1a5fcbc`)
+M0-S6D Scope: APPROVED
+M0-S6D Implementation: COMPLETE
+M0-S6D Verification: COMPLETE
+M0-S6D Review: PENDING
+M0-S6D Ownership Check: NOT_STARTED
+M0-S6D: REVIEW_PENDING
 ```
 
-`M0-S4A` 至 `M0-S4D` 已完成 approved Design / Scope、implementation、focused / integration / manual
-verification、独立 Diff Review、Human Ownership Check 与人工 commit。C2d restricted local Container
-evidence 只标记为 `PROVISIONAL`；M6 仍需在真实或等价 Hosted hardware 完成 capacity confirmation。
-M0-S4 closeout 为 `PASS`，当前进入 `M0-S5` Design；Scope 获得人工批准前不得实现新的 Language
-workspace behavior。
+`M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
+targeted Diff Review。Human Ownership Check 已确认用户理解 Purpose / Operation 分离、外部 identity
+value type 与 enum vocabulary 不等于 runtime capability，并已提交为 `e6e163a`。`M0-S6B` 已按批准
+Scope 完成 typed result / failure contract、focused regression、server compile 与 targeted Diff Review；
+Human Ownership Check 已确认用户理解 sealed result 的互斥状态、route identity pairing，以及
+`retryAfter` 是 metadata 而不是 retry execution，并已提交为 `666e2e6`。`M0-S6C` 已完成 typed
+Text Generation request / response / port、focused verification 与 Diff Review。Ownership 明确限制在当前
+typed contract，以及识别 route resolution / Provider execution 尚未实现，并已提交为 `1a5fcbc`。
+`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation 与 focused verification，
+当前等待真实 Diff Review；不得自动进入 `M0-S6E` timeout / safe failure translation。

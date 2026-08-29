@@ -1421,9 +1421,11 @@ API Key 不得进入：
         ↓
     Context Manager
         ↓
-    Model Gateway
+    Typed Model Operation Port
         ↓
-    Capability Check
+    Purpose + Operation Route
+        ↓
+    Capability Check / Timeout
         ↓
     Provider Adapter
         ↓
@@ -1438,6 +1440,10 @@ API Key 不得进入：
     Calling Domain
 
 业务模块不直接依赖具体 Provider。
+
+每次调用只执行一个明确 Model Operation。Text → Speech → optional Image 等多阶段流程由具体
+Application Workflow 编排，并独立记录每一步 success / failure / skipped；Gateway 不决定 required /
+optional、partial success 或 Learning State mutation。S6 默认不自动 retry 或静默切换 Provider。
 
 ---
 

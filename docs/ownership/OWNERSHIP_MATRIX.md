@@ -339,7 +339,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | UNASSESSED        | L4        | L5               |          |
+| Model Gateway                     | A                 | L1                | L4        | L5               | M0-S6A/S6B/S6C route、result/failure、Text Generation typed contract Review PASS；无 Port implementation / Provider path |
 | Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -963,7 +963,7 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | UNASSESSED | I0                  |          |
+| Model Gateway            | L1        | I0                  | 已有 route + result/failure + Text Generation typed contract；尚无 invocation / Provider path |
 | Trace                    | UNASSESSED | I0                  |          |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |

@@ -392,7 +392,8 @@ Evaluator 预建空的 generic tool loop。
 
 ### Model Gateway
 
-统一模型 Provider 接入。
+统一模型 Provider 接入。它是 logical module boundary，不要求使用一个包含 Text、Speech、Image、
+Embedding 全部方法的万能 Java interface。
 
 业务模块：
 
@@ -416,6 +417,21 @@ Evaluator 预建空的 generic tool loop。
     Ollama / OpenAI-compatible Provider
 
 业务逻辑不应绑定具体 Provider SDK。
+
+Route 同时区分：
+
+```text
+ModelPurpose + ModelOperation
+```
+
+例如 Conversation 的 Text Generation、Speech Transcription 与 Speech Synthesis 可以分别选择不同
+Provider / Model。不同 Operation 使用独立 Typed Port 与 Request / Response；M0-S6 只实现第一个
+Text Generation Port，不提前创建 Speech / Image / Embedding placeholder。
+
+Gateway 每次只执行一个明确 Operation，并负责 capability check、timeout 与 failure translation。
+多个 Operation 的顺序、required / optional、partial success 与 degraded behavior 由具体 Application
+Workflow 控制。默认不静默 retry 或 cross-provider fallback；详细 Contract 见
+[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
 ---
 

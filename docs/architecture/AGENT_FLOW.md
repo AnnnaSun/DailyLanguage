@@ -1245,9 +1245,9 @@ Agent 可以在允许范围内决定替代动作。
 
     Agent
         ↓
-    Model Gateway
+    Typed Model Operation Port
         ↓
-    Provider Selection
+    Purpose + Operation Route
         ↓
     Capability Check
         ↓
@@ -1269,6 +1269,10 @@ Domain Agent 不应依赖：
     OpenAIClient
     GeminiClient
 
+Text Generation、Vision Understanding、Speech Transcription、Speech Synthesis、Image Generation 与
+Embedding 的 Request / Response shape 不同。Model Gateway 是统一 logical module boundary，不使用一个
+万能 Request 或巨大 Provider interface 承载所有 Operation。
+
 ---
 
 ## 28.1 V1 Model Routing
@@ -1277,15 +1281,18 @@ V1 可以使用：
 
 **Fixed Mapping。**
 
-例如逻辑上：
+Route key 同时包含业务 Purpose 与技术 Operation，例如逻辑上：
 
-    PLANNING
+    PLANNING + TEXT_GENERATION
     → configured model
 
-    CONVERSATION
+    CONVERSATION + TEXT_GENERATION
     → configured model
 
-    EVALUATION
+    CONVERSATION + SPEECH_TRANSCRIPTION
+    → separately configured model
+
+    EVALUATION + TEXT_GENERATION
     → configured model
 
 后续再考虑：
@@ -1297,6 +1304,12 @@ V1 可以使用：
 - automatic fallback。
 
 不要在 V1 提前实现复杂自动 Model Router。
+
+Gateway 每次只执行一个 Operation。多个 Operation 的顺序、required / optional、partial success 与
+degradation 属于具体 Application Workflow。S6 默认不自动 retry，也不静默 cross-provider fallback；
+后者需要用户配置、Credential、capability compatibility 与明确 policy 共同授权。
+
+详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
 ---
 
