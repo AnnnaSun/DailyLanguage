@@ -948,9 +948,9 @@ M0-S7A Design: APPROVED
 M0-S7A Scope: APPROVED
 M0-S7A Implementation: COMPLETE
 M0-S7A Verification: PASS (Model Gateway 43/43；server 183 total / 0 failures / 0 errors / 33 environment-skipped)
-M0-S7A Review: PENDING
-M0-S7A Ownership Check: NOT_STARTED
-M0-S7A: REVIEW_PENDING
+M0-S7A Review: COMPLETE (PASS；no blocking findings)
+M0-S7A Ownership Check: COMPLETE (Module-local UNDERSTOOD；Model Gateway remains L2)
+M0-S7A: COMPLETE (`d8d47ac`)
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1012,3 +1012,8 @@ Verification:
 当前实现是 `Module-local complete`：真实 flow 在 operation-specific Adapter boundary 结束。Behavior Flow 见
 [`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。不得把它解释为
 Browser Credential → HTTPS → External Provider 的 End-to-End complete behavior。
+
+M0-S7A 已完成 Diff Review 与 module-local Human Ownership Check。用户能够说明 caller thread 提交 task、
+Executor worker 执行 lambda、lambda 将 Credential 传给 Adapter，以及 timeout 后 `cancel(true)` 不能保证
+worker 停止或 Credential 立即从 JVM heap 消失。该 slice 已提交为 `d8d47ac`；由于仍无 concrete Provider
+execution evidence，Model Gateway Ownership 保持 L2。下一个 M0-S7 implementation slice 尚未批准。

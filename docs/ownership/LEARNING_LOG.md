@@ -828,6 +828,22 @@ L3。
   S6F integrated closeout 的 implementation、Architecture、verification 与 Documentation PASS，Ownership
   因 `ModelResult.Failure` envelope / `ModelFailure` payload 区分尚不稳定而保持 L2，closeout 为 `PARTIAL`。
 
+### M0-S7A confirmed evidence — transient Credential execution boundary
+
+- `TransientProviderCredential` 与 provider-neutral `TextGenerationRequest` 分离，并通过 Typed Port 参数显式进入
+  `RoutedTextGenerationPort`；它不进入 route configuration、result、failure、persistence 或 ThreadLocal；
+- selected route 与 `credential.providerId()` 不匹配时，在 task submission 前返回 route-aware
+  `CREDENTIAL_UNAVAILABLE`，因此 Adapter 不执行；Provider 实际拒绝已提供 Credential 仍归类为
+  `AUTHENTICATION_FAILED`；
+- matching Credential 由 caller thread 提交的 lambda 捕获，Executor worker 执行 lambda，再由 lambda 调用
+  `TextGenerationProviderAdapter`；ExecutorService 负责调度 task，不是 Adapter 执行 lambda；
+- timeout 后 caller 返回 route-aware `TIMEOUT`，`future.cancel(true)` 只请求中断，不能保证 worker 停止，
+  也不能保证 Credential 立即从 JVM heap 消失；
+- focused tests、Model Gateway 43/43、server 183 total / 0 failures / 0 errors / 33 environment-skipped、
+  Behavior Flow 与 Diff Review 已通过；用户完成 module-local Explain Back，M0-S7A 提交为 `d8d47ac`；
+- 当前 flow 在 Adapter SPI 结束，没有 Browser / HTTPS ingress 或 concrete Provider HTTP / SDK evidence。
+  因此本 slice Ownership 为 `UNDERSTOOD`，Model Gateway 整体仍保持 `L2`，不提升为 L3。
+
 ---
 
 ## 11.9 Trace & Eval

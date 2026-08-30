@@ -2,7 +2,7 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A IMPLEMENTED / REVIEW_PENDING
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)
 > Phase: M0-S6 / M0-S7A
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与

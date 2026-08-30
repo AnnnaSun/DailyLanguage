@@ -393,7 +393,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S6F integrated closeout 确认 route、typed contract、Executor / Adapter、timeout 与 safe failure translation 可追踪；`ModelResult` / `ModelFailure` 包装关系仍需练习，无 concrete Provider execution evidence |
+| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7A Ownership 确认 fixed route、显式 Credential task propagation、mismatch no-submit 与 timeout cancellation boundary 可追踪；S6F 的 result envelope gap 不提升为 L3，且仍无 concrete Provider execution evidence |
 | Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -1018,7 +1018,7 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | L2        | I0                  | 可追踪 Request → fixed route → Executor / Adapter → timeout 或 validated result；尚无 concrete Provider execution evidence |
+| Model Gateway            | L2        | I0                  | 可追踪 Request + transient Credential → fixed route → Executor task → Adapter → timeout 或 validated result；尚无 concrete Provider execution evidence |
 | Trace                    | UNASSESSED | I0                  |          |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |

@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-30
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7A / REVIEW_PENDING
-> Production baseline: M0-S6E COMPLETE (`c374449`)
+> Current Gate: M0-S7A / COMPLETE
+> Production baseline: M0-S7A COMPLETE (`d8d47ac`)
 
 ## Approved Decisions
 
@@ -103,12 +103,14 @@
     failure translation、focused regression、Diff Review 与 Human Ownership Check。
 27. M0-S6F integrated closeout：Scope / Architecture / Model Gateway 40 tests / server 180 tests PASS；
     Documentation 已同步；Model Gateway Ownership 保持 L2，closeout 结果为 PARTIAL。
+28. M0-S7A explicit transient Credential propagation：Scope / Architecture / Security boundary / verification PASS；
+    Diff Review 无 blocking finding，module-local Ownership Check 为 UNDERSTOOD；Model Gateway 整体保持 L2。
 
 ## Current Slice
 
 ```text
 Selected slice: M0-S7A
-Gate: REVIEW_PENDING
+Gate: COMPLETE
 M0 umbrella scope: APPROVED
 S6F non-blocking Ownership gap: ACCEPTED (Model Gateway remains L2)
 S7A Design: APPROVED
@@ -116,21 +118,20 @@ S7A Scope: APPROVED
 S7A Implementation: COMPLETE
 Verification: PASS (Model Gateway 43/43; server 183 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
-Code Review: PENDING
-Ownership Check: NOT_STARTED
-Production baseline: M0-S6E COMPLETE (`c374449`)
-Current target: M0-S7A Diff Review and module-local Ownership Check
+Code Review: COMPLETE (PASS; no blocking findings)
+Ownership Check: COMPLETE (UNDERSTOOD for Module-local Credential flow; Model Gateway remains L2)
+Production baseline: M0-S7A COMPLETE (`d8d47ac`)
+Current target: wait for the next M0-S7 slice Design / Scope decision
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-对 M0-S7A 真实 Diff、Security boundary、Credential propagation 与 verification evidence 执行
-Code Ownership Review；不自动进入 HTTP ingress、concrete Provider 或下一 S7 slice。interactive wait、
-durable Job、late-result consume 与 TaskExecutor wiring 继续留在 M0-S9。
+M0-S7A 已完成并提交。下一步只能先定义下一个 M0-S7 slice 的 Design / Scope；在人工批准前不实现
+HTTP ingress、concrete Provider 或其他 Credential capability。interactive wait、durable Job、late-result
+consume 与 TaskExecutor wiring 继续留在 M0-S9。
 
 ## Blockers
 
-None. Model Gateway Ownership 仍为 L2；S7A Ownership 只允许检查当前 Module-local Credential flow，
-不得询问未实现的 HTTP ingress 或 concrete Provider behavior。Hosted password-hash capacity 仍为
-`PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。
+None. Model Gateway Ownership 仍为 L2，但不阻塞下一个 M0-S7 Design / Scope。尚未批准新的 S7
+implementation slice。Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。
