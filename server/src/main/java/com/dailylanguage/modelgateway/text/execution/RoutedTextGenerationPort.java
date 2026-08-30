@@ -1,7 +1,15 @@
 package com.dailylanguage.modelgateway.text.execution;
 
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
 import com.dailylanguage.modelgateway.result.ModelFailure;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
 import com.dailylanguage.modelgateway.result.ModelResult;
@@ -10,14 +18,20 @@ import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 import com.dailylanguage.modelgateway.text.TextGenerationResponse;
 
 /**
- * 使用 fixed route 执行单次 Text Generation；不负责 timeout、retry、fallback 或 exception translation。
+ * 使用 fixed route 执行单次 Text Generation，并在最终 deadline 内归一化已知 Provider operational failure。
  */
 public final class RoutedTextGenerationPort implements TextGenerationPort {
 
     private final FixedTextGenerationRoutes routes;
+    private final ExecutorService modelCallExecutor;
 
-    public RoutedTextGenerationPort(FixedTextGenerationRoutes routes) {
+    public RoutedTextGenerationPort(
+            FixedTextGenerationRoutes routes,
+            ExecutorService modelCallExecutor) {
         this.routes = Objects.requireNonNull(routes, "routes must not be null");
+        this.modelCallExecutor = Objects.requireNonNull(
+                modelCallExecutor,
+                "modelCallExecutor must not be null");
     }
 
     @Override
@@ -29,14 +43,72 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
         }
 
         var selectedRoute = route.orElseThrow();
-        var result = Objects.requireNonNull(
-                selectedRoute.adapter().generateText(
-                        selectedRoute.providerId(),
-                        selectedRoute.modelId(),
-                        request),
-                "adapter result must not be null");
+        var result = executeAdapter(selectedRoute, request);
         validateResultRoute(selectedRoute, result);
         return result;
+    }
+
+    private ModelResult<TextGenerationResponse> executeAdapter(
+            TextGenerationRoute selectedRoute,
+            TextGenerationRequest request) {
+        Future<ModelResult<TextGenerationResponse>> future;
+        try {
+            future = modelCallExecutor.submit(() -> selectedRoute.adapter().generateText(
+                    selectedRoute.providerId(),
+                    selectedRoute.modelId(),
+                    request,
+                    selectedRoute.executionTimeout()));
+        } catch (RejectedExecutionException exception) {
+            throw new IllegalStateException("model call executor rejected the provider task");
+        }
+
+        try {
+            var timeoutNanos = TimeUnit.NANOSECONDS.convert(selectedRoute.executionTimeout());
+            return Objects.requireNonNull(
+                    future.get(timeoutNanos, TimeUnit.NANOSECONDS),
+                    "adapter result must not be null");
+        } catch (TimeoutException exception) {
+            // 本地取消只是 best effort，不能据此认定 Provider 未执行或未计费。
+            future.cancel(true);
+            return timeoutFailure(selectedRoute);
+        } catch (InterruptedException exception) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("model call wait was interrupted");
+        } catch (CancellationException exception) {
+            throw new IllegalStateException("model call task was cancelled unexpectedly");
+        } catch (ExecutionException exception) {
+            return translateExecutionFailure(selectedRoute, exception.getCause());
+        }
+    }
+
+    private static ModelResult<TextGenerationResponse> translateExecutionFailure(
+            TextGenerationRoute selectedRoute,
+            Throwable failure) {
+        if (failure instanceof ModelProviderCallException providerFailure) {
+            var modelFailure = providerFailure.retryAfter()
+                    .map(retryAfter -> ModelFailure.forRoute(
+                            providerFailure.kind(),
+                            selectedRoute.providerId(),
+                            selectedRoute.modelId(),
+                            retryAfter))
+                    .orElseGet(() -> ModelFailure.forRoute(
+                            providerFailure.kind(),
+                            selectedRoute.providerId(),
+                            selectedRoute.modelId()));
+            return ModelResult.failure(modelFailure);
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        throw new IllegalStateException("provider adapter failed without a classified operational failure");
+    }
+
+    private static ModelResult<TextGenerationResponse> timeoutFailure(TextGenerationRoute selectedRoute) {
+        return ModelResult.failure(ModelFailure.forRoute(
+                ModelFailureKind.TIMEOUT,
+                selectedRoute.providerId(),
+                selectedRoute.modelId()));
     }
 
     private static void validateResultRoute(

@@ -1700,6 +1700,7 @@ Required V1 metrics 按 capability 选择：
 
 适用：
 
+- Model call late-result capture；
 - PDF Parsing；
 - Embedding；
 - Indexing；
@@ -1714,6 +1715,49 @@ V1：
     DB Job State
 
 当前不因这些任务提前引入 Kafka。
+
+## 27.1 Model Call Job Data Flow
+
+```text
+Trusted Application Trigger
+        ↓
+Create ModelCallJob before Provider call
+        ↓
+PostgreSQL: CREATED / NOT_READY
+        ↓
+TaskExecutor receives transient in-memory Credential
+        ↓
+Model Gateway executes one typed Operation
+        ↓
+├─ completes inside interactive wait budget
+│      → persist SUCCEEDED
+│      → owning Workflow consumes once
+│
+└─ interactive wait budget exhausted
+       → return PENDING + jobId
+       → Worker continues until final execution deadline
+       → persist safe typed result / failure
+       → compare workflowStepId + workflowVersion
+              ├─ user decision required → PENDING_CONFIRMATION
+              ├─ internal step still current → CONSUMED
+              └─ workflow advanced / replaced → STALE
+```
+
+`jobId` 是稳定 UUIDv7 identity；`workflowVersion` 判断结果是否仍适用；optimistic-lock `rowVersion`
+保证 accept、reject、expire 与 internal consume 只有一个状态转换成功。`expiresAt` 判断 expiry，不把版本信息
+编码进 `jobId`。
+
+Execution status 与 consumption status 分离：
+
+```text
+Execution: CREATED / RUNNING / SUCCEEDED / FAILED / TIMED_OUT / OUTCOME_UNKNOWN
+Consumption: NOT_READY / PENDING_CONFIRMATION / CONSUMED / STALE / DISCARDED / EXPIRED
+```
+
+进程在 Provider call 期间终止时，Kafka 或 DB Job row 都不能恢复 Backend 从未收到的 response。由于 BYOK
+Credential 不持久化，残留 `RUNNING` Job 不得在 restart 后自动调用 Provider，应进入 `OUTCOME_UNKNOWN` 或
+按批准 recovery policy 终止。迟到 Evaluator result 仍需 Structured Output validation 与 Evidence
+qualification，不直接修改长期 Learner State。
 
 ---
 

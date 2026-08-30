@@ -773,6 +773,59 @@ Ownership 提升为 `L2`：已经能够追踪 Request → fixed route → select
 真实调用链。尚无 concrete Provider、timeout / exception translation 与真实外部调用 evidence，因此不提升为
 L3。
 
+### M0-S6E design learning — 为什么不使用 Kafka 回收迟到的 Model response
+
+- Gateway timeout 需要区分两种语义：interactive wait timeout 只表示用户不再同步等待，后台调用仍可继续；
+  model execution timeout 才是一次调用的最终 deadline，但即使本地取消也不能证明 Provider 没有执行或计费；
+- 若要求迟到结果可以恢复，`modelCallAttemptId` / `jobId` 必须在调用 Provider **之前**创建。等到 timeout
+  后再创建会产生结果已返回但尚无归属记录的竞态；正常快速完成时，内部 attempt 可以存在但不必向用户展示；
+- Kafka 不会自动截获 Provider response。必须由仍在运行的 Worker 收到响应后，主动发布带 correlation ID
+  的完成事件；Worker 在外部调用期间崩溃时，Kafka 无法找回 Provider 已生成但尚未发布的 response；
+- Kafka message key 主要用于 partition、ordering 与 correlation，不是供 UI 按 key 随机读取结果的业务查询
+  存储。即使未来使用 Kafka，用户可查询的 Job status、ownership、result、expiry 与 consume-once 状态仍应由
+  PostgreSQL 等 durable application state 承担；
+- Kafka 的 delivery / exactly-once 保证不覆盖 Kafka transaction 之外的 Provider 调用。Consumer retry 仍可能
+  产生第二次模型执行、重复 token cost 与不同输出，需要 Provider idempotency、attempt policy 与明确 Trace 才能处理；
+- BYOK Credential 禁止写入 Kafka、DB、Trace 或 Log。完全异步的 Kafka Consumer 若在原 HTTP request 结束后
+  才调用 Provider，将无法自然取得 transient Credential；为此增加临时 secret distribution 会成为独立的
+  Security Architecture Change；
+- 对已确认的长任务，当前 V1 更合适的 baseline 是 `Spring TaskExecutor + DB Job State`：后台 Worker 完成后
+  写入 durable result，Application Workflow 决定是否创建 `PendingAction`、是否仍适用以及用户确认后如何继续；
+  Kafka 只有在真实出现跨实例吞吐、多消费者、replay、work queue / DLQ 或 ordering 需求时才重新评估；
+- 当前决定是不把 Kafka、late-result persistence、用户通知或 Workflow resume 塞入 M0-S6E。S6E 继续只负责
+  单次 Model call 的最终 deadline 与 safe failure translation；迟到结果回收已于 2026-08-30 作为独立
+  `ModelCallJob` Feature 纳入 V1，并排入 S7 / S8 之后的 M0-S9 backend foundation；
+- 已批准的 Job identity / versioning 保持语义分离：UUIDv7 `jobId` 表示稳定 identity，`workflowVersion`
+  判断结果是否 stale，optimistic-lock `rowVersion` 防止 accept / reject / expire / internal consume 并发覆盖；
+- execution status 与 consumption status 分离。用户可感知结果等待确认；Planner / Evaluator 等内部结果由
+  owning Workflow 核对 step/version 后自动消费或标记 stale；站内 polling 不等于把 Push Notification /
+  Learning Recall scheduler 拉回 V1。
+
+本次讨论增加了对 timeout、external side effect、async job 与 message broker trade-off 的设计理解，但没有
+新增对应 production code 或真实运行 evidence，因此 Model Gateway Ownership 仍为 `L2`。
+
+### M0-S6E approved design learning — final deadline 与 safe exception boundary
+
+- S6E 与 M0-S9 不是同一个 worker：S6E model-call ExecutorService 控制同步 Adapter 的最终 deadline；M0-S9
+  TaskExecutor 负责 Job lifecycle、interactive waiting 和结果持久化。两者若共用 bounded fixed pool，Job
+  worker 可能占满线程并等待同池 Provider task，产生 starvation / deadlock；
+- `executionTimeout` 属于 selected route 的 execution policy，不属于用户侧 TextGenerationRequest，也不是
+  TextGenerationResponse 的业务内容。它必须为 positive Duration，且 Gateway 外层 deadline 与 Adapter 的
+  Provider client timeout 使用同一个值，避免两套无关配置产生难以解释的行为；
+- 本地 timeout 与 `future.cancel(true)` 只是 best effort。它能停止 Backend 等待，却不能证明 Provider 未收到
+  请求、未完成生成或未计费，因此 timeout 不自动触发 retry / cross-provider fallback；
+- Adapter 只通过 checked `ModelProviderCallException` 暴露可归一化的 operational failure kind 与 optional
+  retryAfter。raw Provider response、SDK exception / cause、Prompt、Credential 和 arbitrary message 不得穿过
+  Gateway boundary；未知 RuntimeException、null result 与 route mismatch 保持 programming / wiring bug；
+- S7 的 transient Credential 必须显式传递到实际 Provider call。普通 ThreadLocal 不会因为任务被提交到另一个
+  ExecutorService 就自动可靠传播，不能把 Credential availability 建立在该隐式假设上；
+- S6E 已按批准 Scope 实现并完成 focused tests、S6A-S6E regression、server compile 与 Diff Review。Explain
+  Back 已确认用户能够区分 model-call Executor worker 与 caller wait，理解 `cancel(true)` 只是 best effort，
+  能说明 route identity 来自 selected `TextGenerationRoute`，并能区分 programming bug 与明确分类的 Provider
+  operational failure；
+- 当前 evidence 仍来自 fake Adapter，没有 concrete Provider HTTP / SDK、真实 response classification 或
+  Credential execution path，因此 Model Gateway Ownership 维持 `L2`。S6E 当前为 `READY_TO_COMMIT`。
+
 ---
 
 ## 11.9 Trace & Eval

@@ -26,6 +26,11 @@
 
 当前 V1 Background Job baseline 使用 `Spring TaskExecutor + DB Job State`，不为了 Engineering Showcase 提前引入 distributed message broker。Evaluation、Evidence aggregation、content parsing / embedding / indexing、audio processing、offline Eval、Trace analytics 与后续 Notification 都可能在规模扩大后形成合理的异步消息场景。
 
+2026-08-30 已批准将 Model Call Job / late-result recovery 纳入 V1，但这不改变 Kafka 决定：Kafka 不会自动
+截获 Provider response，必须由存活 Worker 收到后主动发布；message key 不是 UI 可按 `jobId` 查询的业务
+存储；Kafka delivery / exactly-once 不覆盖 transaction 外的 Provider side effect；BYOK Credential 也不得
+进入 topic。V1 因此继续由 PostgreSQL 保存 Job authority 与 typed result，由 TaskExecutor 执行当前内存任务。
+
 ### Post-V1 Review
 
 V1 完成后，根据真实运行数据和瓶颈重新评估：
@@ -33,6 +38,7 @@ V1 完成后，根据真实运行数据和瓶颈重新评估：
 - 现有 DB-backed job 是否存在吞吐、恢复、横向扩展或任务路由限制；
 - 是否主要需要 work queue、ack、retry 与 DLQ；若是，优先评估 RabbitMQ；
 - 是否出现多个独立消费者、长期 event retention、replay 或按 `languageProfileId` 分区有序处理需求；若是，再评估 Kafka；
+- Model Call Job 是否真实出现跨实例吞吐、DB polling、result fan-out 或 ordering bottleneck；
 - 是否值得承担额外部署、运维、监控与 Hosted / Self-hosted 交付成本。
 
 若决定引入，必须先形成 Architecture Change Proposal，并同时设计 Transactional Outbox、idempotent consumer、retry / DLQ、event versioning、trace propagation、per-profile ordering 与 secret / private-content boundary。PostgreSQL 继续作为 structured learning state authority，消息中间件不得使 LLM output 绕过 Evidence qualification 或 Java deterministic state transition。

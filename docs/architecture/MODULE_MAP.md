@@ -1861,11 +1861,26 @@ Architecture:
 
 Targets:
 
+- Model Call Job / late-result capture；
 - PDF parse；
 - embedding；
 - indexing；
 - TTS；
 - other long-running tasks。
+
+Model Call Job owns:
+
+- PostgreSQL execution / consumption status；
+- stable `jobId`、workflow reference/version、optimistic-lock `rowVersion` 与 expiry；
+- interactive pending、late-result persistence 与 consume-once；
+- TaskExecutor execution using transient in-memory Credential。
+
+Model Call Job must not:
+
+- persist Credential；
+- decide Provider routing、Gateway failure taxonomy 或 Learning State mutation；
+- treat Kafka as queryable Job state；
+- automatically retry an outcome-unknown Provider call。
 
 Kafka:
 

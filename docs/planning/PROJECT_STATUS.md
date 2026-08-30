@@ -1,8 +1,8 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-29
+> Last updated: 2026-08-30
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6E / DESIGN_PENDING
+> Current Gate: M0-S6E / READY_TO_COMMIT
 > Production baseline: M0-S6D COMPLETE (`1e32ff7`)
 
 ## Approved Decisions
@@ -10,7 +10,8 @@
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
-- V1 Scope v1.4 已纳入 Engineering Evidence Track，正式范围记录在 `docs/product/V1_SCOPE.md`；
+- V1 Scope v1.5 已纳入 Engineering Evidence Track 与 Model Call Job，正式范围记录在
+  `docs/product/V1_SCOPE.md`；
 - Phase Gate 与 M0 slices 记录在 `docs/planning/V1_PHASE_PLAN.md`。
 - Engineering Evidence Track 已批准：M1 Grounded Evaluator、M2 versioned Memory / replay、M3 RAG +
   Tool Gateway + Controlled Multi-role Agent Workflow、M6 Eval / capacity / CI / interview evidence；详细验收
@@ -48,6 +49,18 @@
   portable response / finish reason 与 optional token usage；不引入 Provider-specific option Map。
 - M0-S6D runtime route 通过 Composition 绑定 ProviderId、ModelId 与 operation-specific Adapter；
   V1 fixed mapping 不引入 Adapter Registry、dynamic router、retry 或 fallback。
+- M0-S6E Design / Scope 已批准：route 持有 positive final `executionTimeout`，Gateway 与 Adapter 使用同一个
+  Duration；dedicated injected `ExecutorService` 负责最终 deadline，typed `ModelProviderCallException` 只暴露
+  safe failure kind / retryAfter。
+- S6E model-call ExecutorService 与 M0-S9 Job TaskExecutor 是两个 execution boundary，不得共用同一个 bounded
+  fixed pool；前者负责单次外部调用 deadline，后者负责 Job lifecycle、interactive waiting 与迟到结果持久化。
+- V1 Model Call Job Design 已批准：production Application Workflow 在调用 Provider 前创建 PostgreSQL-backed
+  Job；interactive wait budget 耗尽后返回 pending，后台调用继续到最终 execution deadline；迟到结果按
+  workflow version 自动消费、等待用户确认或标记 stale。
+- Model Call Job 使用稳定 UUIDv7 `jobId`、独立 `workflowVersion` 与 optimistic-lock `rowVersion`；V1
+  runtime 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ，不持久化 BYOK Credential。
+- Model Call Job backend foundation 排入 M0-S9，依赖 S7 transient Credential 与 S8 Structured Output /
+  Trace；详细 Contract 见 `docs/features/MODEL_CALL_JOB.md`，当前 M0-S6E 不实现 Job。
 
 ## Completed Review
 
@@ -79,29 +92,31 @@
     server compile、Diff Review 与 scope-limited Ownership Check。
 25. M0-S6D fixed Text Generation route、operation-specific Adapter seam、single delegation、route identity
     invariant、focused regression、Diff Review 与 Human Ownership Check。
+26. M0-S6E positive route timeout、dedicated model-call ExecutorService、route-aware TIMEOUT、safe typed Provider
+    failure translation、focused regression、Diff Review 与 Human Ownership Check。
 
 ## Current Slice
 
 ```text
 Selected slice: M0-S6E
-Gate: DESIGN_PENDING
+Gate: READY_TO_COMMIT
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
 Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-Implementation Scope: NOT_APPROVED
-Implementation: NOT_STARTED
-Verification: NOT_STARTED
-Code Review: NOT_STARTED
-Ownership Check: NOT_STARTED
+Implementation Scope: APPROVED
+Implementation: COMPLETE
+Verification: COMPLETE
+Code Review: COMPLETE
+Ownership Check: COMPLETE (UNDERSTOOD, Model Gateway remains L2)
 Production baseline: M0-S6D COMPLETE (`1e32ff7`)
-Current target: timeout and safe failure translation design
+Current target: human commit decision for the completed S6E slice
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-进入 M0-S6E Design / Scope Gate：先明确 timeout execution boundary、可安全归一化的 Adapter failure、
-programming bug 的 fail-fast boundary，以及一次调用、无 retry / fallback 的验证方式；Scope 批准前不实现。
+由用户决定并执行 M0-S6E commit。提交后记录 commit hash，再单独进入 M0-S6F Design / Scope Gate；当前收尾
+不自动实现 S6F。interactive wait、durable Job、late-result consume 与 TaskExecutor wiring 继续留在 M0-S9。
 
 ## Blockers
 
