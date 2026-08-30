@@ -36,6 +36,31 @@ Scope
 每个核心 AI / Java capability 还必须按 `ENGINEERING_EVIDENCE_PLAN.md` 形成适用的 failure test、
 Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径通过不等于 Evidence Gate 完成。
 
+### 1.1 Provider-free Learning Baseline
+
+V1 已批准用户未提供 Model Provider 时仍可执行的最小学习路径。它复用同一 Planner、Practice、
+Evaluator、Evidence、Learning Memory 与 `languageProfileId` isolation，不建立第二套 offline Tutor。
+
+首个 Built-in Content Pack 使用：
+
+```text
+targetLanguage = en
+supportLanguage = zh-CN
+```
+
+`supportLanguage` 只提供翻译、解释与提示，不产生独立学习状态。起始能力范围和内容数量留到 M1
+Scope Decision。详细 Product / Architecture Contract 见
+`docs/features/PROVIDER_FREE_LEARNING.md`。
+
+跨 Phase 交付：
+
+```text
+M1 Built-in Text Practice walking skeleton
+  → M2 deterministic Evidence / Memory / Re-planning
+  → M3 versioned Content productionization
+  → M5 verified Built-in Audio
+```
+
 ## 2. Phase Overview
 
 ### M0 — Engineering Foundation & Language Workspace
@@ -70,6 +95,11 @@ Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径�
 - semantic issue 可以定位到具体 Practice turn / span；缺少 grounding 的 claim 不得进入 Evidence；
 - Model failure 只隔离 model-derived result，Practice 与 deterministic assessment 被正确保存；
 - Planner 在 Model unavailable / invalid output 时仍能生成合法的 deterministic fallback task；
+- 无 Provider 时至少一条 `en + zh-CN` Built-in Text Practice 可以完成 LearningTask、PracticeSession
+  与 deterministic assessment，且不调用 Model Gateway；
+- Built-in task 引用稳定 `materialId + version`，语言不匹配、内容损坏或无可用材料时 fail closed；
+- Provider-free baseline 只产生 exact / rule-verifiable 结果及可信 assistance event 支持的
+  deterministic assessment，不伪造 semantic、naturalness 或 pronunciation Evidence；
 - Evaluator 不直接改变 Weakness、Level 或 Mastery；
 - invalid structure、unsupported claim、Model failure 与 Provider contract 有自动化验证；
 - Planner / Evaluator Trace 记录 model、version、token、latency 与 result status，不记录 Secret。
@@ -94,6 +124,8 @@ Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径�
 - Planner 使用 compact Profile、active state、due review 与 recent practice；
 - Progress 是现有长期状态的 read-only projection；
 - 支持 core continuous assessment 与 lightweight Practice Feedback；
+- Built-in Practice 的正确、错误与 assistance Evidence 进入同一 aggregation、Review 与 re-planning
+  链路，并区分 assisted / independent 语义；
 - 不同 `languageProfileId` 的状态不可串用。
 
 ### M3 — Content / RAG / Multi-role Agent Workflow
@@ -114,6 +146,8 @@ Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径�
 - source / chunk grounding、prompt injection、cross-language retrieval 与 tool-loop termination 有验证；
 - Full Context baseline 与 budgeted Context strategy 完成 quality、token、latency、cost 对比；
 - Content Practice 进入统一 Evaluation / Memory 链路。
+- 根据真实 dogfooding evidence 确定有限 Built-in Content Pack 的数量和覆盖，并将 M1 artifact 接入
+  versioned provenance / publish boundary；不提前承诺完整 curriculum 或全语言内容。
 
 ### M4 — Learning Completeness
 
@@ -138,6 +172,8 @@ Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径�
 **Done Criteria**
 
 - Listening / turn-based Voice 复用 Language Profile、Planner、Evaluator 与 Memory 边界；
+- 经过验证的固定音频可以作为 Built-in Listening material；浏览器或设备 TTS 仅作为可选 UX，
+  不成为 audio authenticity、评分或 Evidence authority；
 - 音频失败、超时与重试不污染长期状态；
 - Voice 不绕过 Tool / Model Gateway；
 - realtime full-duplex voice 不进入 V1。
