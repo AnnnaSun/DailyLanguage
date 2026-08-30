@@ -1121,6 +1121,10 @@ Detailed Function Design 描述长期完整设计。
 
 普通小修改不需要更新所有文档。
 
+已实现的重要跨模块行为调用链，应按 `docs/flow/README.md` 创建或更新 Behavior Flow。
+Flow 必须以真实 source code 和 verification evidence 为依据，并在 Diff Review / Ownership Check
+前校验；不得把未来设计混入已实现流程。
+
 文档应描述：
 
 **真实当前 Architecture。**
