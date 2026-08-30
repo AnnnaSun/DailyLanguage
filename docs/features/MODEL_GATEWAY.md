@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL（implementation / Architecture / verification / docs PASS；Ownership L2）
-> Phase: M0-S6
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A IMPLEMENTED / REVIEW_PENDING
+> Phase: M0-S6 / M0-S7A
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
@@ -136,6 +136,7 @@ M0-S6 的最小 failure taxonomy：
 CAPABILITY_UNAVAILABLE
 REQUEST_REJECTED
 AUTHENTICATION_FAILED
+CREDENTIAL_UNAVAILABLE
 RATE_LIMITED
 TIMEOUT
 TEMPORARY_UNAVAILABLE
@@ -286,10 +287,24 @@ D28 S7 必须显式把 transient Credential 传播到 actual Provider call；不
     ExecutorService boundary 自动传播。
 ```
 
-## 11. Explicit S6 non-goals
+## 11. M0-S7A approved credential decisions
+
+```text
+D29 TransientProviderCredential 是单次 execution 的 Provider-scoped opaque secret，与 provider-neutral
+    TextGenerationRequest 分开传入 Typed Port；不得进入 route configuration、result 或 failure payload。
+D30 selected route 与 credential.providerId 不匹配时，在提交 Adapter task 前返回 route-aware
+    CREDENTIAL_UNAVAILABLE；Provider 实际拒绝已提供 Credential 仍归类为 AUTHENTICATION_FAILED。
+D31 RoutedTextGenerationPort 必须在 submitted task 中显式捕获 Credential 并传给 operation-specific Adapter；
+    不使用 ThreadLocal、global mutable context 或持久化 resolver 隐式传播。
+D32 TransientProviderCredential 不使用会自动暴露字段的 record toString；secret 只能由 Adapter 读取，
+    toString 必须 redacted，exception / ModelFailure 不得携带 secret。
+D33 timeout cancellation 是 best effort；S7A 不承诺 worker 立即停止或 Credential 立即从 JVM heap 消失。
+```
+
+## 12. Explicit S6 / S7A non-goals
 
 - concrete Provider HTTP / SDK integration；
-- BYOK Credential transport、storage 或 UI；
+- Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
 - Structured Output validation；
 - Trace persistence；
 - Planner、Evaluator、Conversation 或 Content Workflow；

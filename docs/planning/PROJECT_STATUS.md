@@ -2,7 +2,7 @@
 
 > Last updated: 2026-08-30
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6F / PARTIAL (non-blocking Ownership gap)
+> Current Gate: M0-S7A / REVIEW_PENDING
 > Production baseline: M0-S6E COMPLETE (`c374449`)
 
 ## Approved Decisions
@@ -61,6 +61,13 @@
   runtime 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ，不持久化 BYOK Credential。
 - Model Call Job backend foundation 排入 M0-S9，依赖 S7 transient Credential 与 S8 Structured Output /
   Trace；详细 Contract 见 `docs/features/MODEL_CALL_JOB.md`，当前 M0-S6E 不实现 Job。
+- M0-S6F non-blocking L2 Ownership gap 已由用户接受；该决定不把 Ownership 提升为 L3，也不改变
+  S6F `PARTIAL` 的历史结论。
+- M0-S7A Design / Scope 已批准：`TransientProviderCredential` 与 provider-neutral request 分离，
+  selected route 在提交 worker 前校验 Provider identity；Credential 通过 Executor task 显式传给 Adapter，
+  不使用 ThreadLocal、global mutable context 或 persistence。
+- selected route 缺少 matching Credential 时返回 route-aware `CREDENTIAL_UNAVAILABLE`；Provider 实际拒绝
+  Credential 仍使用 `AUTHENTICATION_FAILED`。当前只完成 Module-local flow，不宣称 BYOK End-to-End。
 
 ## Completed Review
 
@@ -100,31 +107,30 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S6F
-Gate: PARTIAL (non-blocking Ownership gap)
+Selected slice: M0-S7A
+Gate: REVIEW_PENDING
 M0 umbrella scope: APPROVED
-Detailed Design: APPROVED
-Slice breakdown: COMPLETE (S6A → S6B → S6C → S6D → S6E → S6F)
-S6A-S6E Implementation: COMPLETE
-S6F Scope: APPROVED
-Verification: PASS (Model Gateway 40/40; server 180/180)
-Architecture Boundary: PASS
-Documentation Reconciliation: COMPLETE
-Ownership Check: PARTIAL (Model Gateway remains L2)
-Closeout Result: PARTIAL
+S6F non-blocking Ownership gap: ACCEPTED (Model Gateway remains L2)
+S7A Design: APPROVED
+S7A Scope: APPROVED
+S7A Implementation: COMPLETE
+Verification: PASS (Model Gateway 43/43; server 183 total, 0 failures/errors, 33 environment-skipped)
+Behavior Flow: CURRENT
+Code Review: PENDING
+Ownership Check: NOT_STARTED
 Production baseline: M0-S6E COMPLETE (`c374449`)
-Current target: human decision whether to accept the non-blocking L2 Ownership gap and enter M0-S7 Design / Scope
+Current target: M0-S7A Diff Review and module-local Ownership Check
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-由用户决定是否接受 Model Gateway 当前 L2 Ownership 作为非阻塞缺口，并单独进入 M0-S7
-Design / Scope Gate；不自动开始 S7 implementation。interactive wait、durable Job、late-result consume 与
-TaskExecutor wiring 继续留在 M0-S9。
+对 M0-S7A 真实 Diff、Security boundary、Credential propagation 与 verification evidence 执行
+Code Ownership Review；不自动进入 HTTP ingress、concrete Provider 或下一 S7 slice。interactive wait、
+durable Job、late-result consume 与 TaskExecutor wiring 继续留在 M0-S9。
 
 ## Blockers
 
-No implementation or Architecture blocker. Model Gateway Ownership 低于 A 类模块推荐的 L3，当前保持
-L2 并作为非阻塞 Ownership gap 记录。Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定
-Scope 在 M6 目标硬件验证。
+None. Model Gateway Ownership 仍为 L2；S7A Ownership 只允许检查当前 Module-local Credential flow，
+不得询问未实现的 HTTP ingress 或 concrete Provider behavior。Hosted password-hash capacity 仍为
+`PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

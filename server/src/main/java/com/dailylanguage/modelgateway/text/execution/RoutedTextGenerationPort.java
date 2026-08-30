@@ -9,6 +9,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
 import com.dailylanguage.modelgateway.result.ModelFailure;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
@@ -35,28 +36,40 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
     }
 
     @Override
-    public ModelResult<TextGenerationResponse> generateText(TextGenerationRequest request) {
+    public ModelResult<TextGenerationResponse> generateText(
+            TextGenerationRequest request,
+            TransientProviderCredential credential) {
         Objects.requireNonNull(request, "request must not be null");
+        Objects.requireNonNull(credential, "credential must not be null");
         var route = routes.findRoute(request.purpose());
         if (route.isEmpty()) {
             return ModelResult.failure(ModelFailure.withoutRoute(ModelFailureKind.CAPABILITY_UNAVAILABLE));
         }
 
         var selectedRoute = route.orElseThrow();
-        var result = executeAdapter(selectedRoute, request);
+        if (!selectedRoute.providerId().equals(credential.providerId())) {
+            return ModelResult.failure(ModelFailure.forRoute(
+                    ModelFailureKind.CREDENTIAL_UNAVAILABLE,
+                    selectedRoute.providerId(),
+                    selectedRoute.modelId()));
+        }
+
+        var result = executeAdapter(selectedRoute, request, credential);
         validateResultRoute(selectedRoute, result);
         return result;
     }
 
     private ModelResult<TextGenerationResponse> executeAdapter(
             TextGenerationRoute selectedRoute,
-            TextGenerationRequest request) {
+            TextGenerationRequest request,
+            TransientProviderCredential credential) {
         Future<ModelResult<TextGenerationResponse>> future;
         try {
             future = modelCallExecutor.submit(() -> selectedRoute.adapter().generateText(
                     selectedRoute.providerId(),
                     selectedRoute.modelId(),
                     request,
+                    credential,
                     selectedRoute.executionTimeout()));
         } catch (RejectedExecutionException exception) {
             throw new IllegalStateException("model call executor rejected the provider task");

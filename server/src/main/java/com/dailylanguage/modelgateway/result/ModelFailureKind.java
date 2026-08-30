@@ -13,6 +13,9 @@ public enum ModelFailureKind {
     /** Provider 拒绝当前 Credential；不得携带 Credential 或底层认证响应。 */
     AUTHENTICATION_FAILED,
 
+    /** 选定 route 缺少与 Provider 匹配的 transient Credential，尚未调用 Provider。 */
+    CREDENTIAL_UNAVAILABLE,
+
     /** Provider 对当前 route 实施限流，可以携带正数 retryAfter 提示。 */
     RATE_LIMITED,
 

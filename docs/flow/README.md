@@ -198,3 +198,4 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 
 | Behavior | Document Status | Feature / Slice | Document |
 |---|---|---|---|
+| Text Generation Credential Propagation | IMPLEMENTED | M0-S7A | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |

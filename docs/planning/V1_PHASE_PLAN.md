@@ -942,8 +942,15 @@ M0-S6F Scope: APPROVED
 M0-S6F Implementation / Architecture / Verification: PASS
 M0-S6F Documentation Reconciliation: COMPLETE
 M0-S6F Ownership Check: PARTIAL (Model Gateway remains L2)
-M0-S6F: PARTIAL (non-blocking Ownership gap)
-M0-S6: PARTIAL
+M0-S6F: PARTIAL (accepted non-blocking L2 Ownership gap)
+M0-S6: PARTIAL / ACCEPTED
+M0-S7A Design: APPROVED
+M0-S7A Scope: APPROVED
+M0-S7A Implementation: COMPLETE
+M0-S7A Verification: PASS (Model Gateway 43/43；server 183 total / 0 failures / 0 errors / 33 environment-skipped)
+M0-S7A Review: PENDING
+M0-S7A Ownership Check: NOT_STARTED
+M0-S7A: REVIEW_PENDING
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -966,3 +973,42 @@ route identity attribution 与 programming bug / Provider failure 边界；因�
 保持 L2，并已提交为 `c374449`。`M0-S6F` integrated closeout 确认 Model Gateway 40 tests 与
 server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同步；Ownership 仍为 L2，
 因此 closeout 为 `PARTIAL`。
+
+### M0-S7 Approved Design and Current Slice
+
+`M0-S7` 是 A 类 Security / Credential execution boundary。当前只批准 `M0-S7A` 的 Module-local
+Credential propagation，不把 Browser / HTTPS ingress、concrete Provider 或 Application Workflow 推入本 slice。
+
+```text
+Task / Slice: M0-S7A — Explicit transient Credential propagation
+Goal:
+- 让 Provider-scoped transient Credential 与 provider-neutral TextGenerationRequest 分离，并在
+  TextGenerationPort → fixed route → model-call ExecutorService → TextGenerationProviderAdapter 间显式传播。
+Expected Behavior:
+- TransientProviderCredential 保存 ProviderId 与 opaque secret，拒绝 null / blank，toString 始终 redacted；
+- selected route 与 credential.providerId 不匹配时返回 route-aware CREDENTIAL_UNAVAILABLE，且不提交 Adapter task；
+- matching Credential 由 submitted task 显式捕获并传给 Adapter，不依赖 ThreadLocal；
+- Provider 实际拒绝 Credential 继续使用 AUTHENTICATION_FAILED；既有 timeout / typed failure / route identity
+  validation 行为保持不变；
+- timeout cancellation 不承诺 worker 立即停止或 Credential 立即从 JVM heap 消失。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/credential/TransientProviderCredential.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailureKind.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java
+Architecture / Data / API / Security Impact:
+- 修改 Java Typed Port 与 Adapter SPI，并扩展 failure taxonomy；无 database schema、external HTTP API、
+  production dependency 或 Credential persistence 变化。
+Explicitly Out of Scope:
+- Browser / HTTPS ingress、header contract、UI / local storage、concrete Provider HTTP / SDK；
+- Credential rotation、Secret Manager、heap zeroization guarantee、Spring Executor wiring；
+- retry / fallback、Structured Output、Trace、ModelCallJob、Application Workflow 或 Learning State mutation。
+Verification:
+- focused Credential / route / Executor propagation tests；Model Gateway regression；server regression；
+  Behavior Flow validation；git diff check。
+```
+
+当前实现是 `Module-local complete`：真实 flow 在 operation-specific Adapter boundary 结束。Behavior Flow 见
+[`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。不得把它解释为
+Browser Credential → HTTPS → External Provider 的 End-to-End complete behavior。

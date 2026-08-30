@@ -1311,21 +1311,26 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
 
 详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
-## 28.2 M0-S6 已实现边界
+## 28.2 M0-S6–S7A 已实现边界
 
-当前已实现的是 Text Generation 在 Model Gateway Module 内的执行链：
+当前已实现的是 Text Generation 在 Model Gateway Module 内的 route、transient Credential propagation 与
+execution chain：
 
-    TextGenerationPort.generateText(request)
+    TextGenerationPort.generateText(request, credential)
         ↓
-    RoutedTextGenerationPort.generateText(request)
+    RoutedTextGenerationPort.generateText(request, credential)
         ↓
     FixedTextGenerationRoutes.findRoute(request.purpose())
         ↓
     no route → ModelResult.Failure(CAPABILITY_UNAVAILABLE)
         或
-    ExecutorService.submit(Adapter task)
+    credential.providerId != route.providerId
+        → ModelResult.Failure(CREDENTIAL_UNAVAILABLE, selected route identity)
+        或
+    ExecutorService.submit(Adapter task capturing credential)
         ↓
-    worker: TextGenerationProviderAdapter.generateText(providerId, modelId, request, executionTimeout)
+    worker: TextGenerationProviderAdapter.generateText(
+                providerId, modelId, request, credential, executionTimeout)
         ↓
     caller: Future.get(executionTimeout)
         ↓
@@ -1333,9 +1338,13 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
         ↓
     ModelResult<TextGenerationResponse>
 
-该调用链在 operation-specific Adapter boundary 结束。M0-S6 尚无 concrete Provider HTTP / SDK、
-Credential execution context、Application Workflow、Structured Output validation 或 Trace persistence，因此不得
+该调用链在 operation-specific Adapter boundary 结束。M0-S7A 已实现 Credential 在 module-local
+Port → route → Executor → Adapter 间的显式传播，但尚无 Browser / HTTPS Credential ingress、concrete
+Provider HTTP / SDK、Application Workflow、Structured Output validation 或 Trace persistence，因此不得
 把上述 Module-local flow 解释为已完成的 Agent → External Model End-to-End behavior。
+
+真实调用链与验证证据见
+[`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。
 
 ---
 
