@@ -58,11 +58,13 @@ Flow 应成为 Review 和 Ownership 的输入，而不是在所有 Review 完成
 
 是否创建 Flow 取决于它能否明显降低理解和 Review 成本，而不是文件数量或形式完整性。
 
-## 4. Status / 状态
+## 4. Status Model / 状态模型
 
-每份 Flow 必须声明状态：
+### 4.1 Document Status / 文档内容状态
 
-| Status | Meaning |
+每份已创建的 Flow 必须在 Metadata 中声明 `Document Status`：
+
+| Document Status | Meaning |
 |---|---|
 | `IMPLEMENTED` | 调用链已由真实 source code 和 verification evidence 确认 |
 | `PARTIAL` | 只有部分调用链已实现，必须明确已实现与未实现边界 |
@@ -71,11 +73,25 @@ Flow 应成为 Review 和 Ownership 的输入，而不是在所有 Review 完成
 本目录默认只新增 `IMPLEMENTED` Flow。确需保留 `PARTIAL` 或 `PROPOSED` 时，应与
 `IMPLEMENTED` 图分开，并优先考虑是否更适合放入 `docs/features/`。
 
+### 4.2 Review Sync Status / Review 同步状态
+
+`Review Sync Status` 是 Review 时对 Behavior Flow 完整性和时效性的判断，不写入 Flow Metadata：
+
+| Review Sync Status | Meaning |
+|---|---|
+| `NOT_REQUIRED` | 当前行为未命中 Trigger，不需要 Flow |
+| `CURRENT` | Flow 存在，并与当前 source code 和 verification evidence 一致 |
+| `MISSING` | 当前行为命中 Trigger，但尚未创建 Flow |
+| `UPDATE_REQUIRED` | Flow 已存在，但当前修改使调用链、状态或边界描述过期 |
+
+两个状态维度不得混用：`Document Status` 描述文档画的是什么，`Review Sync Status` 判断该文档
+对于当前 Review 是否存在且仍然准确。
+
 ## 5. Required Content / 必要内容
 
 每份 Flow 至少包含：
 
-1. **Metadata**：Status、Feature / Slice、Last Verified、入口；
+1. **Metadata**：Document Status、Feature / Slice、Last Verified、入口；
 2. **Behavior Boundary**：触发条件、输入、成功结果以及明确不负责的行为；
 3. **Main Call Chain**：从入口到结果的关键调用顺序；
 4. **State and Authority**：读取什么状态、谁能修改、谁负责校验和持久化；
@@ -126,7 +142,7 @@ Flow 应成为 Review 和 Ownership 的输入，而不是在所有 Review 完成
 ````markdown
 # <Behavior Name> Flow
 
-- Status: `IMPLEMENTED`
+- Document Status: `IMPLEMENTED`
 - Feature / Slice: `<feature-or-slice>`
 - Last Verified: `YYYY-MM-DD`
 - Entry: `<API / event / job / method>`
@@ -171,7 +187,7 @@ sequenceDiagram
 Flow 与真实代码冲突时，以当前 source code 和 test evidence 为事实依据，并把文档标记为
 需要更新；不得为了匹配文档而静默改变代码 Architecture。
 
-对于满足本规则 Trigger 的行为，Flow 为 `MISSING` 或 `UPDATE_REQUIRED` 时不得完成
+对于满足本规则 Trigger 的行为，`Review Sync Status` 为 `MISSING` 或 `UPDATE_REQUIRED` 时不得完成
 Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownership Gate，除非错误文档
 掩盖了真实 Correctness、Security、Data 或 Architecture 风险，否则不自动把 Code Review 标记为
 `BLOCK`。
@@ -180,5 +196,5 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 
 新增 Flow 时在下表登记：
 
-| Behavior | Status | Feature / Slice | Document |
+| Behavior | Document Status | Feature / Slice | Document |
 |---|---|---|---|
