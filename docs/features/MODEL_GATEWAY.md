@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: NOT_APPROVED  
-> Phase: M0-S6
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)
+> Phase: M0-S6 / M0-S7A
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
@@ -136,6 +136,7 @@ M0-S6 的最小 failure taxonomy：
 CAPABILITY_UNAVAILABLE
 REQUEST_REJECTED
 AUTHENTICATION_FAILED
+CREDENTIAL_UNAVAILABLE
 RATE_LIMITED
 TIMEOUT
 TEMPORARY_UNAVAILABLE
@@ -151,6 +152,10 @@ Failure 可以包含安全的 Provider / Model identity 和 Provider 明确给�
 - 未脱敏 request dump。
 
 Gateway 只报告和归一化失败，不决定业务降级结果。
+
+`ModelFailureKind.TIMEOUT` 表示单次 Model execution 达到最终 deadline，不等于 Application 的
+interactive wait budget 耗尽。后者由 `ModelCallJob` 返回 pending handle，并允许后台调用在最终 deadline
+内继续；不得把仍在运行的 Job 伪装成 terminal Gateway failure。
 
 ## 6. Retry and fallback boundary
 
@@ -198,6 +203,31 @@ required audio 失败时不得把 Session 伪装成已正常开始。
 Model infrastructure failure 可以进入 Workflow / Trace evidence，但不得成为 learner error、Weakness、
 Skill decline 或其他长期 Learning Evidence。
 
+## 7.1 Model Call Job boundary
+
+V1 production Application Workflow 在调用 Typed Model Operation Port 前创建 `ModelCallJob`。Job 负责：
+
+- interactive wait 与 pending status；
+- TaskExecutor lifecycle；
+- durable execution / consumption status；
+- late-result persistence、expiry、staleness 与 consume-once；
+- 用户 confirmation 或内部 Workflow resume。
+
+Gateway 不创建或持久化 Job，不接收 `jobId`、`userId`、`languageProfileId`、`workflowVersion` 或
+`rowVersion` 作为 Model Request 字段，也不决定迟到结果应被接受、拒绝或标记 stale。
+
+```text
+Application Workflow
+        ↓
+ModelCallJob
+        ↓
+Typed Model Operation Port
+        ↓
+Provider Adapter
+```
+
+详细 lifecycle 见 [`MODEL_CALL_JOB.md`](MODEL_CALL_JOB.md)。
+
 ## 8. Provider adapter boundary
 
 Adapter 按 Operation 实现小而明确的 SPI，避免一个 Provider class 拥有大量不支持的方法并抛出
@@ -233,15 +263,53 @@ D16 S6 默认禁止静默 cross-provider fallback。
 D17 Cross-provider fallback 需要用户配置、Credential、capability 与 policy 共同授权。
 D18 Model infrastructure failure 不产生 Learning Evidence 或长期学习状态变化。
 D19 S6 不新增 Spring AI 或 concrete Provider SDK dependency。
+D20 Model Call Job 位于 Application / Background Job boundary，不进入 Gateway Request / Response。
+D21 interactive wait timeout 返回 pending；只有最终 execution deadline 才产生 Gateway TIMEOUT。
 ```
 
-## 10. Explicit S6 non-goals
+## 10. M0-S6E approved execution decisions
+
+```text
+D22 TextGenerationRoute 必须显式持有 positive executionTimeout，不提供 silent default，也不把 timeout 放入
+    provider-neutral Request / Response。
+D23 Gateway 和 TextGenerationProviderAdapter 使用同一个 executionTimeout：Adapter 配置 Provider HTTP / client
+    timeout，Gateway 通过外层 Future deadline 建立最终本地等待边界。
+D24 S6E 使用外部注入的 dedicated JDK ExecutorService，不在 Gateway 内创建或关闭；它与 M0-S9 Job
+    TaskExecutor 不得共用同一个 bounded fixed pool，避免 Worker 等待自己提交的 Provider task 导致
+    starvation / deadlock。
+D25 final deadline 到期时 best-effort cancel(true)，并返回 route-aware TIMEOUT；不自动 retry / fallback，
+    且不保证 Provider 已停止、未执行或未产生 token cost。
+D26 checked ModelProviderCallException 只携带 ModelFailureKind 与 optional retryAfter；禁止 raw message、raw
+    response、SDK exception / cause、Prompt、Credential 与 arbitrary metadata 穿过 Adapter boundary。
+D27 只有 typed operational exception 被归一化；caller interrupt、executor rejection、unclassified
+    RuntimeException、null result 与 route identity mismatch 均安全 fail fast，Error 不转换为 ModelFailure。
+D28 S7 必须显式把 transient Credential 传播到 actual Provider call；不得假设普通 ThreadLocal 会跨
+    ExecutorService boundary 自动传播。
+```
+
+## 11. M0-S7A approved credential decisions
+
+```text
+D29 TransientProviderCredential 是单次 execution 的 Provider-scoped opaque secret，与 provider-neutral
+    TextGenerationRequest 分开传入 Typed Port；不得进入 route configuration、result 或 failure payload。
+D30 selected route 与 credential.providerId 不匹配时，在提交 Adapter task 前返回 route-aware
+    CREDENTIAL_UNAVAILABLE；Provider 实际拒绝已提供 Credential 仍归类为 AUTHENTICATION_FAILED。
+D31 RoutedTextGenerationPort 必须在 submitted task 中显式捕获 Credential 并传给 operation-specific Adapter；
+    不使用 ThreadLocal、global mutable context 或持久化 resolver 隐式传播。
+D32 TransientProviderCredential 不使用会自动暴露字段的 record toString；secret 只能由 Adapter 读取，
+    toString 必须 redacted，exception / ModelFailure 不得携带 secret。
+D33 timeout cancellation 是 best effort；S7A 不承诺 worker 立即停止或 Credential 立即从 JVM heap 消失。
+```
+
+## 12. Explicit S6 / S7A non-goals
 
 - concrete Provider HTTP / SDK integration；
-- BYOK Credential transport、storage 或 UI；
+- Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
 - Structured Output validation；
 - Trace persistence；
 - Planner、Evaluator、Conversation 或 Content Workflow；
 - Speech、Vision、Image、Embedding Port implementation；
 - automatic retry、fallback、health router 或 circuit breaker；
+- Spring Executor bean / pool sizing / lifecycle configuration；
+- Model Call Job persistence、interactive wait、late-result recovery 或用户 confirmation；
 - 任何 Learning State mutation。

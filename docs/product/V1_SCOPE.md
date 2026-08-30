@@ -3,6 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-21
+> Last updated: 2026-08-30 — Model Call Job and late-result recovery
 > Last updated: 2026-08-29 — Provider-free Learning Baseline
 > Authority: Product Scope Baseline
 
@@ -218,6 +219,17 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 | 18 Practice Feedback | P1 | M2 | 只做 lightweight feedback；advanced dispute / appeal 机制延期 |
 | 34 Notifications / Learning Recall | Backlog | V1 之后 | V1 不实现 push notification 或 scheduler |
 
+### 5.1 Model Call Job V1 Decision
+
+V1 纳入 PostgreSQL-backed `ModelCallJob` 与 late-result recovery。Production Application Workflow 在调用
+外部 Model 前创建 Job；interactive wait budget 耗尽后返回可查询的 pending 状态，后台任务继续，最终
+typed result 根据 workflow version 自动消费、等待用户确认或标记 stale。
+
+V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`jobId` 是稳定 identity；
+`workflowVersion` 判断结果是否仍适用；`rowVersion` 防止 accept / reject / expire 并发覆盖。Credential
+只进入当前内存任务，不进入 durable Job state。详细 Contract 见
+[`MODEL_CALL_JOB.md`](../features/MODEL_CALL_JOB.md)。
+
 ## 6. V1 Included Capability Groups
 
 ### P0 — Core Loop
@@ -226,6 +238,7 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - 多目标语言学习状态硬隔离；
 - provider-agnostic Model Gateway；
 - BYOK transient credential handling；
+- PostgreSQL-backed Model Call Job、late-result capture 与 versioned consume；
 - Provider-free Built-in Text Practice baseline；
 - Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
 - Text Practice / Conversation 的最小闭环；
@@ -246,11 +259,13 @@ API Key 不得持久化到 PostgreSQL、Redis、Trace 或 Log。
 - Tool Gateway 与 Controlled Multi-role Agent Workflow，用于 grounded material preparation / review；
 - Milestone Check；
 - Listening 与 turn-based Voice 的受控最小能力；
-- 必要的 PWA / offline UX，但不包含完整跨设备同步。
+- 必要的 PWA / offline UX，但不包含完整跨设备同步；
+- Model Call Job 的站内状态查询与用户确认；不包含 Push Notification / Learning Recall scheduler。
 
 ## 7. Explicitly Outside V1
 
 - push notification 与学习召回 scheduler；
+- Kafka / RabbitMQ 或 distributed Model Call Job platform；
 - full offline sync 与 device conflict merge；
 - advanced assessment mechanisms；
 - advanced feedback dispute / appeal；

@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.3
 > Approved: 2026-08-20  
-> Last updated: 2026-08-29
+> Last updated: 2026-08-30
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -78,6 +78,7 @@ M1 Built-in Text Practice walking skeleton
 - BYOK Credential 不进入 DB、Redis、Trace 或 Log；
 - Structured Output 的失败路径不会写入长期状态；
 - 至少一条 walking skeleton 能验证请求、模型边界、validation 与 trace metadata。
+- Model Call Job foundation 可以保存迟到结果，且 Credential 不进入 durable Job state。
 
 ### M1 — Minimum Text Practice Loop
 
@@ -102,6 +103,8 @@ M1 Built-in Text Practice walking skeleton
 - Evaluator 不直接改变 Weakness、Level 或 Mastery；
 - invalid structure、unsupported claim、Model failure 与 Provider contract 有自动化验证；
 - Planner / Evaluator Trace 记录 model、version、token、latency 与 result status，不记录 Secret。
+- Text Model Call 在 interactive wait budget 耗尽后可以继续后台执行；迟到结果根据 owning Workflow
+  version 自动消费、等待用户确认或标记 stale。
 
 ### M2 — Persistent Adaptation Loop
 
@@ -208,6 +211,7 @@ M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file s
 | M0-S6 | Model Gateway contract | 业务代码不依赖 concrete provider；timeout/error contract 明确 |
 | M0-S7 | BYOK transient credential path | Credential 不持久化、不进入 logs/traces/exceptions |
 | M0-S8 | Structured Output 与 minimal Trace walking skeleton | invalid output 不落长期状态；metadata 可追踪；unknown Provider finish reason 具有受控诊断策略 |
+| M0-S9 | Model Call Job foundation | PostgreSQL Job state + TaskExecutor 回收迟到结果；versioned consume；Credential 不持久化 |
 
 #### M0-S8 Reserved Observability Decision
 
@@ -226,6 +230,23 @@ M0-S8 设计 minimal Trace 时，必须显式处理 Provider raw finish reason�
 
 以上只保留 S8 的设计约束；具体 allowlist、长度、rate limit、digest、日志级别与 Debug 开关留到 S8
 Scope / Architecture Decision，不在 S6C 实现。
+
+#### M0-S9 Approved Model Call Job Decision
+
+M0-S9 在 S7 transient Credential 与 S8 Structured Output / Trace foundation 之后实现 V1 backend
+`ModelCallJob` foundation：
+
+- production Application Workflow 在调用 Provider 前创建 Job；
+- interactive wait timeout 只切换为 pending，不取消仍在最终 execution deadline 内的后台调用；
+- execution 与 consumption status 分离；`workflowVersion` 判断 stale，`rowVersion` 保护 consume-once；
+- PostgreSQL 保存 durable status / safe typed result，`Spring TaskExecutor` 执行当前内存任务；
+- BYOK Credential 不进入 DB、Redis、Trace、Log 或 durable task payload；
+- 不引入 Kafka / RabbitMQ、automatic retry、Push Notification 或 generic workflow engine；
+- Planner / Evaluator 等内部结果由 owning Workflow 自动消费或标记 stale；用户可感知结果可以进入站内
+  confirmation，但不得未经确认自动继续后续 Operation。
+
+Detailed Design 已批准并记录在 [`MODEL_CALL_JOB.md`](../features/MODEL_CALL_JOB.md)。M0-S9 implementation
+slice、schema、API 与 file scope 仍需在 S8 完成后单独批准；本决定不扩大当前 M0-S6E implementation。
 
 ### M0 Slice Control
 
@@ -627,12 +648,13 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | M0-S6A | Portable route vocabulary | 可以类型化表示 Purpose + Operation route 与 Provider / Model identity；无 Provider SDK type | COMPLETE |
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
-| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | REVIEW_PENDING |
-| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | PENDING |
-| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
+| M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | COMPLETE |
+| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | COMPLETE (`c374449`) |
+| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PARTIAL — implementation / Architecture / verification / docs PASS；Ownership L2 |
 
-以上是已批准 Design 下的 implementation slices。`M0-S6A` 与 `M0-S6B` 已完成并提交；`M0-S6C`
-已完成 implementation 与 verification，当前停在独立 Diff Review Gate。
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 至 `M0-S6E` 已完成并提交。`M0-S6F`
+已完成 integrated closeout：implementation、Architecture、verification 与 Documentation PASS；Model Gateway
+Ownership 保持 L2，因此 closeout 结果为 `PARTIAL`，但不构成 S7 Design / Scope 的实现阻塞。
 
 #### Proposed M0-S6A Current Slice Contract
 
@@ -770,6 +792,55 @@ Verification:
 - focused S6D tests；S6A-S6D Model Gateway regression；server compile；targeted Diff review。
 ```
 
+#### Approved M0-S6E Current Slice Contract
+
+```text
+Task / Slice: M0-S6E — Final execution timeout and safe Provider failure translation
+Goal: 为 routed Text Generation 增加单次 Provider call 的最终 execution deadline，并安全归一化已知
+Provider operational exception。
+Expected Behavior:
+- TextGenerationRoute 必须配置 positive Duration executionTimeout，不提供 silent default；
+- TextGenerationProviderAdapter 同时接收 selected ProviderId、ModelId、request 与 executionTimeout；
+- Gateway 使用同一个 executionTimeout 控制外层 final deadline，Adapter 使用它配置 Provider HTTP / client timeout；
+- RoutedTextGenerationPort 通过注入的 dedicated JDK ExecutorService 执行 Adapter，一次 route 只调用一次 Adapter；
+- deadline 到期时 best-effort future.cancel(true)，返回包含 selected route identity 的 TIMEOUT；
+- timeout 不证明 Provider 已停止、未执行或未计费，也不授权自动 retry / fallback；
+- checked ModelProviderCallException 只携带 ModelFailureKind 与 optional positive retryAfter，不携带 arbitrary
+  message、raw response、SDK exception / cause、Prompt、Credential 或 metadata；
+- typed Provider exception 转为带 selected route identity 的 ModelFailure；只有显式 PROVIDER_FAILURE 才返回
+  PROVIDER_FAILURE，不使用 catch-all Provider failure；
+- caller interrupt 恢复 interrupt flag 后 fail fast；executor rejection 与 unclassified RuntimeException 以不泄漏
+  raw message / cause 的安全 internal failure fail fast；Error 不转换；
+- Adapter 返回 null，或 Success / Failure route identity mismatch，继续作为 programming / wiring bug fail fast；
+- S6E executor 只负责 final Model call deadline；M0-S9 TaskExecutor 负责 Job lifecycle / interactive waiting，
+  两者不得共用同一个 bounded fixed pool。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/execution/ModelProviderCallException.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationRoute.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java
+Expected Tests:
+- server/src/test/java/com/dailylanguage/modelgateway/execution/ModelProviderCallExceptionTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/TextGenerationRouteTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutesTests.java
+- server/src/test/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPortTests.java
+Architecture / Data / API / Security Impact:
+- 扩展 approved internal Adapter / route execution contract；不改变 public HTTP API、Request / Response、schema、
+  Credential persistence 或 dependency；ExecutorService 由外部注入，本 slice 不新增 Spring wiring。
+Critical Code Expected:
+- positive timeout invariant 与同一 Duration 的内外层传播；
+- exactly-once Adapter delegation、deadline cancellation 与 route-aware TIMEOUT；
+- safe typed exception translation、retryAfter invariant 与 unknown/internal failure boundary；
+- no retry / fallback，以及 Job TaskExecutor 与 model-call ExecutorService 的职责隔离。
+Explicitly Out of Scope:
+- M0-S9 Job persistence、interactive pending、late-result capture / consume；
+- concrete Provider / HTTP / SDK integration 与 Spring Executor bean / configuration；
+- BYOK implementation、retry、fallback、circuit breaker、Structured Output、Trace；
+- Workflow / Learning State mutation，或保证 timeout 后 Provider 停止执行。
+Verification:
+- focused S6E tests；S6A-S6E Model Gateway regression；server compile；git diff check；targeted Diff review。
+```
+
 ## 4. Later-phase Planning Rule
 
 M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 implementation tasks。
@@ -893,9 +964,31 @@ M0-S6C: COMPLETE (`1a5fcbc`)
 M0-S6D Scope: APPROVED
 M0-S6D Implementation: COMPLETE
 M0-S6D Verification: COMPLETE
-M0-S6D Review: PENDING
-M0-S6D Ownership Check: NOT_STARTED
-M0-S6D: REVIEW_PENDING
+M0-S6D Review: COMPLETE
+M0-S6D Ownership Check: COMPLETE (L2 traceable route / Adapter path)
+M0-S6D: COMPLETE (`1e32ff7`)
+M0-S6E Design: APPROVED
+M0-S6E Scope: APPROVED
+M0-S6E Implementation: COMPLETE
+M0-S6E Verification: COMPLETE
+M0-S6E Review: COMPLETE
+M0-S6E Ownership Check: COMPLETE (L2 timeout / failure execution path)
+M0-S6E: COMPLETE (`c374449`)
+M0-S6F Scope: APPROVED
+M0-S6F Implementation / Architecture / Verification: PASS
+M0-S6F Documentation Reconciliation: COMPLETE
+M0-S6F Ownership Check: PARTIAL (Model Gateway remains L2)
+M0-S6F: PARTIAL (accepted non-blocking L2 Ownership gap)
+M0-S6: PARTIAL / ACCEPTED
+M0-S7A Design: APPROVED
+M0-S7A Scope: APPROVED
+M0-S7A Implementation: COMPLETE
+M0-S7A Verification: PASS (Model Gateway 43/43；server 183 total / 0 failures / 0 errors / 33 environment-skipped)
+M0-S7A Review: COMPLETE (PASS；no blocking findings)
+M0-S7A Ownership Check: COMPLETE (Module-local UNDERSTOOD；Model Gateway remains L2)
+M0-S7A: COMPLETE (`d8d47ac`)
+M0-S9 Detailed Design: APPROVED
+M0-S9 Implementation Scope: NOT_APPROVED
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与
@@ -906,5 +999,57 @@ Human Ownership Check 已确认用户理解 sealed result 的互斥状态、rout
 `retryAfter` 是 metadata 而不是 retry execution，并已提交为 `666e2e6`。`M0-S6C` 已完成 typed
 Text Generation request / response / port、focused verification 与 Diff Review。Ownership 明确限制在当前
 typed contract，以及识别 route resolution / Provider execution 尚未实现，并已提交为 `1a5fcbc`。
-`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation 与 focused verification，
-当前等待真实 Diff Review；不得自动进入 `M0-S6E` timeout / safe failure translation。
+`M0-S6D` 已完成 fixed route、operation-specific Adapter seam、single delegation、route identity invariant、
+focused verification、Diff Review 与 Human Ownership Check，并已提交为 `1e32ff7`。Ownership 已具备真实
+Request → route → Adapter → result 调用链的 L2 traceable evidence。`M0-S6E` 已按批准 Scope 实现 route
+timeout、timeout-aware Adapter、dedicated ExecutorService、route-aware TIMEOUT 与 safe typed Provider exception
+translation，并已完成 focused tests、S6A-S6E regression、server compile、
+Diff Review 与 Human Ownership Check。用户能够解释 Executor worker / caller wait、best-effort cancellation、
+route identity attribution 与 programming bug / Provider failure 边界；因尚无 concrete Provider evidence，Ownership
+保持 L2，并已提交为 `c374449`。`M0-S6F` integrated closeout 确认 Model Gateway 40 tests 与
+server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同步；Ownership 仍为 L2，
+因此 closeout 为 `PARTIAL`。
+
+### M0-S7 Approved Design and Current Slice
+
+`M0-S7` 是 A 类 Security / Credential execution boundary。当前只批准 `M0-S7A` 的 Module-local
+Credential propagation，不把 Browser / HTTPS ingress、concrete Provider 或 Application Workflow 推入本 slice。
+
+```text
+Task / Slice: M0-S7A — Explicit transient Credential propagation
+Goal:
+- 让 Provider-scoped transient Credential 与 provider-neutral TextGenerationRequest 分离，并在
+  TextGenerationPort → fixed route → model-call ExecutorService → TextGenerationProviderAdapter 间显式传播。
+Expected Behavior:
+- TransientProviderCredential 保存 ProviderId 与 opaque secret，拒绝 null / blank，toString 始终 redacted；
+- selected route 与 credential.providerId 不匹配时返回 route-aware CREDENTIAL_UNAVAILABLE，且不提交 Adapter task；
+- matching Credential 由 submitted task 显式捕获并传给 Adapter，不依赖 ThreadLocal；
+- Provider 实际拒绝 Credential 继续使用 AUTHENTICATION_FAILED；既有 timeout / typed failure / route identity
+  validation 行为保持不变；
+- timeout cancellation 不承诺 worker 立即停止或 Credential 立即从 JVM heap 消失。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/credential/TransientProviderCredential.java
+- server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailureKind.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/TextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java
+- server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java
+Architecture / Data / API / Security Impact:
+- 修改 Java Typed Port 与 Adapter SPI，并扩展 failure taxonomy；无 database schema、external HTTP API、
+  production dependency 或 Credential persistence 变化。
+Explicitly Out of Scope:
+- Browser / HTTPS ingress、header contract、UI / local storage、concrete Provider HTTP / SDK；
+- Credential rotation、Secret Manager、heap zeroization guarantee、Spring Executor wiring；
+- retry / fallback、Structured Output、Trace、ModelCallJob、Application Workflow 或 Learning State mutation。
+Verification:
+- focused Credential / route / Executor propagation tests；Model Gateway regression；server regression；
+  Behavior Flow validation；git diff check。
+```
+
+当前实现是 `Module-local complete`：真实 flow 在 operation-specific Adapter boundary 结束。Behavior Flow 见
+[`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。不得把它解释为
+Browser Credential → HTTPS → External Provider 的 End-to-End complete behavior。
+
+M0-S7A 已完成 Diff Review 与 module-local Human Ownership Check。用户能够说明 caller thread 提交 task、
+Executor worker 执行 lambda、lambda 将 Credential 传给 Adapter，以及 timeout 后 `cancel(true)` 不能保证
+worker 停止或 Credential 立即从 JVM heap 消失。该 slice 已提交为 `d8d47ac`；由于仍无 concrete Provider
+execution evidence，Model Gateway Ownership 保持 L2。下一个 M0-S7 implementation slice 尚未批准。

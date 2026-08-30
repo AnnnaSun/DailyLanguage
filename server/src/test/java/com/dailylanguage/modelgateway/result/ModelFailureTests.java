@@ -22,6 +22,7 @@ class ModelFailureTests {
                 ModelFailureKind.CAPABILITY_UNAVAILABLE,
                 ModelFailureKind.REQUEST_REJECTED,
                 ModelFailureKind.AUTHENTICATION_FAILED,
+                ModelFailureKind.CREDENTIAL_UNAVAILABLE,
                 ModelFailureKind.RATE_LIMITED,
                 ModelFailureKind.TIMEOUT,
                 ModelFailureKind.TEMPORARY_UNAVAILABLE,

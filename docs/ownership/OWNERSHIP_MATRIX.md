@@ -241,6 +241,60 @@ Ownership 不能只根据：
 
 并能够指出实际代码位置。
 
+### Explain Back Question Scope / 反向解释的提问边界
+
+Explain Back 必须以已实现的真实代码为边界。提问前先判断行为流程的完成度，
+不得要求用户通过未实现的设计、未接入的 dependency 或未决定的后续阶段猜测当前调用链。
+
+#### 1. End-to-End Behavior Complete
+
+当已存在真实入口、核心处理、实际 dependency 调用以及调用方可观测的结局时，
+可以询问：
+
+* 从真实入口到最终结果的完整 Call Chain；
+* 关键 State Read / Mutation；
+* 成功与已实现的 Failure Path；
+* 已落地的设计理由和 trade-off。
+
+#### 2. Module-local Behavior Complete
+
+当 Module 从自身入口到 `ModuleResult` 的内部行为已实现，但真实上游、下游或
+concrete adapter 尚未接入时，只能询问当前 Module 内的代码事实：
+
+* 给定具体入口、参数和前置条件，会进入哪个方法或分支；
+* 最终得到哪个具体返回值、异常或 Module-local state change；
+* 返回对象的关键字段是什么；
+* 当前代码在哪个外部边界结束。
+
+不得把该局部调用链表述为完整业务流程，也不得询问尚未实现的 Credential、
+Provider invocation、persistence 或业务降级行为。
+
+#### 3. Contract-only / Placeholder
+
+当当前 slice 只包含 interface、record、enum、sealed result、validation 或未可执行的
+placeholder 时，不询问运行时调用链。只能确认：
+
+* Contract 当前表达的业务语义；
+* 哪些字段组合合法，哪些 invariant 会在构造时被拒绝；
+* 当前明确已实现和未实现的能力边界。
+
+不得要求用户解释一个尚未存在的执行流程或业务结局。
+
+#### Question Precision / 提问精度
+
+每个 Explain Back 问题应明确给出：
+
+1. 正在检查的已实现范围；
+2. 具体入口或方法；
+3. 必要的输入与前置条件；
+4. 希望回答的层级：下一个方法、具体分支、对象字段、异常、State Mutation 或最终业务结果。
+
+一次只检查一个明确行为分支。“如何返回”、“流程是什么”等可能对应多个代码层级的
+问题，必须改写为可通过当前代码唯一定位的问题。
+
+如果问题越过已实现边界、未指明回答层级，或依赖未决定的未来设计，本次回答不得作为
+Ownership 降级或 `PARTIAL` / `NOT_UNDERSTOOD` 的证据。应废弃问题，明确范围后重新评估。
+
 ---
 
 ## L3 → L4
@@ -339,7 +393,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | L1                | L4        | L5               | M0-S6A/S6B/S6C route、result/failure、Text Generation typed contract Review PASS；无 Port implementation / Provider path |
+| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7A Ownership 确认 fixed route、显式 Credential task propagation、mismatch no-submit 与 timeout cancellation boundary 可追踪；S6F 的 result envelope gap 不提升为 L3，且仍无 concrete Provider execution evidence |
 | Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -647,6 +701,7 @@ Human Touch 的目的：
 | Module / Feature | Questions | Result  | Missing Area | Date |
 | ---------------- | --------: | ------- | ------------ | ---- |
 | M0-S2 Local Infrastructure | 4 | UNDERSTOOD | None for current slice | 2026-08-21 |
+| M0-S6 Model Gateway | 4 | PARTIAL | `ModelResult.Failure` envelope 与 `ModelFailure` payload 的稳定区分；无 concrete Provider execution evidence | 2026-08-30 |
 
 Result：
 
@@ -963,7 +1018,7 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | L1        | I0                  | 已有 route + result/failure + Text Generation typed contract；尚无 invocation / Provider path |
+| Model Gateway            | L2        | I0                  | 可追踪 Request + transient Credential → fixed route → Executor task → Adapter → timeout 或 validated result；尚无 concrete Provider execution evidence |
 | Trace                    | UNASSESSED | I0                  |          |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |

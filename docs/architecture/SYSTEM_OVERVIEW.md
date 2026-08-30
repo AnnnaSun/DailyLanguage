@@ -675,6 +675,7 @@ permission、maximum turns / tool calls、timeout、idempotency、validation 与
 
 可能进入 Background Job 的任务：
 
+- Model call late-result capture；
 - large PDF parsing；
 - embedding；
 - content indexing；
@@ -688,6 +689,25 @@ V1 设计优先：
     Spring TaskExecutor
     +
     DB Job Status
+
+V1 Model call 使用两层等待语义：
+
+    interactive wait budget exhausted
+        → return pending jobId
+        → background call continues
+
+    final model execution deadline exhausted
+        → Gateway TIMEOUT
+        → Job terminal execution status
+
+这两层语义对应两个独立 execution boundary：Application `TaskExecutor` 运行 Job lifecycle，Gateway 的
+dedicated model-call `ExecutorService` 包围同步 Provider Adapter call 并控制 final deadline。两者不得共用
+同一个 bounded fixed pool，避免 Job worker 占满线程后等待同池 Provider task 的 starvation / deadlock。
+
+`ModelCallJob` 在调用 Provider 前创建。PostgreSQL 保存 owner、workflow reference/version、execution /
+consumption status、safe typed result 与 expiry；BYOK Credential 只存在于当前 Worker 内存，不进入 durable
+Job state。用户可感知的迟到结果通过站内查询等待确认；Planner / Evaluator 等内部结果由 owning Workflow
+根据 version 自动消费或标记 stale。
 
 当前架构不因为“未来可能有大量任务”提前引入 Kafka。
 

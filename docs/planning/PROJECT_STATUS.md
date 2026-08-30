@@ -1,16 +1,17 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-29
+> Last updated: 2026-08-30
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6D / REVIEW_PENDING
-> Production implementation: M0-S6D COMPLETE
+> Current Gate: M0-S7A / COMPLETE
+> Production baseline: M0-S7A COMPLETE (`d8d47ac`)
 
 ## Approved Decisions
 
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
-- V1 Scope v1.4 已纳入 Engineering Evidence Track，正式范围记录在 `docs/product/V1_SCOPE.md`；
+- V1 Scope v1.5 已纳入 Engineering Evidence Track 与 Model Call Job，正式范围记录在
+  `docs/product/V1_SCOPE.md`；
 - Phase Gate 与 M0 slices 记录在 `docs/planning/V1_PHASE_PLAN.md`。
 - Engineering Evidence Track 已批准：M1 Grounded Evaluator、M2 versioned Memory / replay、M3 RAG +
   Tool Gateway + Controlled Multi-role Agent Workflow、M6 Eval / capacity / CI / interview evidence；详细验收
@@ -48,6 +49,25 @@
   portable response / finish reason 与 optional token usage；不引入 Provider-specific option Map。
 - M0-S6D runtime route 通过 Composition 绑定 ProviderId、ModelId 与 operation-specific Adapter；
   V1 fixed mapping 不引入 Adapter Registry、dynamic router、retry 或 fallback。
+- M0-S6E 已完成并提交（`c374449`）：route 持有 positive final `executionTimeout`，Gateway 与 Adapter 使用同一个
+  Duration；dedicated injected `ExecutorService` 负责最终 deadline，typed `ModelProviderCallException` 只暴露
+  safe failure kind / retryAfter。
+- S6E model-call ExecutorService 与 M0-S9 Job TaskExecutor 是两个 execution boundary，不得共用同一个 bounded
+  fixed pool；前者负责单次外部调用 deadline，后者负责 Job lifecycle、interactive waiting 与迟到结果持久化。
+- V1 Model Call Job Design 已批准：production Application Workflow 在调用 Provider 前创建 PostgreSQL-backed
+  Job；interactive wait budget 耗尽后返回 pending，后台调用继续到最终 execution deadline；迟到结果按
+  workflow version 自动消费、等待用户确认或标记 stale。
+- Model Call Job 使用稳定 UUIDv7 `jobId`、独立 `workflowVersion` 与 optimistic-lock `rowVersion`；V1
+  runtime 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ，不持久化 BYOK Credential。
+- Model Call Job backend foundation 排入 M0-S9，依赖 S7 transient Credential 与 S8 Structured Output /
+  Trace；详细 Contract 见 `docs/features/MODEL_CALL_JOB.md`，当前 M0-S6E 不实现 Job。
+- M0-S6F non-blocking L2 Ownership gap 已由用户接受；该决定不把 Ownership 提升为 L3，也不改变
+  S6F `PARTIAL` 的历史结论。
+- M0-S7A Design / Scope 已批准：`TransientProviderCredential` 与 provider-neutral request 分离，
+  selected route 在提交 worker 前校验 Provider identity；Credential 通过 Executor task 显式传给 Adapter，
+  不使用 ThreadLocal、global mutable context 或 persistence。
+- selected route 缺少 matching Credential 时返回 route-aware `CREDENTIAL_UNAVAILABLE`；Provider 实际拒绝
+  Credential 仍使用 `AUTHENTICATION_FAILED`。当前只完成 Module-local flow，不宣称 BYOK End-to-End。
 
 ## Completed Review
 
@@ -77,30 +97,41 @@
     S6A + S6B focused regression、server compile 与 targeted Diff Review。
 24. M0-S6C provider-neutral Text Generation request / response / port、focused contract regression、
     server compile、Diff Review 与 scope-limited Ownership Check。
+25. M0-S6D fixed Text Generation route、operation-specific Adapter seam、single delegation、route identity
+    invariant、focused regression、Diff Review 与 Human Ownership Check。
+26. M0-S6E positive route timeout、dedicated model-call ExecutorService、route-aware TIMEOUT、safe typed Provider
+    failure translation、focused regression、Diff Review 与 Human Ownership Check。
+27. M0-S6F integrated closeout：Scope / Architecture / Model Gateway 40 tests / server 180 tests PASS；
+    Documentation 已同步；Model Gateway Ownership 保持 L2，closeout 结果为 PARTIAL。
+28. M0-S7A explicit transient Credential propagation：Scope / Architecture / Security boundary / verification PASS；
+    Diff Review 无 blocking finding，module-local Ownership Check 为 UNDERSTOOD；Model Gateway 整体保持 L2。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S6D
-Gate: REVIEW_PENDING
+Selected slice: M0-S7A
+Gate: COMPLETE
 M0 umbrella scope: APPROVED
-Detailed Design: APPROVED
-Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-Implementation Scope: APPROVED
-Implementation: COMPLETE
-Verification: COMPLETE
-Code Review: PENDING
-Ownership Check: NOT_STARTED
-Production baseline: M0-S6C COMPLETE (`1a5fcbc`)
-Current target: fixed Text Generation route and Provider Adapter seam
+S6F non-blocking Ownership gap: ACCEPTED (Model Gateway remains L2)
+S7A Design: APPROVED
+S7A Scope: APPROVED
+S7A Implementation: COMPLETE
+Verification: PASS (Model Gateway 43/43; server 183 total, 0 failures/errors, 33 environment-skipped)
+Behavior Flow: CURRENT
+Code Review: COMPLETE (PASS; no blocking findings)
+Ownership Check: COMPLETE (UNDERSTOOD for Module-local Credential flow; Model Gateway remains L2)
+Production baseline: M0-S7A COMPLETE (`d8d47ac`)
+Current target: wait for the next M0-S7 slice Design / Scope decision
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S6D 等待基于真实 Diff 的 Code Review。Review 与 Ownership 完成前不得 commit，也不得开始
-`M0-S6E` timeout / safe failure translation。
+M0-S7A 已完成并提交。下一步只能先定义下一个 M0-S7 slice 的 Design / Scope；在人工批准前不实现
+HTTP ingress、concrete Provider 或其他 Credential capability。interactive wait、durable Job、late-result
+consume 与 TaskExecutor wiring 继续留在 M0-S9。
 
 ## Blockers
 
-None. Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证，不阻塞 M0-S6。
+None. Model Gateway Ownership 仍为 L2，但不阻塞下一个 M0-S7 Design / Scope。尚未批准新的 S7
+implementation slice。Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

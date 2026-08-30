@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Optional;
 
+import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.result.ModelFailure;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
 import com.dailylanguage.modelgateway.result.ModelResult;
@@ -27,13 +28,16 @@ class TextGenerationPortTests {
                 "Practice ordering food.",
                 TextGenerationResponse.FinishReason.COMPLETED,
                 Optional.empty());
-        TextGenerationPort successfulPort = ignored -> ModelResult.success(response);
-        TextGenerationPort unavailablePort = ignored -> ModelResult.failure(
+        TransientProviderCredential credential = new TransientProviderCredential(
+                response.providerId(),
+                "test-provider-secret");
+        TextGenerationPort successfulPort = (ignoredRequest, ignoredCredential) -> ModelResult.success(response);
+        TextGenerationPort unavailablePort = (ignoredRequest, ignoredCredential) -> ModelResult.failure(
                 ModelFailure.withoutRoute(ModelFailureKind.CAPABILITY_UNAVAILABLE));
 
-        assertThat(successfulPort.generateText(request))
+        assertThat(successfulPort.generateText(request, credential))
                 .isEqualTo(ModelResult.success(response));
-        assertThat(unavailablePort.generateText(request))
+        assertThat(unavailablePort.generateText(request, credential))
                 .isEqualTo(ModelResult.failure(
                         ModelFailure.withoutRoute(ModelFailureKind.CAPABILITY_UNAVAILABLE)));
     }
