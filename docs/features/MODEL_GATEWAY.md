@@ -2,7 +2,7 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6D COMPLETE；S6E READY_TO_COMMIT；S6F NOT_APPROVED
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL（implementation / Architecture / verification / docs PASS；Ownership L2）
 > Phase: M0-S6
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与

@@ -1311,6 +1311,32 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
 
 详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
+## 28.2 M0-S6 已实现边界
+
+当前已实现的是 Text Generation 在 Model Gateway Module 内的执行链：
+
+    TextGenerationPort.generateText(request)
+        ↓
+    RoutedTextGenerationPort.generateText(request)
+        ↓
+    FixedTextGenerationRoutes.findRoute(request.purpose())
+        ↓
+    no route → ModelResult.Failure(CAPABILITY_UNAVAILABLE)
+        或
+    ExecutorService.submit(Adapter task)
+        ↓
+    worker: TextGenerationProviderAdapter.generateText(providerId, modelId, request, executionTimeout)
+        ↓
+    caller: Future.get(executionTimeout)
+        ↓
+    timeout / typed Provider failure translation 或 route identity validation
+        ↓
+    ModelResult<TextGenerationResponse>
+
+该调用链在 operation-specific Adapter boundary 结束。M0-S6 尚无 concrete Provider HTTP / SDK、
+Credential execution context、Application Workflow、Structured Output validation 或 Trace persistence，因此不得
+把上述 Module-local flow 解释为已完成的 Agent → External Model End-to-End behavior。
+
 ---
 
 # 29. BYOK Runtime / BYOK 运行链
@@ -1984,9 +2010,7 @@ Optimization / Self-improvement 当前保持受控：
 
 # 44. Physical Agent Mapping / 实际代码映射
 
-> 当前只记录逻辑 Architecture。
->
-> 本节在真实实现出现后更新。
+> 已有真实实现的 Module 记录实际映射；未实现部分保持 `TBD`，不根据 Architecture Design 猜测 class name。
 
 | Agent / Runtime | Source Path | Main Entry | Prompt | Context Policy | Tools | Output Schema | Tests |
 |---|---|---|---|---|---|---|---|
@@ -1995,7 +2019,7 @@ Optimization / Self-improvement 当前保持受控：
 | Evaluator | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Context Manager | TBD | TBD | N/A | TBD | N/A | TBD | TBD |
 | Tool Gateway | TBD | TBD | N/A | N/A | TBD | TBD | TBD |
-| Model Gateway | TBD | TBD | N/A | N/A | N/A | TBD | TBD |
+| Model Gateway | `server/src/main/java/com/dailylanguage/modelgateway` | `TextGenerationPort`, `RoutedTextGenerationPort` | N/A | Request 不携带 Domain identity 或 Credential | N/A | `ModelResult<TextGenerationResponse>` | `server/src/test/java/com/dailylanguage/modelgateway` |
 | RAG | TBD | TBD | N/A | N/A | N/A | TBD | TBD |
 
 不得根据 Architecture Design 猜测 class name。

@@ -613,11 +613,12 @@ Closeout：以上 Exit Criteria 已于 2026-08-29 基于 committed implementatio
 | M0-S6B | Typed result / failure contract | 调用方可以显式区分 success 与 normalized operational failure；failure 不携带 unsafe detail | COMPLETE |
 | M0-S6C | Text Generation Typed Port | 调用方只通过 provider-neutral text Request / Response contract 发起 Text Generation；无万能 option Map | COMPLETE |
 | M0-S6D | Fixed route 与 Provider Adapter seam | Purpose + Text Generation 解析为 configured Provider / Model；unsupported route / capability 明确失败 | COMPLETE |
-| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | READY_TO_COMMIT |
-| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PENDING |
+| M0-S6E | Timeout 与 safe failure translation | slow / rejected / unavailable fake Adapter 被转换为稳定 failure；默认无 retry / cross-provider fallback | COMPLETE (`c374449`) |
+| M0-S6F | Integrated contract verification 与收口 | dependency boundary、routing、timeout、failure isolation、Diff Review 与 Ownership Check 完成 | PARTIAL — implementation / Architecture / verification / docs PASS；Ownership L2 |
 
-以上是已批准 Design 下的 implementation slices。`M0-S6A` 至 `M0-S6D` 已完成并提交；`M0-S6E` 已完成
-implementation、verification、Diff Review 与 Ownership Check，当前 Gate 是 `READY_TO_COMMIT`，不自动进入 S6F。
+以上是已批准 Design 下的 implementation slices。`M0-S6A` 至 `M0-S6E` 已完成并提交。`M0-S6F`
+已完成 integrated closeout：implementation、Architecture、verification 与 Documentation PASS；Model Gateway
+Ownership 保持 L2，因此 closeout 结果为 `PARTIAL`，但不构成 S7 Design / Scope 的实现阻塞。
 
 #### Proposed M0-S6A Current Slice Contract
 
@@ -936,7 +937,13 @@ M0-S6E Implementation: COMPLETE
 M0-S6E Verification: COMPLETE
 M0-S6E Review: COMPLETE
 M0-S6E Ownership Check: COMPLETE (L2 timeout / failure execution path)
-M0-S6E: READY_TO_COMMIT
+M0-S6E: COMPLETE (`c374449`)
+M0-S6F Scope: APPROVED
+M0-S6F Implementation / Architecture / Verification: PASS
+M0-S6F Documentation Reconciliation: COMPLETE
+M0-S6F Ownership Check: PARTIAL (Model Gateway remains L2)
+M0-S6F: PARTIAL (non-blocking Ownership gap)
+M0-S6: PARTIAL
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -956,4 +963,6 @@ timeout、timeout-aware Adapter、dedicated ExecutorService、route-aware TIMEOU
 translation，并已完成 focused tests、S6A-S6E regression、server compile、
 Diff Review 与 Human Ownership Check。用户能够解释 Executor worker / caller wait、best-effort cancellation、
 route identity attribution 与 programming bug / Provider failure 边界；因尚无 concrete Provider evidence，Ownership
-保持 L2。当前 Gate 是 `READY_TO_COMMIT`，不自动进入 S6F。
+保持 L2，并已提交为 `c374449`。`M0-S6F` integrated closeout 确认 Model Gateway 40 tests 与
+server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同步；Ownership 仍为 L2，
+因此 closeout 为 `PARTIAL`。

@@ -824,7 +824,9 @@ L3。
   能说明 route identity 来自 selected `TextGenerationRoute`，并能区分 programming bug 与明确分类的 Provider
   operational failure；
 - 当前 evidence 仍来自 fake Adapter，没有 concrete Provider HTTP / SDK、真实 response classification 或
-  Credential execution path，因此 Model Gateway Ownership 维持 `L2`。S6E 当前为 `READY_TO_COMMIT`。
+  Credential execution path，因此 Model Gateway Ownership 维持 `L2`。S6E 已提交为 `c374449`；
+  S6F integrated closeout 的 implementation、Architecture、verification 与 Documentation PASS，Ownership
+  因 `ModelResult.Failure` envelope / `ModelFailure` payload 区分尚不稳定而保持 L2，closeout 为 `PARTIAL`。
 
 ---
 

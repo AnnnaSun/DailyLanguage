@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-30
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S6E / READY_TO_COMMIT
-> Production baseline: M0-S6D COMPLETE (`1e32ff7`)
+> Current Gate: M0-S6F / PARTIAL (non-blocking Ownership gap)
+> Production baseline: M0-S6E COMPLETE (`c374449`)
 
 ## Approved Decisions
 
@@ -49,7 +49,7 @@
   portable response / finish reason 与 optional token usage；不引入 Provider-specific option Map。
 - M0-S6D runtime route 通过 Composition 绑定 ProviderId、ModelId 与 operation-specific Adapter；
   V1 fixed mapping 不引入 Adapter Registry、dynamic router、retry 或 fallback。
-- M0-S6E Design / Scope 已批准：route 持有 positive final `executionTimeout`，Gateway 与 Adapter 使用同一个
+- M0-S6E 已完成并提交（`c374449`）：route 持有 positive final `executionTimeout`，Gateway 与 Adapter 使用同一个
   Duration；dedicated injected `ExecutorService` 负责最终 deadline，typed `ModelProviderCallException` 只暴露
   safe failure kind / retryAfter。
 - S6E model-call ExecutorService 与 M0-S9 Job TaskExecutor 是两个 execution boundary，不得共用同一个 bounded
@@ -94,30 +94,37 @@
     invariant、focused regression、Diff Review 与 Human Ownership Check。
 26. M0-S6E positive route timeout、dedicated model-call ExecutorService、route-aware TIMEOUT、safe typed Provider
     failure translation、focused regression、Diff Review 与 Human Ownership Check。
+27. M0-S6F integrated closeout：Scope / Architecture / Model Gateway 40 tests / server 180 tests PASS；
+    Documentation 已同步；Model Gateway Ownership 保持 L2，closeout 结果为 PARTIAL。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S6E
-Gate: READY_TO_COMMIT
+Selected slice: M0-S6F
+Gate: PARTIAL (non-blocking Ownership gap)
 M0 umbrella scope: APPROVED
 Detailed Design: APPROVED
-Slice breakdown: PROPOSED (S6A → S6B → S6C → S6D → S6E → S6F)
-Implementation Scope: APPROVED
-Implementation: COMPLETE
-Verification: COMPLETE
-Code Review: COMPLETE
-Ownership Check: COMPLETE (UNDERSTOOD, Model Gateway remains L2)
-Production baseline: M0-S6D COMPLETE (`1e32ff7`)
-Current target: human commit decision for the completed S6E slice
+Slice breakdown: COMPLETE (S6A → S6B → S6C → S6D → S6E → S6F)
+S6A-S6E Implementation: COMPLETE
+S6F Scope: APPROVED
+Verification: PASS (Model Gateway 40/40; server 180/180)
+Architecture Boundary: PASS
+Documentation Reconciliation: COMPLETE
+Ownership Check: PARTIAL (Model Gateway remains L2)
+Closeout Result: PARTIAL
+Production baseline: M0-S6E COMPLETE (`c374449`)
+Current target: human decision whether to accept the non-blocking L2 Ownership gap and enter M0-S7 Design / Scope
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-由用户决定并执行 M0-S6E commit。提交后记录 commit hash，再单独进入 M0-S6F Design / Scope Gate；当前收尾
-不自动实现 S6F。interactive wait、durable Job、late-result consume 与 TaskExecutor wiring 继续留在 M0-S9。
+由用户决定是否接受 Model Gateway 当前 L2 Ownership 作为非阻塞缺口，并单独进入 M0-S7
+Design / Scope Gate；不自动开始 S7 implementation。interactive wait、durable Job、late-result consume 与
+TaskExecutor wiring 继续留在 M0-S9。
 
 ## Blockers
 
-None. Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证，不阻塞 M0-S6。
+No implementation or Architecture blocker. Model Gateway Ownership 低于 A 类模块推荐的 L3，当前保持
+L2 并作为非阻塞 Ownership gap 记录。Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定
+Scope 在 M6 目标硬件验证。
