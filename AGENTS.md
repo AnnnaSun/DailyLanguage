@@ -1287,10 +1287,79 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 
 ---
 
-## 34. Repository Navigation / 项目导航
+## 34. CURRENT_HANDOFF / Codex 与 Zcode 交接约定
+
+`docs/planning/CURRENT_HANDOFF.md` 是 Codex 与 Zcode 共享的、可覆盖更新的当前工作快照。
+
+它只负责回答：
+
+- 当前由谁工作、为什么交接；
+- 当前 Branch / HEAD / Worktree 是什么；
+- 当前 Slice 到达哪个 Gate；
+- 哪些修改已经完成、验证到哪里；
+- 哪些风险、UNKNOWN、用户决定和下一步仍未解决。
+
+它不是新的 Product / Architecture / Scope Source of Truth，也不替代：
+
+- `PROJECT_STATUS.md`；
+- `V1_PHASE_PLAN.md`；
+- Feature Dossier / ADR；
+- Git、source code、tests 与真实 Diff。
+
+### 34.1 Read and Verify / 接手规则
+
+Codex 与 Zcode 每次接手 repository work 时，必须在 `AGENTS.md` 之后读取
+`docs/planning/CURRENT_HANDOFF.md`，并在修改前至少核对：
+
+1. `git branch --show-current` 与 `git rev-parse --short HEAD`；
+2. `git status --short`；
+3. 与当前 Slice 有关的 Diff；
+4. `PROJECT_STATUS.md` 与相关 approved Phase / Feature decision。
+
+`CURRENT_HANDOFF.md` 中的陈述与 Git、source、tests 或正式决策冲突时，以后者为事实依据；接手 Agent
+必须把冲突标记为 `UNKNOWN` 或 stale，并在影响范围内停止修改，不能静默选择一个版本或覆盖未提交工作。
+
+### 34.2 Required Maintenance / 必须维护的时机
+
+Codex 与 Zcode 都必须在以下时机更新 `CURRENT_HANDOFF.md`：
+
+- 主动把工作交给另一个 Agent 前；
+- 当前 Slice 停在 `REVIEW_PENDING`、`READY_TO_COMMIT`、`COMPLETE`、`BLOCKED` 或其他明确 Stop Point 时；
+- 准备因额度、Context、session 或工具限制结束当前工作时；
+- commit、用户 Scope Decision、新验证结果或 Worktree 变化使现有快照失真时。
+
+更新应是当前 Slice 的最后一项 documentation action，并在最终回复前完成。更新后如果又修改了代码、文档、
+验证结果或 commit，必须再次同步。Commit 仍由用户决定；维护 handoff 不授权 Agent 自动 commit。
+
+如果额度突然耗尽导致离开者无法更新，接手 Agent 必须先根据 Git 与正式文档重建快照，将
+`Handoff State` 标记为 `RECOVERED`，并把无法确认的意图、验证或 ownership 标记为 `UNKNOWN`。
+
+### 34.3 Required Snapshot / 必填内容
+
+每次更新至少包含：
+
+- Updated At、Updated By、Handoff State 与 Handoff Reason；
+- Branch、HEAD 与 Worktree Summary；
+- Current Product Gate、Current Slice、Slice Gate 与 Stop Point；
+- Approved Scope / Explicit Non-scope；
+- Completed Work；
+- Verification Evidence，区分 fresh、prior 与 not run；
+- Uncommitted Changes，区分本 Slice 修改与接手前已有修改；
+- Decisions、Blockers、Risks、`UNKNOWN`；
+- 单一、可执行的 Next Action；
+- 需要用户完成的 Scope / Architecture / Commit Decision。
+
+文件按当前快照原地更新，不把它写成累积日志。禁止记录 API Key、Secret、完整私密 Prompt / Conversation、
+未经脱敏的用户数据或其他敏感信息。
+
+---
+
+## 35. Repository Navigation / 项目导航
 
 如果以下文件存在：
 
+- `docs/planning/CURRENT_HANDOFF.md`
+- `docs/planning/PROJECT_STATUS.md`
 - `docs/architecture/SYSTEM_OVERVIEW.md`
 - `docs/architecture/MODULE_MAP.md`
 - `docs/architecture/DATA_FLOW.md`
@@ -1307,7 +1376,7 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 
 ---
 
-## 35. Architecture Change / 架构修改
+## 36. Architecture Change / 架构修改
 
 以下项目级核心原则不得作为普通 implementation detail 修改：
 
@@ -1338,7 +1407,7 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 
 ---
 
-## 36. Final Project Rule / 最终项目规则
+## 37. Final Project Rule / 最终项目规则
 
 每次核心功能开发都应避免两个方向。
 

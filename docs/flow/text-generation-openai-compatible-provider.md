@@ -11,14 +11,15 @@
 OpenAI-compatible Text Adapter 使用 matching transient Credential 发起 non-streaming Chat Completions HTTP
 request，并把安全、portable 的结果或 typed failure 返回 Gateway。
 
-第一个配置目标是 DeepSeek。S7C 已增加 Spring runtime wiring，但当前没有 Browser / HTTPS Credential ingress、
-Application Workflow 或 live DeepSeek network verification，因此本 Flow 仍不是 BYOK End-to-End behavior。
+第一个配置目标是 DeepSeek。S7C 已增加 Spring runtime wiring，S7D 已增加 authenticated Backend Credential
+API ingress；当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent Workflow 或 live DeepSeek network
+verification，因此本 Flow 仍不是完整产品 BYOK End-to-End evidence。
 
 ## 2. Runtime Composition
 
 `application.yml` 显式导入 `model-gateway.yml`，`TextGenerationGatewayConfiguration` 在 startup 使用其中的
-typed deployment properties 组成一套 runtime：默认 route
-只有 `CONVERSATION → deepseek / deepseek-chat / 30s`，并注入同一个 OpenAI-compatible Adapter、禁止 redirect
+typed deployment properties 组成一套 runtime：默认 route 包含 `CONNECTION_VERIFICATION` 与 `CONVERSATION`，
+均指向 `deepseek / deepseek-chat / 30s`，并注入同一个 OpenAI-compatible Adapter、禁止 redirect
 的 JDK HttpClient，以及独立 bounded model-call ExecutorService（默认 4 workers / 16 queue）。这一过程不读取
 Credential，也不发起网络请求；切换到 OpenAI 只替换 ProviderId、endpoint 与 ModelId 配置。
 
@@ -78,8 +79,8 @@ sequenceDiagram
   Retry-After, interrupt restoration and secret-safe failure；
 - `TextGenerationGatewayConfigurationTests`: imported configuration resource、default DeepSeek binding、OpenAI
   override、bounded executor 与 invalid configuration；
-- S7C configuration tests: 6/6 PASS；Model Gateway regression: 67/67 PASS；
-- server regression: 207 total / 0 failures / 0 errors / 33 environment-skipped.
+- S7D focused tests: 16/16 PASS；Model Gateway regression: 77/77 PASS；
+- server regression: 217 total / 0 failures / 0 errors / 33 environment-skipped.
 
 ## 7. Source References
 

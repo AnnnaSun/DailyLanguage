@@ -323,8 +323,8 @@ D39 TextGenerationGatewayProperties 只绑定 trusted deployment values：OpenAI
     purpose routes 与 executor capacity；Credential 不进入 model-gateway.yml、properties 或 Spring bean state。
 D40 Spring composition 暴露真实 TextGenerationPort，并把同一个 OpenAiCompatibleTextGenerationAdapter 绑定到
     configured routes；DeepSeek / OpenAI 的兼容协议差异只通过配置值表达，不复制 Provider Adapter。
-D41 当前只配置 CONVERSATION → deepseek / deepseek-chat / 30s；未配置 purpose 在提交 task 前返回
-    CAPABILITY_UNAVAILABLE，不推断或创建隐式 route。
+D41 S7C 初始只配置 CONVERSATION → deepseek / deepseek-chat / 30s；S7D 增加独立
+    CONNECTION_VERIFICATION route。未配置 purpose 在提交 task 前返回 CAPABILITY_UNAVAILABLE，不推断或创建隐式 route。
 D42 model-call ExecutorService 是独立 bounded fixed platform-thread pool，默认 4 workers / 16 queue，使用
     AbortPolicy fail fast；不得与 M0-S9 Job TaskExecutor 共用，Hosted capacity confirmation 留到 M6。
 D43 Spring 创建的 JDK HttpClient 固定 Redirect.NEVER；Application startup 不发起 Provider network request。
@@ -333,9 +333,27 @@ D45 application.yml 必须显式导入 model-gateway.yml；配置资源拆分只
     environment override、typed binding 或 runtime behavior。
 ```
 
-## 14. Explicit S6 / S7 non-goals
+## 14. M0-S7D approved Backend Credential ingress decisions
 
-- Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
+```text
+D46 authenticated GET /api/model-provider-presets 只暴露当前 CONNECTION_VERIFICATION fixed route 的 ProviderId /
+    ModelId，不暴露 endpoint、protocol、Credential 或 Provider-specific options。
+D47 authenticated + CSRF-protected POST /api/model-provider-presets/{providerId}/verify 只从
+    X-Model-Provider-Credential header 接收 transient secret；不使用 JSON Credential DTO。
+D48 path providerId 只创建 Provider-scoped TransientProviderCredential，不能选择或覆盖 route、ModelId、endpoint
+    或 Adapter；selected route 仍由 CONNECTION_VERIFICATION purpose 与 trusted configuration 决定。
+D49 ProviderConnectionVerificationService 使用固定 probe request，客户端不能提交任意 Prompt；Provider 成功输出
+    在 Service boundary 丢弃，只返回 selected ProviderId / ModelId。
+D50 connection verification 不持久化状态、不自动 retry / fallback，也不创建 ModelCallJob；Gateway typed failure
+    映射为稳定 HTTP status / code，response 不包含 secret、generated text、raw response 或 exception detail。
+D51 S7D 只实现 Backend authenticated Credential API ingress；Hosted HTTPS / TLS 属于 deployment boundary，当前
+    尚无 channel verification。Browser local/session storage UI 与 live Provider verification 也未实现，因而不能
+    宣称完整产品 BYOK End-to-End evidence。
+```
+
+## 15. Explicit S6 / S7 non-goals
+
+- Browser local/session Credential storage、rotation 或 UI；
 - live DeepSeek network verification；
 - 第二个 Provider configuration 或 native Provider protocol；
 - Structured Output validation；

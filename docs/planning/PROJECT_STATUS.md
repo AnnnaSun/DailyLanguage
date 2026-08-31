@@ -2,7 +2,7 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7C / COMPLETE
+> Current Gate: M0-S7D / REVIEW_PENDING
 > Production baseline: M0-S7C COMPLETE (`59c3e24`)
 
 ## Approved Decisions
@@ -77,6 +77,9 @@
   不与 M0-S9 Job TaskExecutor 共用，Hosted capacity 仍留到 M6 在目标硬件确认。
 - M0-S7C-R1 configuration resource split 已批准：`application.yml` 显式导入 `model-gateway.yml`；只调整
   Model Gateway deployment properties 的文件组织，不改变 key、默认值、environment override 或 runtime behavior。
+- M0-S7D Design / Scope 已批准：提供 authenticated fixed Provider preset 查询与 CSRF-protected connection
+  verification；Credential 只通过 `X-Model-Provider-Credential` 进入当前内存调用链，path `providerId` 不能覆盖
+  route、Model、endpoint 或 Adapter。当前不引入 dynamic Provider / Model selection、Registry 或 UI。
 
 ## Completed Review
 
@@ -124,32 +127,31 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S7C / S7C-R1 — OpenAI-compatible Text Runtime Composition
-Gate: COMPLETE
+Selected slice: M0-S7D — DeepSeek-first BYOK Connection Verification
+Gate: REVIEW_PENDING
 M0 umbrella scope: APPROVED
-S7C Design: APPROVED
-S7C Scope: APPROVED
-S7C Implementation: COMPLETE
-S7C-R1 Amendment: COMPLETE / PASS (focused 6/6; server 207 total, 0 failures/errors, 33 environment-skipped)
-Verification: PASS (focused 6/6; Model Gateway 67/67; server 207 total, 0 failures/errors, 33 environment-skipped)
+S7D Design: APPROVED
+S7D Scope: APPROVED
+S7D Implementation: COMPLETE (uncommitted)
+Verification: PASS (focused 16/16; Model Gateway 77/77; server 217 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
-Code Review: COMPLETE (PASS; no blocking findings)
-Ownership Check: COMPLETE (Runtime-composition UNDERSTOOD; Model Gateway remains L2)
+Code Review: PENDING
+Ownership Check: PENDING
 Production baseline: M0-S7C COMPLETE (`59c3e24`)
-Current target: wait for the documentation reconciliation Commit Decision; do not start Provider Preset or Browser ingress
+Current target: review the implemented Backend preset / Credential verification boundary; do not start Browser UI or M0-S8
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7C / S7C-R1 implementation 已由用户提交为 `59c3e24`，verification、Diff Review 与 Ownership Check
-均已完成。当前只剩本轮 5 个状态 / Ownership 文档 reconciliation 等待用户 Commit Decision；不得把“下一步”
-解释为自动开始 Provider Preset、Browser / HTTPS Credential ingress 或后续 slice。interactive wait、durable
-Job 与 late-result consume 仍留在 M0-S9。
+执行 M0-S7D Diff Review，重点检查 authenticated Session / CSRF、Credential header non-disclosure、fixed route
+authority、generated text discard 与 HTTP failure mapping。Review 完成前不进入 Ownership Check、Browser UI、
+live Provider verification 或 M0-S8。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers
 
-None. 当前已有 Spring bean / route / Executor production wiring，但没有 Browser / HTTPS Credential ingress、
-Application Workflow 或 live DeepSeek Credential / network verification，因此不能宣称 BYOK End-to-End complete。
+None. 当前已有 authenticated Backend Credential API ingress，但没有 Hosted TLS verification、Browser local/session
+storage UI、业务 Agent Workflow 或 live DeepSeek Credential / network verification，因此只能宣称 Backend API
+ingress complete，不能宣称完整产品 BYOK End-to-End complete。
 Hosted model-call 与 password-hash capacity 仍为
 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

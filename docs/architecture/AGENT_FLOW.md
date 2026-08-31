@@ -1358,14 +1358,17 @@ execution chain、OpenAI-compatible Provider HTTP boundary 与 Spring runtime co
         ↓
     ModelResult<TextGenerationResponse>
 
-M0-S7C 已把 concrete OpenAI-compatible HTTP Adapter 组成真实 Spring `TextGenerationPort`，但尚无 Browser /
-HTTPS Credential ingress、Application Workflow 或 live DeepSeek call，因此不得把上述 module runtime
-解释为已完成的 Agent → External Model End-to-End behavior。Application startup 只创建 bean，不发起 Provider call。
+M0-S7C 已把 concrete OpenAI-compatible HTTP Adapter 组成真实 Spring `TextGenerationPort`；M0-S7D 已增加
+authenticated preset discovery 与 CSRF-protected Backend Credential API verification。当前仍无 Hosted TLS evidence、Browser
+local/session storage UI、业务 Agent Workflow 或 live DeepSeek call，因此不得把上述 Backend ingress
+解释为已完成的产品 Agent → External Model End-to-End evidence。Application startup 只创建 bean，不发起 Provider call。
 
 真实调用链与验证证据见
 [`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。
 Provider protocol mapping 与 HTTP failure evidence 见
 [`text-generation-openai-compatible-provider.md`](../flow/text-generation-openai-compatible-provider.md)。
+Backend Credential ingress 见
+[`model-provider-connection-verification.md`](../flow/model-provider-connection-verification.md)。
 
 ---
 

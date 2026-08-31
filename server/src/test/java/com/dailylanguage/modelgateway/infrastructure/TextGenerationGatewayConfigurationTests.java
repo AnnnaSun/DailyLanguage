@@ -68,6 +68,13 @@ class TextGenerationGatewayConfigurationTests {
             assertThat(conversationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
             assertThat(conversationRoute.adapter())
                     .isSameAs(context.getBean(OpenAiCompatibleTextGenerationAdapter.class));
+            TextGenerationRoute verificationRoute = routes.findRoute(
+                            ModelPurpose.CONNECTION_VERIFICATION)
+                    .orElseThrow();
+            assertThat(verificationRoute.providerId()).isEqualTo(new ProviderId("deepseek"));
+            assertThat(verificationRoute.modelId()).isEqualTo(new ModelId("deepseek-chat"));
+            assertThat(verificationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
+            assertThat(verificationRoute.adapter()).isSameAs(conversationRoute.adapter());
             assertThat(routes.findRoute(ModelPurpose.PLANNING)).isEmpty();
 
             HttpClient httpClient = context.getBean(
@@ -96,6 +103,7 @@ class TextGenerationGatewayConfigurationTests {
                 .withPropertyValues(
                         "app.model-gateway.text-generation.open-ai-compatible-provider.provider-id=openai",
                         "app.model-gateway.text-generation.open-ai-compatible-provider.chat-completions-endpoint=https://api.openai.com/v1/chat/completions",
+                        "app.model-gateway.text-generation.routes.connection-verification.model-id=gpt-5-mini",
                         "app.model-gateway.text-generation.routes.conversation.model-id=gpt-5-mini")
                 .run(context -> {
                     assertThat(context)
@@ -112,6 +120,11 @@ class TextGenerationGatewayConfigurationTests {
                     TextGenerationRoute route = routes.findRoute(ModelPurpose.CONVERSATION).orElseThrow();
                     assertThat(route.providerId()).isEqualTo(new ProviderId("openai"));
                     assertThat(route.modelId()).isEqualTo(new ModelId("gpt-5-mini"));
+                    TextGenerationRoute verificationRoute = routes.findRoute(
+                                    ModelPurpose.CONNECTION_VERIFICATION)
+                            .orElseThrow();
+                    assertThat(verificationRoute.providerId()).isEqualTo(new ProviderId("openai"));
+                    assertThat(verificationRoute.modelId()).isEqualTo(new ModelId("gpt-5-mini"));
                 });
     }
 

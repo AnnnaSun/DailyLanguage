@@ -1003,6 +1003,13 @@ M0-S7C Verification: PASS (focused 6/6；Model Gateway 67/67；server 207 total 
 M0-S7C Review: COMPLETE (PASS；no blocking findings)
 M0-S7C Ownership Check: COMPLETE (Runtime-composition UNDERSTOOD；Model Gateway remains L2)
 M0-S7C: COMPLETE (`59c3e24`)
+M0-S7D Design: APPROVED
+M0-S7D Scope: APPROVED
+M0-S7D Implementation: COMPLETE / REVIEW_PENDING
+M0-S7D Verification: PASS (focused 16/16；Model Gateway 77/77；server 217 total / 0 failures / 0 errors /
+33 environment-skipped)
+M0-S7D Review: PENDING
+M0-S7D Ownership Check: PENDING
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1029,8 +1036,9 @@ server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同
 ### M0-S7 Approved Design and Current Slice
 
 `M0-S7` 是 A 类 Security / Credential execution boundary。`M0-S7A` 已完成 Module-local Credential
-propagation，`M0-S7B` 已完成 DeepSeek-first OpenAI-compatible Provider boundary；当前 `M0-S7C` 已实现
-Spring runtime composition 并停在 `REVIEW_PENDING`。Browser / HTTPS ingress 与 Application Workflow 不进入本 slice。
+propagation，`M0-S7B` 已完成 DeepSeek-first OpenAI-compatible Provider boundary，`M0-S7C` 已完成 Spring
+runtime composition；当前 `M0-S7D` 已实现 authenticated Backend Credential API ingress，并停在
+`REVIEW_PENDING`。Browser local/session storage UI 与业务 Agent Workflow 不进入本 slice。
 
 ```text
 Task / Slice: M0-S7A — Explicit transient Credential propagation
@@ -1140,6 +1148,44 @@ M0-S7C / S7C-R1 已完成 amended Diff Review 与 runtime-composition Ownership 
 `application.yml → model-gateway.yml → @ConfigurationProperties → Spring bean graph`，能够区分 4 个 running
 worker、16 个 queued task 与第 21 个 task 的本地 rejection，并确认底层 `RejectedExecutionException` 会在
 `RoutedTextGenerationPort` 包装为 safe `IllegalStateException`，而不是 Provider HTTP 429 的 `RATE_LIMITED`。
-当前仍无 Browser / HTTPS ingress 或 live Provider evidence，因此 Model Gateway 整体 Ownership 保持 L2。
+S7C completion 时仍无 Browser / HTTPS ingress 或 live Provider evidence，因此 Model Gateway 整体 Ownership 保持 L2。
 M0-S7C / S7C-R1 implementation 已由用户提交为 `59c3e24`；本段 Review / Ownership reconciliation
-保留为独立未提交文档修改，Commit Decision 继续由用户负责。
+已由用户提交为 `1c8136e`。
+
+#### Approved M0-S7D Current Slice Contract
+
+```text
+Task / Slice: M0-S7D — DeepSeek-first BYOK Connection Verification
+Goal:
+- 让 authenticated Browser 读取当前可信 Provider preset，并通过单次 request header 把 transient
+  Credential 交给既有 TextGenerationPort verification route；不开放任意 Prompt、endpoint 或 Model selection。
+Expected Behavior:
+- GET /api/model-provider-presets 返回 CONNECTION_VERIFICATION fixed route 的 ProviderId / ModelId，不返回 endpoint；
+- POST /api/model-provider-presets/{providerId}/verify 受 Session authentication 与 CSRF 保护，只从
+  X-Model-Provider-Credential header 接收 secret；
+- path providerId 只限定 Credential scope，不能覆盖 route、ModelId、endpoint 或 Adapter；
+- Service 构造固定 probe，成功时丢弃 generated text，只返回 VERIFIED + selected Provider / Model；
+- missing / blank Credential 或非法 ProviderId 返回 400；Provider auth / route mismatch 返回 422；rate limit、
+  timeout、temporary unavailable 与 Provider failure 分别映射稳定 429 / 504 / 503 / 502，safe Retry-After 可保留；
+- Credential 不进入 PostgreSQL、Redis、Trace、Log、response、exception detail 或 JSON request DTO。
+Expected Production Files:
+- server/src/main/java/com/dailylanguage/modelgateway/api/ModelProviderPresetController.java
+- server/src/main/java/com/dailylanguage/modelgateway/application/ProviderConnectionVerificationService.java
+- server/src/main/java/com/dailylanguage/modelgateway/routing/ModelPurpose.java
+- server/src/main/resources/model-gateway.yml
+Architecture / Security Impact:
+- 新增 authenticated public API 与 CONNECTION_VERIFICATION fixed purpose；不改变 TextGenerationPort、route
+  authority、schema、dependency、Credential persistence model 或 existing Executor boundary。
+Explicitly Out of Scope:
+- Browser local/session storage UI、live DeepSeek Credential verification、dynamic Provider / Model selection；
+- custom endpoint、第二个同时启用 Provider、Registry / Factory / Base Class；
+- retry / fallback、Structured Output、Trace、ModelCallJob、业务 Agent Workflow 或 Learning State mutation。
+Verification:
+- focused 16/16；Model Gateway 77/77；server 217 total / 0 failures / 0 errors / 33 environment-skipped；
+  Behavior Flow validation；git diff check。
+```
+
+当前完成度是 `Backend Credential API ingress complete / Hosted TLS, Browser UI and live Provider evidence incomplete`。
+所有测试使用 fake Credential 与 mocked Provider boundary，没有验证 channel enforcement，也没有发送真实 DeepSeek
+request。Behavior Flow 见
+[`model-provider-connection-verification.md`](../flow/model-provider-connection-verification.md)。
