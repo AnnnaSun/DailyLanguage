@@ -11,6 +11,7 @@ import com.dailylanguage.modelgateway.routing.ProviderId;
 import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 import com.dailylanguage.modelgateway.text.TextGenerationResponse;
 import com.dailylanguage.modelgateway.text.TextMessage;
+import com.dailylanguage.modelgateway.text.TextOutputSpecification;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,8 +34,18 @@ final class OpenAiCompatibleTextPayloadMapper {
         List<ChatMessage> messages = request.messages().stream()
                 .map(message -> new ChatMessage(mapRole(message.role()), message.content()))
                 .toList();
+        Object providerRequest = switch (request.outputSpecification()) {
+            case TextOutputSpecification.PlainText ignored ->
+                    new ChatRequest(modelId.value(), false, messages);
+            case TextOutputSpecification.JsonObject ignored ->
+                    new JsonObjectChatRequest(
+                            modelId.value(),
+                            false,
+                            messages,
+                            new ResponseFormat("json_object"));
+        };
         try {
-            return jsonMapper.writeValueAsString(new ChatRequest(modelId.value(), false, messages));
+            return jsonMapper.writeValueAsString(providerRequest);
         }
         catch (JacksonException exception) {
             // Prompt 可能出现在 serialization exception 中，因此不传播 message 或 cause。
@@ -110,6 +121,16 @@ final class OpenAiCompatibleTextPayloadMapper {
     }
 
     private record ChatRequest(String model, boolean stream, List<ChatMessage> messages) {
+    }
+
+    private record JsonObjectChatRequest(
+            String model,
+            boolean stream,
+            List<ChatMessage> messages,
+            ResponseFormat response_format) {
+    }
+
+    private record ResponseFormat(String type) {
     }
 
     private record ChatMessage(String role, String content) {

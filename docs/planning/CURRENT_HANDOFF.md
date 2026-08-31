@@ -5,20 +5,20 @@
 
 ## Handoff Metadata
 
-- Updated At: `2026-08-31 19:51 CST` (`Asia/Shanghai`)
+- Updated At: `2026-08-31 20:09 CST` (`Asia/Shanghai`)
 - Updated By: `Codex`
-- Handoff State: `DESIGN_SCOPE_APPROVAL_PENDING`
-- Handoff Reason: `M0-S7 PARTIAL closeout accepted; M0-S8 umbrella design and first slice await approval`
-- Intended Receiver: `User`
+- Handoff State: `REVIEW_PENDING`
+- Handoff Reason: `M0-S8A implementation and verification complete; stopped for read-only Diff Review`
+- Intended Receiver: `User or the next Review Agent selected by the user`
 
 ## Repository Snapshot
 
-- Branch: `codex/m0s7`
-- HEAD: `4deed20` (`实现 provider 的最小可验证实现+新增文档交接`)
-- Worktree Summary: `DIRTY; documentation-only M0-S7D post-commit reconciliation`
-- Current Product Gate: `M0-S8 / DESIGN_SCOPE_APPROVAL_PENDING`
+- Branch: `codex/M0S8-structure-output`
+- HEAD: `ba923d9` (`S7 收尾`)
+- Worktree Summary: `DIRTY; uncommitted M0-S8A code, tests and direct docs`
+- Current Product Gate: `M0-S8A / REVIEW_PENDING`
 - Production Baseline: `M0-S7D COMPLETE (4deed20)`
-- Stop Point: `Do not implement M0-S8 before the user approves the umbrella design and current slice contract`
+- Stop Point: `Do not start S8B, Trace work or commit before the S8A Diff Review and Ownership gate`
 
 ## M0-S7 Delivered Scope
 
@@ -46,6 +46,10 @@ Explicit non-scope remains unchanged:
 - Compile and `git diff --check`: PASS at the S7D review point.
 - Current documentation-only reconciliation `git diff --check`: PASS.
 - M0-S7 closeout Scope, Architecture, Documentation and Verification: PASS.
+- S8A focused request / payload tests: `11/11 PASS`.
+- S8A Model Gateway regression: `79/79 PASS`.
+- S8A server compile: PASS.
+- S8A `git diff --check`: PASS.
 
 The closeout reused the recorded test evidence because no behavior code changed after those runs. The current documentation-only
 reconciliation requires `git diff --check`, not another full server regression.
@@ -70,17 +74,19 @@ Not run / not claimed:
 
 ## Uncommitted Changes
 
-Documentation-only S7D / closeout reconciliation:
+M0-S8A changes:
 
-- `docs/architecture/AGENT_FLOW.md`
-- `docs/architecture/MODULE_MAP.md`
-- `docs/ownership/LEARNING_LOG.md`
-- `docs/ownership/OWNERSHIP_MATRIX.md`
+- `docs/features/MODEL_GATEWAY.md`
+- `docs/flow/text-generation-openai-compatible-provider.md`
 - `docs/planning/CURRENT_HANDOFF.md`
 - `docs/planning/PROJECT_STATUS.md`
 - `docs/planning/V1_PHASE_PLAN.md`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/TextOutputSpecification.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextPayloadMapper.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/TextGenerationRequestTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextPayloadMapperTests.java`
 
 ## Next Action
 
-The user reviews the proposed M0-S8 umbrella design and the S8A JSON Object transport / syntax-validation slice.
-Do not start implementation or commit automatically before approval.
+Perform the M0-S8A read-only Diff Review. The slice only maps the provider-neutral JsonObject specification to the fixed
+OpenAI-compatible request field; response validation remains S8B scope. Do not start S8B or commit automatically.

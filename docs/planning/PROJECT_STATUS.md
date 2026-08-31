@@ -2,7 +2,7 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S8 / DESIGN_SCOPE_APPROVAL_PENDING
+> Current Gate: M0-S8A / REVIEW_PENDING
 > Production baseline: M0-S7D COMPLETE (`4deed20`)
 
 ## Approved Decisions
@@ -131,7 +131,7 @@
 
 ```text
 Selected phase: M0-S8 — Structured Output and minimal Trace walking skeleton
-Gate: DESIGN_SCOPE_APPROVAL_PENDING
+Gate: S8A REVIEW_PENDING
 M0 umbrella scope: APPROVED
 S7D Design: APPROVED
 S7D Scope: APPROVED
@@ -140,16 +140,23 @@ Verification: PASS (focused 16/16; Model Gateway 77/77; server 217 total, 0 fail
 Behavior Flow: CURRENT
 Code Review: PASS (no blocking findings)
 Ownership Check: COMPLETE (Backend API flow UNDERSTOOD; Model Gateway and BYOK / Provider Configuration remain L2)
-M0-S7 integrated closeout: PARTIAL / ACCEPTED (non-blocking L2 Ownership gap)
+M0-S7 integrated closeout: PARTIAL / ACCEPTED (`ba923d9`; non-blocking L2 Ownership gap)
+M0-S8 umbrella direction: PROPOSED; later Trace slices require separate Design / Scope approval
+S8A Design: APPROVED
+S8A Scope: APPROVED
+S8A Implementation: COMPLETE (uncommitted)
+S8A Verification: PASS (focused 11/11; Model Gateway 79/79; server compile; git diff check)
+S8A Completion Level: JSON Object transport contract complete / Structured Output validation pending S8B
 Production baseline: M0-S7D COMPLETE (`4deed20`)
-Current target: review and approve the M0-S8 umbrella design and first S8A slice; do not implement before approval
+Current target: review the two-file S8A production Diff; do not start S8B
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-审批 M0-S8 umbrella design 与首个 S8A JSON Object transport / syntax-validation slice。当前不开始
-Structured Output production implementation、Trace persistence、Browser UI 或 live Provider verification。
+执行 M0-S8A Diff Review，重点检查 PlainText payload 不变、JsonObject 只映射固定 `response_format`、
+以及 S8A 没有误称已完成 response validation。Review 前不开始 S8B、Trace persistence、Browser UI
+或 live Provider verification。
 interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers

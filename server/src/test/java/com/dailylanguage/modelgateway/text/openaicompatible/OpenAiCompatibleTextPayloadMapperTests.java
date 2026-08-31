@@ -47,6 +47,22 @@ class OpenAiCompatibleTextPayloadMapperTests {
         assertThat(payload.at("/messages/1/role").stringValue()).isEqualTo("user");
         assertThat(payload.at("/messages/2/role").stringValue()).isEqualTo("assistant");
         assertThat(payload.at("/messages/0/content").stringValue()).isEqualTo("Reply naturally.");
+        assertThat(payload.has("response_format")).isFalse();
+    }
+
+    @Test
+    void requestsOpenAiCompatibleJsonObjectModeForThePortableSpecification() throws Exception {
+        TextGenerationRequest request = new TextGenerationRequest(
+                ModelPurpose.CONVERSATION,
+                List.of(new TextMessage(TextMessage.Role.USER, "Return a JSON object.")),
+                TextOutputSpecification.jsonObject());
+
+        JsonNode payload = jsonMapper.readTree(payloadMapper.writeRequest(SELECTED_MODEL_ID, request));
+
+        assertThat(payload.at("/response_format/type").stringValue()).isEqualTo("json_object");
+        assertThat(payload.get("model").stringValue()).isEqualTo(SELECTED_MODEL_ID.value());
+        assertThat(payload.get("stream").asBoolean()).isFalse();
+        assertThat(payload.get("messages")).hasSize(1);
     }
 
     @Test

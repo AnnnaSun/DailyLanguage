@@ -351,12 +351,25 @@ D51 S7D 只实现 Backend authenticated Credential API ingress；Hosted HTTPS / 
     宣称完整产品 BYOK End-to-End evidence。
 ```
 
-## 15. Explicit S6 / S7 non-goals
+## 15. M0-S8A approved JSON Object request decisions
+
+```text
+D52 TextOutputSpecification 增加 provider-neutral JsonObject singleton；不携带 schema string、
+    Provider option Map 或业务 DTO type。
+D53 OpenAI-compatible mapper 只在 JsonObject specification 下发送
+    response_format={"type":"json_object"}；PlainText request payload 保持不变。
+D54 S8A 是 JSON Object transport contract，不解析或验证 Provider 生成内容；parse / shape /
+    enum / semantic failure 由 S8B 的 StructuredOutputFailure boundary 负责，不扩展 ModelFailureKind。
+D55 Gateway 不为 JsonObject 自动修改 Prompt，不自动 repair / retry / fallback；调用方必须在
+    message 中明确要求 JSON，并在 S8B 完成前不得把 response text 当作 validated artifact。
+```
+
+## 16. Explicit S6–S8A non-goals
 
 - Browser local/session Credential storage、rotation 或 UI；
 - live DeepSeek network verification；
 - 第二个 Provider configuration 或 native Provider protocol；
-- Structured Output validation；
+- Structured Output parse / shape / enum / semantic validation；
 - Trace persistence；
 - Planner、Evaluator、Conversation 或 Content Workflow；
 - Speech、Vision、Image、Embedding Port implementation；

@@ -1,7 +1,7 @@
 # OpenAI-compatible Text Provider Call Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M0-S7B / M0-S7C`
+- Feature / Slice: `M0-S7B / M0-S7C / M0-S8A`
 - Last Verified: `2026-08-31`
 - Entry: `OpenAiCompatibleTextGenerationAdapter.generateText(...)`
 
@@ -10,6 +10,10 @@
 本 Flow 描述已经实现的 concrete Provider protocol boundary：一个已经由 fixed route 选中的
 OpenAI-compatible Text Adapter 使用 matching transient Credential 发起 non-streaming Chat Completions HTTP
 request，并把安全、portable 的结果或 typed failure 返回 Gateway。
+
+S8A 增加了 provider-neutral JSON Object request contract：`PlainText` payload 保持原样，
+`JsonObject` 才映射为 OpenAI-compatible `response_format.type=json_object`。当前不解析或验证
+Provider 返回的 JSON content，因此不是 Structured Output validation End-to-End evidence。
 
 第一个配置目标是 DeepSeek。S7C 已增加 Spring runtime wiring，S7D 已增加 authenticated Backend Credential
 API ingress；当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent Workflow 或 live DeepSeek network
@@ -36,7 +40,7 @@ sequenceDiagram
     Worker->>Adapter: generateText(providerId, modelId, request, credential, timeout)
     Adapter->>Adapter: validate configured Provider and Credential identity
     Adapter->>Mapper: writeRequest(modelId, portable request)
-    Mapper-->>Adapter: non-streaming Chat Completions JSON
+    Mapper-->>Adapter: non-streaming Chat Completions JSON<br/>PlainText unchanged or JsonObject response_format
     Adapter->>HTTP: POST + Bearer credential + request timeout
     HTTP->>Provider: configured HTTPS /chat/completions endpoint
     alt HTTP or transport failure
@@ -56,6 +60,8 @@ sequenceDiagram
 
 - `OpenAiCompatibleProviderConfig` owns the trusted ProviderId and HTTPS endpoint value；
 - `TextGenerationRoute` remains the selected ModelId authority；Provider raw `model` does not replace it；
+- `TextOutputSpecification` owns the portable PlainText / JsonObject request choice；JsonObject 不允许覆盖
+  Provider、Model、endpoint 或任意 Provider option；
 - `TransientProviderCredential.secret()` is read only to build the outbound Bearer header；
 - Adapter and mapper do not write PostgreSQL, Redis, Trace, logs, or Learning State；
 - the injected `HttpClient` must use `Redirect.NEVER`, so Credential is not forwarded by redirect.
@@ -73,14 +79,16 @@ sequenceDiagram
 ## 6. Verification Evidence
 
 - `OpenAiCompatibleProviderConfigTests`: trusted DeepSeek HTTPS endpoint and invalid endpoint rejection；
-- `OpenAiCompatibleTextPayloadMapperTests`: role/request mapping, selected route identity, finish reason, usage and
-  malformed payload safety；
+- `TextGenerationRequestTests` / `OpenAiCompatibleTextPayloadMapperTests`: provider-neutral JsonObject specification、
+  PlainText payload regression、JsonObject response-format mapping、role/request mapping、selected route identity、
+  finish reason、usage and malformed payload safety；
 - `OpenAiCompatibleTextGenerationAdapterTests`: Bearer header, timeout, redirect rejection, HTTP / transport failure,
   Retry-After, interrupt restoration and secret-safe failure；
 - `TextGenerationGatewayConfigurationTests`: imported configuration resource、default DeepSeek binding、OpenAI
   override、bounded executor 与 invalid configuration；
-- S7D focused tests: 16/16 PASS；Model Gateway regression: 77/77 PASS；
-- server regression: 217 total / 0 failures / 0 errors / 33 environment-skipped.
+- S8A focused tests: 11/11 PASS；Model Gateway regression: 79/79 PASS；server compile: PASS；
+- latest wider server regression remains the S7D evidence: 217 total / 0 failures / 0 errors / 33 environment-skipped；
+  S8A 未重跑 full server suite。
 
 ## 7. Source References
 

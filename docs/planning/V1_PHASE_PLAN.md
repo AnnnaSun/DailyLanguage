@@ -1011,8 +1011,11 @@ M0-S7D Verification: PASS (focused 16/16；Model Gateway 77/77；server 217 tota
 M0-S7D Review: COMPLETE (PASS；no blocking findings)
 M0-S7D Ownership Check: COMPLETE (Backend API flow UNDERSTOOD；Model Gateway and BYOK / Provider Configuration remain L2)
 M0-S7D: COMPLETE (`4deed20`)
-M0-S7 Integrated Closeout: PARTIAL / ACCEPTED (non-blocking L2 Ownership gap)
-M0-S8 Design / Scope: PROPOSED / APPROVAL_PENDING
+M0-S7 Integrated Closeout: PARTIAL / ACCEPTED (`ba923d9`; non-blocking L2 Ownership gap)
+M0-S8 Umbrella Direction: PROPOSED (later Trace slices require separate approval)
+M0-S8A Design / Scope: APPROVED
+M0-S8A Implementation: COMPLETE / REVIEW_PENDING
+M0-S8A Verification: PASS (focused 11/11；Model Gateway 79/79；server compile)
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
