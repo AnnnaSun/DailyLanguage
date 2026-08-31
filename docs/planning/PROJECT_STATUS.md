@@ -1,8 +1,8 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-30
+> Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7A / COMPLETE
+> Current Gate: M0-S7B / READY_TO_COMMIT
 > Production baseline: M0-S7A COMPLETE (`d8d47ac`)
 
 ## Approved Decisions
@@ -68,6 +68,9 @@
   不使用 ThreadLocal、global mutable context 或 persistence。
 - selected route 缺少 matching Credential 时返回 route-aware `CREDENTIAL_UNAVAILABLE`；Provider 实际拒绝
   Credential 仍使用 `AUTHENTICATION_FAILED`。当前只完成 Module-local flow，不宣称 BYOK End-to-End。
+- M0-S7B Design / Scope 已批准：第一个 Provider 是 DeepSeek，但 Adapter 按 OpenAI-compatible protocol family
+  命名和复用；ProviderId、HTTPS Chat Completions endpoint 与 ModelId 分别由 typed config / route 承载，
+  不为每个兼容厂商复制 Adapter，也不提前引入 Registry、Factory 或 Base Class。
 
 ## Completed Review
 
@@ -105,33 +108,35 @@
     Documentation 已同步；Model Gateway Ownership 保持 L2，closeout 结果为 PARTIAL。
 28. M0-S7A explicit transient Credential propagation：Scope / Architecture / Security boundary / verification PASS；
     Diff Review 无 blocking finding，module-local Ownership Check 为 UNDERSTOOD；Model Gateway 整体保持 L2。
+29. M0-S7B DeepSeek-first OpenAI-compatible Text Adapter：Scope / Architecture / Security boundary / verification
+    PASS；Diff Review 无 blocking finding，Provider-boundary Ownership Check 为 UNDERSTOOD；Model Gateway
+    整体保持 L2。
 
 ## Current Slice
 
 ```text
-Selected slice: M0-S7A
-Gate: COMPLETE
+Selected slice: M0-S7B
+Gate: READY_TO_COMMIT
 M0 umbrella scope: APPROVED
-S6F non-blocking Ownership gap: ACCEPTED (Model Gateway remains L2)
-S7A Design: APPROVED
-S7A Scope: APPROVED
-S7A Implementation: COMPLETE
-Verification: PASS (Model Gateway 43/43; server 183 total, 0 failures/errors, 33 environment-skipped)
+S7B Design: APPROVED
+S7B Scope: APPROVED
+S7B Implementation: COMPLETE
+Verification: PASS (focused 18/18; Model Gateway 61/61; server 201 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
 Code Review: COMPLETE (PASS; no blocking findings)
-Ownership Check: COMPLETE (UNDERSTOOD for Module-local Credential flow; Model Gateway remains L2)
+Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD; Model Gateway remains L2)
 Production baseline: M0-S7A COMPLETE (`d8d47ac`)
-Current target: wait for the next M0-S7 slice Design / Scope decision
+Current target: wait for the human Commit Decision
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7A 已完成并提交。下一步只能先定义下一个 M0-S7 slice 的 Design / Scope；在人工批准前不实现
-HTTP ingress、concrete Provider 或其他 Credential capability。interactive wait、durable Job、late-result
-consume 与 TaskExecutor wiring 继续留在 M0-S9。
+M0-S7B 已达到 `READY_TO_COMMIT`。由用户决定是否 commit；不自动进入 Spring runtime wiring、Browser /
+HTTPS ingress 或第二个 Provider。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers
 
-None. Model Gateway Ownership 仍为 L2，但不阻塞下一个 M0-S7 Design / Scope。尚未批准新的 S7
-implementation slice。Hosted password-hash capacity 仍为 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。
+None. 当前没有 Spring bean / route / Executor production wiring，也没有 live DeepSeek Credential / network
+verification，因此不能宣称 Application 或 BYOK End-to-End complete。Hosted password-hash capacity 仍为
+`PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

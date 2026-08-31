@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)
-> Phase: M0-S6 / M0-S7A
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)；S7B READY_TO_COMMIT
+> Phase: M0-S6 / M0-S7A / M0-S7B
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
@@ -237,9 +237,10 @@ Adapter 按 Operation 实现小而明确的 SPI，避免一个 Provider class �
 translation 与 protocol mapping；不为复用字段创建通用 Base Class，也不把 Provider SDK 类型泄漏给
 Application / Domain。
 
-S6 不新增 Spring AI 或 concrete Provider SDK。第一个真实 Provider Adapter 是否使用 Spring AI、
-Provider SDK 或 Spring / JDK HTTP，只能在其独立 Scope 中决定；无论选择什么，必须位于本 Contract
-之后。
+S7B 已实现第一个 concrete protocol Adapter：使用 JDK HttpClient 与现有 Jackson 3，按
+OpenAI-compatible Chat Completions 的 portable subset 映射。第一个配置目标是 DeepSeek；兼容 Provider 的
+ProviderId / endpoint 差异通过 typed config 表达，协议行为差异才新增 Adapter。不引入 Spring AI、Provider
+SDK、Registry、Factory 或 Base Class。
 
 ## 9. S6 design decisions
 
@@ -301,10 +302,25 @@ D32 TransientProviderCredential 不使用会自动暴露字段的 record toStrin
 D33 timeout cancellation 是 best effort；S7A 不承诺 worker 立即停止或 Credential 立即从 JVM heap 消失。
 ```
 
-## 12. Explicit S6 / S7A non-goals
+## 12. M0-S7B approved Provider Adapter decisions
 
-- concrete Provider HTTP / SDK integration；
+```text
+D34 Adapter 按 OpenAI-compatible protocol family + TEXT_GENERATION operation 命名，不按每个兼容厂商复制代码。
+D35 OpenAiCompatibleProviderConfig 只保存 ProviderId 与 trusted HTTPS Chat Completions endpoint；ModelId 仍由
+    selected route 提供，endpoint 不来自 request 或 Credential。
+D36 Credential 只在 Adapter 构造 Authorization Bearer header 时读取；HttpClient 必须禁止 redirect，避免
+    Credential 被转发到 configured endpoint 之外的位置。
+D37 Adapter 只实现 non-streaming portable text subset；Provider-specific thinking、Tool Calling、Structured
+    Output、streaming 与 raw finish reason 不通过 option Map 偷渡。
+D38 HTTP error body、transport exception、JSON parsing exception、Prompt 与 Credential 不进入 typed failure；
+    selected Provider / Model identity 仍由 Gateway route 负责。
+```
+
+## 13. Explicit S6 / S7 non-goals
+
 - Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
+- Spring bean / route / Executor production wiring 与 live DeepSeek network verification；
+- 第二个 Provider configuration 或 native Provider protocol；
 - Structured Output validation；
 - Trace persistence；
 - Planner、Evaluator、Conversation 或 Content Workflow；
