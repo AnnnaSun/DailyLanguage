@@ -1,6 +1,8 @@
 spring:
   application:
     name: daily-language-server
+  config:
+    import: classpath:model-gateway.yml
   datasource:
     url: jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:daily_language}
     username: ${DATABASE_USER:daily_language}

@@ -987,6 +987,22 @@ M0-S7A Verification: PASS (Model Gateway 43/43；server 183 total / 0 failures /
 M0-S7A Review: COMPLETE (PASS；no blocking findings)
 M0-S7A Ownership Check: COMPLETE (Module-local UNDERSTOOD；Model Gateway remains L2)
 M0-S7A: COMPLETE (`d8d47ac`)
+M0-S7B Design: APPROVED
+M0-S7B Scope: APPROVED
+M0-S7B Implementation: COMPLETE
+M0-S7B Verification: PASS (focused 18/18；Model Gateway 61/61；server 201 total / 0 failures / 0 errors / 33 environment-skipped)
+M0-S7B Review: COMPLETE (PASS；no blocking findings)
+M0-S7B Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD；Model Gateway remains L2)
+M0-S7B: COMPLETE (`7f5f59f`)
+M0-S7C Design: APPROVED
+M0-S7C Scope: APPROVED
+M0-S7C Implementation: COMPLETE
+M0-S7C-R1 Configuration Resource Split: COMPLETE / PASS (focused 6/6；server 207 total / 0 failures /
+0 errors / 33 environment-skipped)
+M0-S7C Verification: PASS (focused 6/6；Model Gateway 67/67；server 207 total / 0 failures / 0 errors / 33 environment-skipped)
+M0-S7C Review: PENDING
+M0-S7C Ownership Check: PENDING
+M0-S7C: REVIEW_PENDING
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1012,8 +1028,9 @@ server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同
 
 ### M0-S7 Approved Design and Current Slice
 
-`M0-S7` 是 A 类 Security / Credential execution boundary。当前只批准 `M0-S7A` 的 Module-local
-Credential propagation，不把 Browser / HTTPS ingress、concrete Provider 或 Application Workflow 推入本 slice。
+`M0-S7` 是 A 类 Security / Credential execution boundary。`M0-S7A` 已完成 Module-local Credential
+propagation，`M0-S7B` 已完成 DeepSeek-first OpenAI-compatible Provider boundary；当前 `M0-S7C` 已实现
+Spring runtime composition 并停在 `REVIEW_PENDING`。Browser / HTTPS ingress 与 Application Workflow 不进入本 slice。
 
 ```text
 Task / Slice: M0-S7A — Explicit transient Credential propagation
@@ -1052,4 +1069,69 @@ Browser Credential → HTTPS → External Provider 的 End-to-End complete behav
 M0-S7A 已完成 Diff Review 与 module-local Human Ownership Check。用户能够说明 caller thread 提交 task、
 Executor worker 执行 lambda、lambda 将 Credential 传给 Adapter，以及 timeout 后 `cancel(true)` 不能保证
 worker 停止或 Credential 立即从 JVM heap 消失。该 slice 已提交为 `d8d47ac`；由于仍无 concrete Provider
-execution evidence，Model Gateway Ownership 保持 L2。下一个 M0-S7 implementation slice 尚未批准。
+execution evidence，Model Gateway Ownership 保持 L2。后续由已批准的 M0-S7B 继续完成 concrete Provider protocol boundary。
+
+#### Approved M0-S7B Current Slice Contract
+
+```text
+Task / Slice: M0-S7B — DeepSeek-first OpenAI-compatible Text Adapter
+Goal:
+- 使用 S7A 的 TransientProviderCredential 完成 OpenAI-compatible non-streaming Chat Completions HTTP boundary；
+  第一个配置目标是 DeepSeek，但按 protocol family 复用 Adapter。
+Expected Behavior:
+- ProviderId 与 trusted HTTPS /chat/completions endpoint 由 typed config 绑定，ModelId 继续来自 route；
+- INSTRUCTION / USER / MODEL 映射为 system / user / assistant，Credential 只进入 Bearer header；
+- 2xx response 映射 portable text / finish reason / optional usage，并保持 selected route identity；
+- 401/403、408、429、5xx、transport failure 与 malformed payload 转换为安全 typed failure；
+- HttpClient 禁止 redirect，failure 不解析或暴露 Provider raw error body。
+Architecture / Security Impact:
+- 新增第一个 concrete external Provider protocol Adapter；无新 dependency、schema、persistence 或 public HTTP API。
+Explicitly Out of Scope:
+- Spring bean / fixed route / Executor production wiring、Browser / HTTPS ingress、BYOK UI、live DeepSeek call；
+- 第二个 Provider、native Gemini / Anthropic protocol、streaming、Tool Calling、Structured Output；
+- retry / fallback、Trace、ModelCallJob、Application Workflow 或 Learning State mutation。
+Verification:
+- focused 18/18；Model Gateway 61/61；server 201 total / 0 failures / 0 errors / 33 environment-skipped；
+  Behavior Flow validation；git diff check。
+```
+
+当前完成度是 `Provider-boundary implemented / runtime wiring pending`，不是 Browser Credential → HTTPS →
+Application Workflow → DeepSeek 的 End-to-End complete behavior。
+
+M0-S7B 已完成真实 Diff Review 与 Provider-boundary Human Ownership Check。用户能够追踪
+`validateCall → writeRequest → buildProviderRequest → send → status classification / readResponse → result`，
+能够说明 429 `RATE_LIMITED` + `Retry-After` 只形成等待提示而不授权自动 retry，并理解
+`Redirect.NEVER` 在 Adapter construction 阶段阻止 Bearer Credential 随 Provider 返回的 `Location`
+被转发到 configured endpoint 之外。当前没有 Spring runtime wiring、Browser / HTTPS ingress 或 live
+DeepSeek network evidence，因此 Model Gateway 整体 Ownership 保持 L2。
+M0-S7B 已提交为 `7f5f59f`。
+
+#### Approved M0-S7C Current Slice Contract
+
+```text
+Task / Slice: M0-S7C — OpenAI-compatible Text Runtime Composition
+Goal:
+- 将 S7B concrete Adapter、fixed routes、no-redirect HttpClient 与 dedicated model-call ExecutorService 组成可注入的
+  Spring TextGenerationPort；默认 Provider 为 DeepSeek。
+Expected Behavior:
+- typed deployment properties 保存 ProviderId、trusted endpoint、purpose routes 与 executor capacity，不保存 Credential；
+- 默认只配置 CONVERSATION → deepseek / deepseek-chat / 30s，未配置 purpose 返回 CAPABILITY_UNAVAILABLE；
+- OpenAI 与 DeepSeek 复用同一个 OpenAiCompatibleTextGenerationAdapter，只通过配置切换；
+- model-call executor 使用独立 bounded fixed platform-thread pool（4 workers / 16 queue）与 AbortPolicy；
+- HttpClient 固定 Redirect.NEVER；invalid endpoint / timeout / capacity fail startup；startup 不发起 Provider call。
+- application.yml 显式导入 model-gateway.yml；配置拆分不改变 property key、默认值、environment override 或
+  runtime behavior。
+Architecture / Security Impact:
+- 新增 Spring production composition 与独立 concurrency resource；无 dependency、schema、public HTTP API 或
+  Credential persistence 变化；不得与 M0-S9 Job TaskExecutor 共用线程池。
+Explicitly Out of Scope:
+- Browser / HTTPS Credential ingress、Controller / Application Workflow、live DeepSeek verification；
+- 第二个 Provider 配置或 Provider-specific Adapter、retry / fallback、Structured Output、Trace 与 ModelCallJob。
+Verification:
+- focused configuration 6/6；Model Gateway 67/67；server 207 total / 0 failures / 0 errors /
+  33 environment-skipped；Behavior Flow validation；git diff check。
+```
+
+当前完成度是 `Module runtime composition complete / End-to-End incomplete`。配置测试证明 Spring bean graph、
+DeepSeek 默认 route、OpenAI config-only replacement、no-redirect HttpClient、bounded executor、未配置 purpose 与
+invalid configuration boundary；没有 Browser Credential 或 live Provider network evidence。

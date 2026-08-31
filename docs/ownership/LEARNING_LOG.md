@@ -844,6 +844,26 @@ L3。
 - 当前 flow 在 Adapter SPI 结束，没有 Browser / HTTPS ingress 或 concrete Provider HTTP / SDK evidence。
   因此本 slice Ownership 为 `UNDERSTOOD`，Model Gateway 整体仍保持 `L2`，不提升为 L3。
 
+### M0-S7B confirmed evidence — OpenAI-compatible Provider boundary
+
+- DeepSeek 是第一个配置目标，但 `OpenAiCompatibleTextGenerationAdapter` 按 protocol family + Text operation
+  复用；compatible Provider 通过 typed ProviderId / HTTPS endpoint config 表达差异，不按厂商复制 Adapter；
+- 用户能够追踪 `validateCall → writeRequest → buildProviderRequest → send → status classification /
+  readResponse → result` 的 module-local concrete HTTP call chain，并区分 selected route identity 与 Provider raw
+  response；
+- Credential 只进入 outbound Bearer header；Provider / Credential identity mismatch 在 HTTP 前失败，Adapter
+  construction 要求 `Redirect.NEVER`，避免 Credential 随动态 `Location` 被转发到 configured endpoint 之外；
+- 用户能够说明 HTTP 429 映射为 `RATE_LIMITED`，positive numeric `Retry-After` 进入 typed failure，但不会授权
+  Gateway 自动 retry；Provider error body、Prompt、Credential 与底层 exception detail 不跨越 Adapter；
+- Review 中确认 `ModelProviderCallException` 已是 Provider-neutral execution contract；HTTP helper 只有在第二个
+  Adapter 出现相同 transport / failure semantics 时才按真实重复酌情提取，不列为当前 Technical Debt；
+- focused tests 18/18、Model Gateway 61/61、server 201 total / 0 failures / 0 errors /
+  33 environment-skipped、Behavior Flow 与 Diff Review 已通过；Provider-boundary Explain Back 为
+  `UNDERSTOOD`；
+- 当前已有 concrete protocol Adapter 的 module-local mocked HTTP evidence，但无 Spring runtime wiring、Browser /
+  HTTPS ingress、live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`；M0-S7B
+  已提交为 `7f5f59f`。
+
 ---
 
 ## 11.9 Trace & Eval

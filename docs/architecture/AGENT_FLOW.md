@@ -1311,10 +1311,22 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
 
 详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
-## 28.2 M0-S6–S7A 已实现边界
+## 28.2 M0-S6–S7C 已实现边界
 
-当前已实现的是 Text Generation 在 Model Gateway Module 内的 route、transient Credential propagation 与
-execution chain：
+当前已实现的是 Text Generation 在 Model Gateway Module 内的 route、transient Credential propagation、
+execution chain、OpenAI-compatible Provider HTTP boundary 与 Spring runtime composition：
+
+    application.yml imports model-gateway.yml trusted deployment values
+        ↓
+    TextGenerationGatewayProperties
+        ↓
+    TextGenerationGatewayConfiguration
+        ├── OpenAiCompatibleProviderConfig
+        ├── HttpClient(Redirect.NEVER)
+        ├── OpenAiCompatibleTextGenerationAdapter
+        ├── FixedTextGenerationRoutes(CONVERSATION → deepseek / deepseek-chat / 30s)
+        ├── dedicated bounded modelCallExecutor(4 workers / 16 queue)
+        └── TextGenerationPort
 
     TextGenerationPort.generateText(request, credential)
         ↓
@@ -1329,8 +1341,16 @@ execution chain：
         或
     ExecutorService.submit(Adapter task capturing credential)
         ↓
-    worker: TextGenerationProviderAdapter.generateText(
+    worker: OpenAiCompatibleTextGenerationAdapter.generateText(
                 providerId, modelId, request, credential, executionTimeout)
+        ↓
+    map portable messages → non-streaming Chat Completions JSON
+        ↓
+    Authorization: Bearer <credential> → configured HTTPS endpoint
+        ↓
+    HTTP / transport / payload safe failure classification
+        或
+    portable TextGenerationResponse(selected route identity)
         ↓
     caller: Future.get(executionTimeout)
         ↓
@@ -1338,13 +1358,14 @@ execution chain：
         ↓
     ModelResult<TextGenerationResponse>
 
-该调用链在 operation-specific Adapter boundary 结束。M0-S7A 已实现 Credential 在 module-local
-Port → route → Executor → Adapter 间的显式传播，但尚无 Browser / HTTPS Credential ingress、concrete
-Provider HTTP / SDK、Application Workflow、Structured Output validation 或 Trace persistence，因此不得
-把上述 Module-local flow 解释为已完成的 Agent → External Model End-to-End behavior。
+M0-S7C 已把 concrete OpenAI-compatible HTTP Adapter 组成真实 Spring `TextGenerationPort`，但尚无 Browser /
+HTTPS Credential ingress、Application Workflow 或 live DeepSeek call，因此不得把上述 module runtime
+解释为已完成的 Agent → External Model End-to-End behavior。Application startup 只创建 bean，不发起 Provider call。
 
 真实调用链与验证证据见
 [`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。
+Provider protocol mapping 与 HTTP failure evidence 见
+[`text-generation-openai-compatible-provider.md`](../flow/text-generation-openai-compatible-provider.md)。
 
 ---
 
