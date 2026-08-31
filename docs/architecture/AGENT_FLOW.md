@@ -1311,10 +1311,22 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
 
 详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
-## 28.2 M0-S6–S7B 已实现边界
+## 28.2 M0-S6–S7C 已实现边界
 
 当前已实现的是 Text Generation 在 Model Gateway Module 内的 route、transient Credential propagation、
-execution chain 与 OpenAI-compatible Provider HTTP boundary：
+execution chain、OpenAI-compatible Provider HTTP boundary 与 Spring runtime composition：
+
+    application.yml imports model-gateway.yml trusted deployment values
+        ↓
+    TextGenerationGatewayProperties
+        ↓
+    TextGenerationGatewayConfiguration
+        ├── OpenAiCompatibleProviderConfig
+        ├── HttpClient(Redirect.NEVER)
+        ├── OpenAiCompatibleTextGenerationAdapter
+        ├── FixedTextGenerationRoutes(CONVERSATION → deepseek / deepseek-chat / 30s)
+        ├── dedicated bounded modelCallExecutor(4 workers / 16 queue)
+        └── TextGenerationPort
 
     TextGenerationPort.generateText(request, credential)
         ↓
@@ -1346,9 +1358,9 @@ execution chain 与 OpenAI-compatible Provider HTTP boundary：
         ↓
     ModelResult<TextGenerationResponse>
 
-M0-S7B 已实现 concrete OpenAI-compatible HTTP Adapter，但尚无 Spring runtime wiring、Browser / HTTPS
-Credential ingress、Application Workflow 或 live DeepSeek call，因此不得把上述 Provider-boundary
-implementation 解释为已完成的 Agent → External Model End-to-End behavior。
+M0-S7C 已把 concrete OpenAI-compatible HTTP Adapter 组成真实 Spring `TextGenerationPort`，但尚无 Browser /
+HTTPS Credential ingress、Application Workflow 或 live DeepSeek call，因此不得把上述 module runtime
+解释为已完成的 Agent → External Model End-to-End behavior。Application startup 只创建 bean，不发起 Provider call。
 
 真实调用链与验证证据见
 [`text-generation-credential-propagation.md`](../flow/text-generation-credential-propagation.md)。

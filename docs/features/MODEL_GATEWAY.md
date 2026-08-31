@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)；S7B COMPLETE (`7f5f59f`)
-> Phase: M0-S6 / M0-S7A / M0-S7B
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)；S7B COMPLETE (`7f5f59f`)；S7C REVIEW_PENDING
+> Phase: M0-S6 / M0-S7
 
 本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
@@ -316,16 +316,32 @@ D38 HTTP error body、transport exception、JSON parsing exception、Prompt 与 
     selected Provider / Model identity 仍由 Gateway route 负责。
 ```
 
-## 13. Explicit S6 / S7 non-goals
+## 13. M0-S7C approved runtime composition decisions
+
+```text
+D39 TextGenerationGatewayProperties 只绑定 trusted deployment values：OpenAI-compatible ProviderId / endpoint、
+    purpose routes 与 executor capacity；Credential 不进入 model-gateway.yml、properties 或 Spring bean state。
+D40 Spring composition 暴露真实 TextGenerationPort，并把同一个 OpenAiCompatibleTextGenerationAdapter 绑定到
+    configured routes；DeepSeek / OpenAI 的兼容协议差异只通过配置值表达，不复制 Provider Adapter。
+D41 当前只配置 CONVERSATION → deepseek / deepseek-chat / 30s；未配置 purpose 在提交 task 前返回
+    CAPABILITY_UNAVAILABLE，不推断或创建隐式 route。
+D42 model-call ExecutorService 是独立 bounded fixed platform-thread pool，默认 4 workers / 16 queue，使用
+    AbortPolicy fail fast；不得与 M0-S9 Job TaskExecutor 共用，Hosted capacity confirmation 留到 M6。
+D43 Spring 创建的 JDK HttpClient 固定 Redirect.NEVER；Application startup 不发起 Provider network request。
+D44 非法 Provider endpoint、route timeout 或 executor capacity 阻止 runtime startup。
+D45 application.yml 必须显式导入 model-gateway.yml；配置资源拆分只改变文件组织，不改变 property key、
+    environment override、typed binding 或 runtime behavior。
+```
+
+## 14. Explicit S6 / S7 non-goals
 
 - Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
-- Spring bean / route / Executor production wiring 与 live DeepSeek network verification；
+- live DeepSeek network verification；
 - 第二个 Provider configuration 或 native Provider protocol；
 - Structured Output validation；
 - Trace persistence；
 - Planner、Evaluator、Conversation 或 Content Workflow；
 - Speech、Vision、Image、Embedding Port implementation；
 - automatic retry、fallback、health router 或 circuit breaker；
-- Spring Executor bean / pool sizing / lifecycle configuration；
 - Model Call Job persistence、interactive wait、late-result recovery 或用户 confirmation；
 - 任何 Learning State mutation。

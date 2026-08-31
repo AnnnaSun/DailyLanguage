@@ -1,8 +1,8 @@
 # OpenAI-compatible Text Provider Call Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M0-S7B`
-- Last Verified: `2026-08-30`
+- Feature / Slice: `M0-S7B / M0-S7C`
+- Last Verified: `2026-08-31`
 - Entry: `OpenAiCompatibleTextGenerationAdapter.generateText(...)`
 
 ## 1. Behavior Boundary
@@ -11,10 +11,18 @@
 OpenAI-compatible Text Adapter 使用 matching transient Credential 发起 non-streaming Chat Completions HTTP
 request，并把安全、portable 的结果或 typed failure 返回 Gateway。
 
-第一个配置目标是 DeepSeek。当前没有 Spring runtime wiring、Browser / HTTPS Credential ingress、
-Application Workflow 或 live DeepSeek network verification，因此本 Flow 不是 BYOK End-to-End behavior。
+第一个配置目标是 DeepSeek。S7C 已增加 Spring runtime wiring，但当前没有 Browser / HTTPS Credential ingress、
+Application Workflow 或 live DeepSeek network verification，因此本 Flow 仍不是 BYOK End-to-End behavior。
 
-## 2. Main Call Chain
+## 2. Runtime Composition
+
+`application.yml` 显式导入 `model-gateway.yml`，`TextGenerationGatewayConfiguration` 在 startup 使用其中的
+typed deployment properties 组成一套 runtime：默认 route
+只有 `CONVERSATION → deepseek / deepseek-chat / 30s`，并注入同一个 OpenAI-compatible Adapter、禁止 redirect
+的 JDK HttpClient，以及独立 bounded model-call ExecutorService（默认 4 workers / 16 queue）。这一过程不读取
+Credential，也不发起网络请求；切换到 OpenAI 只替换 ProviderId、endpoint 与 ModelId 配置。
+
+## 3. Main Call Chain
 
 ```mermaid
 sequenceDiagram
@@ -43,7 +51,7 @@ sequenceDiagram
     end
 ```
 
-## 3. State and Authority
+## 4. State and Authority
 
 - `OpenAiCompatibleProviderConfig` owns the trusted ProviderId and HTTPS endpoint value；
 - `TextGenerationRoute` remains the selected ModelId authority；Provider raw `model` does not replace it；
@@ -51,7 +59,7 @@ sequenceDiagram
 - Adapter and mapper do not write PostgreSQL, Redis, Trace, logs, or Learning State；
 - the injected `HttpClient` must use `Redirect.NEVER`, so Credential is not forwarded by redirect.
 
-## 4. Failure / Rejection Paths
+## 5. Failure / Rejection Paths
 
 - configured Provider / Credential identity mismatch: fail fast before HTTP；
 - unsafe header value: `AUTHENTICATION_FAILED` without message or cause；
@@ -61,19 +69,26 @@ sequenceDiagram
 - positive numeric `Retry-After` is retained only for rate limit / temporary unavailable；invalid raw value is dropped；
 - Provider error body, raw response, Prompt, Credential, transport / parsing message and cause do not cross the Adapter.
 
-## 5. Verification Evidence
+## 6. Verification Evidence
 
 - `OpenAiCompatibleProviderConfigTests`: trusted DeepSeek HTTPS endpoint and invalid endpoint rejection；
 - `OpenAiCompatibleTextPayloadMapperTests`: role/request mapping, selected route identity, finish reason, usage and
   malformed payload safety；
 - `OpenAiCompatibleTextGenerationAdapterTests`: Bearer header, timeout, redirect rejection, HTTP / transport failure,
   Retry-After, interrupt restoration and secret-safe failure；
-- focused tests: 18/18 PASS；Model Gateway regression: 61/61 PASS；
-- server regression: 201 total / 0 failures / 0 errors / 33 environment-skipped.
+- `TextGenerationGatewayConfigurationTests`: imported configuration resource、default DeepSeek binding、OpenAI
+  override、bounded executor 与 invalid configuration；
+- S7C configuration tests: 6/6 PASS；Model Gateway regression: 67/67 PASS；
+- server regression: 207 total / 0 failures / 0 errors / 33 environment-skipped.
 
-## 6. Source References
+## 7. Source References
 
 - `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleProviderConfig.java`
 - `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextGenerationAdapter.java`
 - `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextPayloadMapper.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayProperties.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayConfiguration.java`
+- `server/src/main/resources/application.yml`
+- `server/src/main/resources/model-gateway.yml`
 - `server/src/test/java/com/dailylanguage/modelgateway/text/openaicompatible/`
+- `server/src/test/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayConfigurationTests.java`

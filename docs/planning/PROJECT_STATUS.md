@@ -2,7 +2,7 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7B / COMPLETE
+> Current Gate: M0-S7C / REVIEW_PENDING
 > Production baseline: M0-S7B COMPLETE (`7f5f59f`)
 
 ## Approved Decisions
@@ -71,6 +71,12 @@
 - M0-S7B Design / Scope 已批准：第一个 Provider 是 DeepSeek，但 Adapter 按 OpenAI-compatible protocol family
   命名和复用；ProviderId、HTTPS Chat Completions endpoint 与 ModelId 分别由 typed config / route 承载，
   不为每个兼容厂商复制 Adapter，也不提前引入 Registry、Factory 或 Base Class。
+- M0-S7C Design / Scope 已批准：通过 typed properties 与 Spring composition 暴露真实 `TextGenerationPort`；
+  DeepSeek 是默认 OpenAI-compatible 配置，切换 OpenAI 只改变 ProviderId、endpoint 与 ModelId，不新增 Adapter。
+- model-call Executor 使用独立 bounded platform-thread pool（默认 4 workers / 16 queue）与 `AbortPolicy`；
+  不与 M0-S9 Job TaskExecutor 共用，Hosted capacity 仍留到 M6 在目标硬件确认。
+- M0-S7C-R1 configuration resource split 已批准：`application.yml` 显式导入 `model-gateway.yml`；只调整
+  Model Gateway deployment properties 的文件组织，不改变 key、默认值、environment override 或 runtime behavior。
 
 ## Completed Review
 
@@ -115,29 +121,31 @@
 ## Current Slice
 
 ```text
-Selected slice: M0-S7B
-Gate: COMPLETE
+Selected slice: M0-S7C / S7C-R1 — OpenAI-compatible Text Runtime Composition
+Gate: REVIEW_PENDING
 M0 umbrella scope: APPROVED
-S7B Design: APPROVED
-S7B Scope: APPROVED
-S7B Implementation: COMPLETE
-Verification: PASS (focused 18/18; Model Gateway 61/61; server 201 total, 0 failures/errors, 33 environment-skipped)
+S7C Design: APPROVED
+S7C Scope: APPROVED
+S7C Implementation: COMPLETE
+S7C-R1 Amendment: COMPLETE / PASS (focused 6/6; server 207 total, 0 failures/errors, 33 environment-skipped)
+Verification: PASS (focused 6/6; Model Gateway 67/67; server 207 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
-Code Review: COMPLETE (PASS; no blocking findings)
-Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD; Model Gateway remains L2)
+Code Review: PENDING
+Ownership Check: PENDING
 Production baseline: M0-S7B COMPLETE (`7f5f59f`)
-Current target: wait for the next M0-S7 slice Design / Scope decision
+Current target: verify and review the amended S7C runtime composition diff; do not start Provider Preset or Browser ingress
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7B 已完成并提交为 `7f5f59f`。下一步只能先定义下一个 M0-S7 slice 的 Design / Scope；在人工批准前
-不实现 Spring runtime wiring、Browser / HTTPS ingress 或第二个 Provider。interactive wait、durable Job 与
-late-result consume 仍留在 M0-S9。
+M0-S7C implementation 与验证已完成，当前停在 `REVIEW_PENDING`。下一步先基于真实 Diff Review runtime
+composition、bounded executor 与配置安全边界；在 Review / Ownership 结束前不进入 Browser / HTTPS
+Credential ingress 或下一 slice。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers
 
-None. 当前没有 Spring bean / route / Executor production wiring，也没有 live DeepSeek Credential / network
-verification，因此不能宣称 Application 或 BYOK End-to-End complete。Hosted password-hash capacity 仍为
+None. 当前已有 Spring bean / route / Executor production wiring，但没有 Browser / HTTPS Credential ingress、
+Application Workflow 或 live DeepSeek Credential / network verification，因此不能宣称 BYOK End-to-End complete。
+Hosted model-call 与 password-hash capacity 仍为
 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

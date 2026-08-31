@@ -994,6 +994,15 @@ M0-S7B Verification: PASS (focused 18/18；Model Gateway 61/61；server 201 tota
 M0-S7B Review: COMPLETE (PASS；no blocking findings)
 M0-S7B Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD；Model Gateway remains L2)
 M0-S7B: COMPLETE (`7f5f59f`)
+M0-S7C Design: APPROVED
+M0-S7C Scope: APPROVED
+M0-S7C Implementation: COMPLETE
+M0-S7C-R1 Configuration Resource Split: COMPLETE / PASS (focused 6/6；server 207 total / 0 failures /
+0 errors / 33 environment-skipped)
+M0-S7C Verification: PASS (focused 6/6；Model Gateway 67/67；server 207 total / 0 failures / 0 errors / 33 environment-skipped)
+M0-S7C Review: PENDING
+M0-S7C Ownership Check: PENDING
+M0-S7C: REVIEW_PENDING
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1020,8 +1029,8 @@ server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同
 ### M0-S7 Approved Design and Current Slice
 
 `M0-S7` 是 A 类 Security / Credential execution boundary。`M0-S7A` 已完成 Module-local Credential
-propagation；当前批准并已实现 `M0-S7B` 的 DeepSeek-first OpenAI-compatible Provider boundary。Browser /
-HTTPS ingress、Spring runtime wiring 与 Application Workflow 不进入本 slice。
+propagation，`M0-S7B` 已完成 DeepSeek-first OpenAI-compatible Provider boundary；当前 `M0-S7C` 已实现
+Spring runtime composition 并停在 `REVIEW_PENDING`。Browser / HTTPS ingress 与 Application Workflow 不进入本 slice。
 
 ```text
 Task / Slice: M0-S7A — Explicit transient Credential propagation
@@ -1096,3 +1105,33 @@ M0-S7B 已完成真实 Diff Review 与 Provider-boundary Human Ownership Check�
 被转发到 configured endpoint 之外。当前没有 Spring runtime wiring、Browser / HTTPS ingress 或 live
 DeepSeek network evidence，因此 Model Gateway 整体 Ownership 保持 L2。
 M0-S7B 已提交为 `7f5f59f`。
+
+#### Approved M0-S7C Current Slice Contract
+
+```text
+Task / Slice: M0-S7C — OpenAI-compatible Text Runtime Composition
+Goal:
+- 将 S7B concrete Adapter、fixed routes、no-redirect HttpClient 与 dedicated model-call ExecutorService 组成可注入的
+  Spring TextGenerationPort；默认 Provider 为 DeepSeek。
+Expected Behavior:
+- typed deployment properties 保存 ProviderId、trusted endpoint、purpose routes 与 executor capacity，不保存 Credential；
+- 默认只配置 CONVERSATION → deepseek / deepseek-chat / 30s，未配置 purpose 返回 CAPABILITY_UNAVAILABLE；
+- OpenAI 与 DeepSeek 复用同一个 OpenAiCompatibleTextGenerationAdapter，只通过配置切换；
+- model-call executor 使用独立 bounded fixed platform-thread pool（4 workers / 16 queue）与 AbortPolicy；
+- HttpClient 固定 Redirect.NEVER；invalid endpoint / timeout / capacity fail startup；startup 不发起 Provider call。
+- application.yml 显式导入 model-gateway.yml；配置拆分不改变 property key、默认值、environment override 或
+  runtime behavior。
+Architecture / Security Impact:
+- 新增 Spring production composition 与独立 concurrency resource；无 dependency、schema、public HTTP API 或
+  Credential persistence 变化；不得与 M0-S9 Job TaskExecutor 共用线程池。
+Explicitly Out of Scope:
+- Browser / HTTPS Credential ingress、Controller / Application Workflow、live DeepSeek verification；
+- 第二个 Provider 配置或 Provider-specific Adapter、retry / fallback、Structured Output、Trace 与 ModelCallJob。
+Verification:
+- focused configuration 6/6；Model Gateway 67/67；server 207 total / 0 failures / 0 errors /
+  33 environment-skipped；Behavior Flow validation；git diff check。
+```
+
+当前完成度是 `Module runtime composition complete / End-to-End incomplete`。配置测试证明 Spring bean graph、
+DeepSeek 默认 route、OpenAI config-only replacement、no-redirect HttpClient、bounded executor、未配置 purpose 与
+invalid configuration boundary；没有 Browser Credential 或 live Provider network evidence。
