@@ -1005,11 +1005,14 @@ M0-S7C Ownership Check: COMPLETE (Runtime-composition UNDERSTOOD；Model Gateway
 M0-S7C: COMPLETE (`59c3e24`)
 M0-S7D Design: APPROVED
 M0-S7D Scope: APPROVED
-M0-S7D Implementation: COMPLETE / REVIEW_PENDING
+M0-S7D Implementation: COMPLETE
 M0-S7D Verification: PASS (focused 16/16；Model Gateway 77/77；server 217 total / 0 failures / 0 errors /
 33 environment-skipped)
-M0-S7D Review: PENDING
-M0-S7D Ownership Check: PENDING
+M0-S7D Review: COMPLETE (PASS；no blocking findings)
+M0-S7D Ownership Check: COMPLETE (Backend API flow UNDERSTOOD；Model Gateway and BYOK / Provider Configuration remain L2)
+M0-S7D: COMPLETE (`4deed20`)
+M0-S7 Integrated Closeout: PARTIAL / ACCEPTED (non-blocking L2 Ownership gap)
+M0-S8 Design / Scope: PROPOSED / APPROVAL_PENDING
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1033,12 +1036,15 @@ route identity attribution 与 programming bug / Provider failure 边界；因�
 server 180 tests 通过，Architecture boundary 无漂移，Documentation 已同步；Ownership 仍为 L2，
 因此 closeout 为 `PARTIAL`。
 
-### M0-S7 Approved Design and Current Slice
+### M0-S7 Approved Design and Closeout
 
 `M0-S7` 是 A 类 Security / Credential execution boundary。`M0-S7A` 已完成 Module-local Credential
 propagation，`M0-S7B` 已完成 DeepSeek-first OpenAI-compatible Provider boundary，`M0-S7C` 已完成 Spring
-runtime composition；当前 `M0-S7D` 已实现 authenticated Backend Credential API ingress，并停在
-`REVIEW_PENDING`。Browser local/session storage UI 与业务 Agent Workflow 不进入本 slice。
+runtime composition；`M0-S7D` 已实现 authenticated Backend Credential API ingress，完成 Review、
+Ownership Check 并由用户提交为 `4deed20`。M0-S7 integrated closeout 的 Scope、Architecture、
+Verification 与 Documentation 通过；因 Model Gateway 与 BYOK / Provider Configuration 仍为 L2，
+结论为非阻塞 `PARTIAL / ACCEPTED`。Browser local/session storage UI 与业务 Agent Workflow
+不进入 M0-S7 scope。
 
 ```text
 Task / Slice: M0-S7A — Explicit transient Credential propagation
@@ -1152,7 +1158,7 @@ S7C completion 时仍无 Browser / HTTPS ingress 或 live Provider evidence，�
 M0-S7C / S7C-R1 implementation 已由用户提交为 `59c3e24`；本段 Review / Ownership reconciliation
 已由用户提交为 `1c8136e`。
 
-#### Approved M0-S7D Current Slice Contract
+#### Approved M0-S7D Slice Contract
 
 ```text
 Task / Slice: M0-S7D — DeepSeek-first BYOK Connection Verification
@@ -1189,3 +1195,11 @@ Verification:
 所有测试使用 fake Credential 与 mocked Provider boundary，没有验证 channel enforcement，也没有发送真实 DeepSeek
 request。Behavior Flow 见
 [`model-provider-connection-verification.md`](../flow/model-provider-connection-verification.md)。
+
+M0-S7D 已完成 read-only Diff Review 与 Backend API Ownership Check。用户能够追踪
+authenticated Controller → verification Service → `TextGenerationPort` → fixed route → bounded Executor →
+Adapter，能够说明 route / Credential mismatch 在 task submission 前结束，以及 success 只返回
+Provider / Model identity、generated text 不跨过 Service boundary、rate-limit metadata 不触发自动 retry。
+对 HTTP status / header 等 open-book mapping 细节的记忆不作为 Ownership 降级证据。M0-S7D 已由用户
+提交为 `4deed20`；由于仍无 Hosted TLS、Browser UI、live Provider 或完整 BYOK End-to-End
+operation evidence，Model Gateway 与 BYOK / Provider Configuration 均保持 L2。

@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7D / REVIEW_PENDING
-> Production baseline: M0-S7C COMPLETE (`59c3e24`)
+> Current Gate: M0-S8 / DESIGN_SCOPE_APPROVAL_PENDING
+> Production baseline: M0-S7D COMPLETE (`4deed20`)
 
 ## Approved Decisions
 
@@ -123,35 +123,41 @@
 30. M0-S7C / S7C-R1 OpenAI-compatible Text runtime composition：Scope / Architecture / verification PASS；
     amended Diff Review 无 blocking finding，runtime-composition Ownership Check 为 UNDERSTOOD；Model Gateway
     整体保持 L2。
+31. M0-S7D DeepSeek-first BYOK Connection Verification：Scope / Architecture / Security boundary / verification PASS；
+    Diff Review 无 blocking finding，Backend API Ownership Check 为 UNDERSTOOD；Model Gateway 与 BYOK /
+    Provider Configuration 均保持 L2；已由用户提交为 `4deed20`。
 
-## Current Slice
+## Current Gate
 
 ```text
-Selected slice: M0-S7D — DeepSeek-first BYOK Connection Verification
-Gate: REVIEW_PENDING
+Selected phase: M0-S8 — Structured Output and minimal Trace walking skeleton
+Gate: DESIGN_SCOPE_APPROVAL_PENDING
 M0 umbrella scope: APPROVED
 S7D Design: APPROVED
 S7D Scope: APPROVED
-S7D Implementation: COMPLETE (uncommitted)
+S7D Implementation: COMPLETE (`4deed20`)
 Verification: PASS (focused 16/16; Model Gateway 77/77; server 217 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
-Code Review: PENDING
-Ownership Check: PENDING
-Production baseline: M0-S7C COMPLETE (`59c3e24`)
-Current target: review the implemented Backend preset / Credential verification boundary; do not start Browser UI or M0-S8
+Code Review: PASS (no blocking findings)
+Ownership Check: COMPLETE (Backend API flow UNDERSTOOD; Model Gateway and BYOK / Provider Configuration remain L2)
+M0-S7 integrated closeout: PARTIAL / ACCEPTED (non-blocking L2 Ownership gap)
+Production baseline: M0-S7D COMPLETE (`4deed20`)
+Current target: review and approve the M0-S8 umbrella design and first S8A slice; do not implement before approval
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-执行 M0-S7D Diff Review，重点检查 authenticated Session / CSRF、Credential header non-disclosure、fixed route
-authority、generated text discard 与 HTTP failure mapping。Review 完成前不进入 Ownership Check、Browser UI、
-live Provider verification 或 M0-S8。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
+审批 M0-S8 umbrella design 与首个 S8A JSON Object transport / syntax-validation slice。当前不开始
+Structured Output production implementation、Trace persistence、Browser UI 或 live Provider verification。
+interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers
 
-None. 当前已有 authenticated Backend Credential API ingress，但没有 Hosted TLS verification、Browser local/session
-storage UI、业务 Agent Workflow 或 live DeepSeek Credential / network verification，因此只能宣称 Backend API
-ingress complete，不能宣称完整产品 BYOK End-to-End complete。
+None. M0-S7 的 transient Credential execution goal 已完成；Model Gateway 与 BYOK / Provider Configuration
+Ownership 仍为 L2，integrated closeout 的非阻塞 `PARTIAL` 结论已由用户接受。当前已有 authenticated Backend
+Credential API ingress，但没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent Workflow 或
+live DeepSeek Credential / network verification，因此只能宣称 Backend API ingress complete，不能宣称完整产品
+BYOK End-to-End complete。
 Hosted model-call 与 password-hash capacity 仍为
 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

@@ -1311,7 +1311,7 @@ degradation 属于具体 Application Workflow。S6 默认不自动 retry，也�
 
 详细 Contract：[`MODEL_GATEWAY.md`](../features/MODEL_GATEWAY.md)。
 
-## 28.2 M0-S6–S7C 已实现边界
+## 28.2 M0-S6–S7D 已实现边界
 
 当前已实现的是 Text Generation 在 Model Gateway Module 内的 route、transient Credential propagation、
 execution chain、OpenAI-compatible Provider HTTP boundary 与 Spring runtime composition：

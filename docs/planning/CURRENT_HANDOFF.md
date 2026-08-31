@@ -5,121 +5,82 @@
 
 ## Handoff Metadata
 
-- Updated At: `2026-08-31 17:49 CST` (`Asia/Shanghai`)
+- Updated At: `2026-08-31 19:51 CST` (`Asia/Shanghai`)
 - Updated By: `Codex`
-- Handoff State: `OWNERSHIP_PENDING`
-- Handoff Reason: `M0-S7D read-only Diff Review passed; stopped for Human Ownership Check`
-- Intended Receiver: `User or the next Review Agent selected by the user`
+- Handoff State: `DESIGN_SCOPE_APPROVAL_PENDING`
+- Handoff Reason: `M0-S7 PARTIAL closeout accepted; M0-S8 umbrella design and first slice await approval`
+- Intended Receiver: `User`
 
 ## Repository Snapshot
 
 - Branch: `codex/m0s7`
-- HEAD: `1c8136e` (`Reconcile M0-S7C runtime composition documentation`)
-- Worktree Summary: `DIRTY; uncommitted M0-S7D changes plus a concurrent harness change in AGENTS.md`
-- Current Product Gate: `M0-S7D / REVIEW_PENDING`
-- Current Slice: `M0-S7D — DeepSeek-first BYOK Connection Verification`
-- Slice Gate: `IMPLEMENTATION COMPLETE / VERIFICATION PASS / CODE REVIEW PASS / OWNERSHIP_PENDING`
-- Stop Point: `Do not commit; complete the scoped S7D Explain Back before Browser UI or M0-S8`
+- HEAD: `4deed20` (`实现 provider 的最小可验证实现+新增文档交接`)
+- Worktree Summary: `DIRTY; documentation-only M0-S7D post-commit reconciliation`
+- Current Product Gate: `M0-S8 / DESIGN_SCOPE_APPROVAL_PENDING`
+- Production Baseline: `M0-S7D COMPLETE (4deed20)`
+- Stop Point: `Do not implement M0-S8 before the user approves the umbrella design and current slice contract`
 
-## Approved Scope / Explicit Non-scope
+## M0-S7 Delivered Scope
 
-Approved:
+- S7A: explicit Provider-scoped `TransientProviderCredential` propagation through the existing typed Port, fixed route,
+  bounded Executor task and Adapter boundary.
+- S7B: DeepSeek-first OpenAI-compatible non-streaming Text Adapter with no redirects and safe typed failure mapping.
+- S7C / S7C-R1: typed deployment properties, `model-gateway.yml` import, Spring runtime composition, fixed routes,
+  no-redirect `HttpClient` and dedicated bounded model-call ExecutorService.
+- S7D: authenticated preset discovery and CSRF-protected fixed connection verification using a request-header Credential;
+  fixed probe output is discarded and only safe Provider / Model identity or typed failure is returned.
 
-- Add authenticated fixed Provider preset discovery.
-- Add CSRF-protected transient Credential connection verification through the existing `TextGenerationPort`.
-- Add a dedicated `CONNECTION_VERIFICATION` fixed route.
-- Keep Provider / Model / endpoint authority in trusted route configuration.
-- Discard generated verification text and expose only safe Provider / Model identity or typed failure.
+Explicit non-scope remains unchanged:
 
-Explicitly out of scope:
-
-- Browser local/session storage UI and live DeepSeek Credential verification.
-- Hosted TLS / channel enforcement verification.
-- Dynamic Provider / Model selection, custom endpoint, second simultaneously configured Provider.
-- Provider Registry, Factory, Base Class or per-call route replacement.
+- Browser local/session storage UI, Hosted TLS/channel verification and live DeepSeek Credential verification.
+- Dynamic Provider / Model / endpoint selection, second active Provider, Registry, Factory or Base Class.
 - Retry, fallback, Structured Output, Trace, ModelCallJob, Agent Workflow or Learning State mutation.
-- Commit, push, merge or rebase.
 
-## Completed Work
+## Review and Verification Evidence
 
-- Added `GET /api/model-provider-presets` for safe configured Provider / Model metadata.
-- Added `POST /api/model-provider-presets/{providerId}/verify` using the
-  `X-Model-Provider-Credential` header.
-- Added `ProviderConnectionVerificationService` with a fixed probe request and generated-text discard.
-- Added `CONNECTION_VERIFICATION` to `ModelPurpose` and `model-gateway.yml`.
-- Mapped safe operational failures to stable HTTP statuses and optional positive `Retry-After`.
-- Added focused Service, MVC / Security and runtime configuration tests.
-- Added the S7D Behavior Flow and reconciled directly affected Architecture / Feature / Planning documents.
-- Corrected documentation to distinguish the implemented Backend API from unverified Hosted TLS enforcement.
-- Completed read-only S7D Diff Review: Scope MATCH, no blocking findings, Architecture PASS, Behavior Flow CURRENT.
-
-## Verification Evidence
-
-Fresh:
-
-- `mvn -q -DskipTests compile`: PASS.
+- S7D Diff Review: PASS; Scope MATCH, Architecture PASS, no blocking findings, Behavior Flow CURRENT.
+- S7D Ownership Check: UNDERSTOOD for the implemented Backend API flow.
 - Focused S7D tests: `16/16 PASS`.
 - Model Gateway regression: `77/77 PASS`.
 - Server regression: `217 total / 0 failures / 0 errors / 33 environment-skipped`.
-- Final Controller test rerun after a test-only assertion tightening: `7/7 PASS`.
-- `git diff --check`: PASS.
+- Compile and `git diff --check`: PASS at the S7D review point.
+- Current documentation-only reconciliation `git diff --check`: PASS.
+- M0-S7 closeout Scope, Architecture, Documentation and Verification: PASS.
 
-Execution note:
-
-- The first targeted run stopped before assertions because Mockito could not self-attach on the current Java 25 runtime.
-  Rerunning with the project-used explicit Mockito `-javaagent` passed; no production fix was required.
+The closeout reused the recorded test evidence because no behavior code changed after those runs. The current documentation-only
+reconciliation requires `git diff --check`, not another full server regression.
 
 Not run / not claimed:
 
-- No live DeepSeek request or real API Key was used.
-- No Browser UI, local/session storage or Hosted TLS/channel enforcement was verified.
+- No real API Key or live DeepSeek network request.
+- No Browser UI, browser-local Credential storage or Hosted TLS/channel enforcement verification.
+
+## Ownership, Risks and Closeout Decision
+
+- Model Gateway Ownership: `L2`.
+- BYOK / Provider Configuration Ownership: `L2`.
+- M0-S7 integrated closeout: `PARTIAL / ACCEPTED`.
+- The Ownership gap is non-blocking for M0-S8 Design / Scope because the required transient Credential, typed result,
+  normalized finish reason and runtime Port boundaries exist and are covered by module/API tests.
+- Residual operational risk: repeated authenticated verification calls share the bounded model-call executor; per-user fairness
+  and Hosted capacity remain unverified and require later operational evidence.
+- UNKNOWN: live DeepSeek compatibility and Credential behavior without a user-authorized real key.
+- UNKNOWN: Hosted TLS/channel enforcement at the deployment boundary.
+- No code, schema, dependency or Architecture blocker was found for M0-S8 Design / Scope.
 
 ## Uncommitted Changes
 
-M0-S7D changes created by Codex:
+Documentation-only S7D / closeout reconciliation:
 
 - `docs/architecture/AGENT_FLOW.md`
 - `docs/architecture/MODULE_MAP.md`
-- `docs/features/MODEL_GATEWAY.md`
-- `docs/flow/README.md`
-- `docs/flow/text-generation-openai-compatible-provider.md`
-- `docs/flow/model-provider-connection-verification.md`
+- `docs/ownership/LEARNING_LOG.md`
+- `docs/ownership/OWNERSHIP_MATRIX.md`
+- `docs/planning/CURRENT_HANDOFF.md`
 - `docs/planning/PROJECT_STATUS.md`
 - `docs/planning/V1_PHASE_PLAN.md`
-- `server/src/main/java/com/dailylanguage/modelgateway/api/ModelProviderPresetController.java`
-- `server/src/main/java/com/dailylanguage/modelgateway/application/ProviderConnectionVerificationService.java`
-- `server/src/main/java/com/dailylanguage/modelgateway/routing/ModelPurpose.java`
-- `server/src/main/resources/model-gateway.yml`
-- `server/src/test/java/com/dailylanguage/modelgateway/api/ModelProviderPresetControllerTests.java`
-- `server/src/test/java/com/dailylanguage/modelgateway/application/ProviderConnectionVerificationServiceTests.java`
-- `server/src/test/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayConfigurationTests.java`
-
-Concurrent harness changes not created by the M0-S7D implementation:
-
-- `AGENTS.md` — adds the Codex / Zcode `CURRENT_HANDOFF` convention.
-- `docs/planning/CURRENT_HANDOFF.md` — initially created by that harness slice, then updated by Codex as required at
-  the S7D stop point.
-
-Do not silently combine the harness change with S7D when making a later Commit Decision.
-
-## Decisions, Blockers, Risks and UNKNOWN
-
-- FACT: path `providerId` scopes `TransientProviderCredential`; it cannot change the fixed route, endpoint, ModelId or
-  Adapter.
-- FACT: Credential is accepted only as a request header and is not returned in success / failure payloads.
-- FACT: the fixed probe output is discarded and cannot become Learning Evidence or state.
-- FACT: S7D is Backend Credential API ingress complete, not full product BYOK End-to-End complete.
-- FACT: Code Review passed with no blocking findings; Extensibility Fit is RIGHT_SIZED and no Registry / Factory /
-  dynamic router was added.
-- Residual risk: repeated authenticated verification calls share the bounded model-call executor; per-user fairness and
-  Hosted capacity remain outside S7D and require later operational evidence.
-- Risk / UNKNOWN: live DeepSeek compatibility and Credential behavior remain unverified without a user-authorized real key.
-- Risk / UNKNOWN: Hosted TLS/channel enforcement is a deployment boundary and has no current verification evidence.
-- Blocker: none for Ownership Check.
-- User Decision Required: Architecture and Scope are already approved. Commit Decision remains with the user after
-  Diff Review and Ownership Check.
 
 ## Next Action
 
-Complete the scoped M0-S7D Explain Back for the authenticated verification entry, route / Credential mismatch and safe
-success / failure response. Do not start Browser UI, live Provider verification, M0-S8 or commit before Ownership closes.
+The user reviews the proposed M0-S8 umbrella design and the S8A JSON Object transport / syntax-validation slice.
+Do not start implementation or commit automatically before approval.

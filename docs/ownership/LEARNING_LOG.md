@@ -883,6 +883,23 @@ L3。
   live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`；M0-S7C / S7C-R1
   implementation 已由用户提交为 `59c3e24`。
 
+### M0-S7D confirmed evidence — Backend BYOK connection verification
+
+- authenticated + CSRF-protected Controller 只从 `X-Model-Provider-Credential` header 读取 secret；path
+  `providerId` 只创建 Provider-scoped `TransientProviderCredential`，不能覆盖 fixed verification route、ModelId、
+  endpoint 或 Adapter；
+- 用户能够追踪 Controller → `ProviderConnectionVerificationService` → `TextGenerationPort` → fixed route →
+  bounded Executor → Adapter 的 Backend module flow，并说明 route / Credential mismatch 在 task submission 前返回
+  `CREDENTIAL_UNAVAILABLE`；
+- verification success 只把 response ProviderId / ModelId 投影为 `ProviderPreset`，generated text、finish reason
+  与 usage 不跨过 Service boundary；`Retry-After` 是 caller 可使用的 metadata，Backend 不自动 retry；
+- focused S7D tests 16/16、Model Gateway 77/77、server 217 total / 0 failures / 0 errors /
+  33 environment-skipped、Behavior Flow、git diff check 与 read-only Diff Review 已通过；Explain Back 为
+  `UNDERSTOOD`；M0-S7D 已由用户提交为 `4deed20`；
+- 本 slice 是 `Backend Credential API ingress complete`，不是 Hosted / Browser / live Provider End-to-End。
+  Model Gateway 与 BYOK / Provider Configuration 当前均保持 `L2`，不因记忆 HTTP status / header 等
+  open-book mapping 细节而降级。
+
 ---
 
 ## 11.9 Trace & Eval

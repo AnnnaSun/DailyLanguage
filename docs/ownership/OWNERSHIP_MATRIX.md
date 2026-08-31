@@ -393,7 +393,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7C Ownership 确认 imported typed configuration、Spring bean graph、fixed route、bounded executor saturation 与 OpenAI-compatible Provider call chain 可追踪；已有 module-local runtime composition 与 mocked HTTP evidence，但无 live Provider 或 BYOK End-to-End evidence |
+| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7D Ownership 确认 authenticated verification entry、fixed route authority、transient Credential propagation、bounded executor、OpenAI-compatible Provider call 与 safe result boundary 可追踪；已有 Backend API 与 mocked HTTP evidence，但无 Hosted TLS、Browser UI、live Provider 或 BYOK End-to-End evidence |
 | Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -402,7 +402,7 @@ I understand Planner.
 | Prompt / Rubric / Context Version | A                 | UNASSESSED        | L3        | L4               |          |
 | Trace / Observability             | A                 | UNASSESSED        | L3        | L5               |          |
 | Eval System                       | A                 | UNASSESSED        | L3        | L5               |          |
-| BYOK / Provider Configuration     | A                 | UNASSESSED        | L3        | L4               |          |
+| BYOK / Provider Configuration     | A                 | L2                | L3        | L4               | M0-S7A–S7D 已能追踪 provider-scoped Credential 从 authenticated header 进入 fixed route、Executor task 与 Adapter 的 transient flow，并理解 mismatch-before-submit、no persistence、no automatic retry 与 generated-text discard；缺 Browser / TLS / live Provider operation evidence |
 | Agent Loop Guardrails             | A                 | UNASSESSED        | L3        | L5               |          |
 | Tool Permission / Allowlist       | A                 | UNASSESSED        | L4        | L5               |          |
 | Memory Retrieval                  | A                 | UNASSESSED        | L3        | L4               |          |
@@ -704,6 +704,7 @@ Human Touch 的目的：
 | M0-S6 Model Gateway | 4 | PARTIAL | `ModelResult.Failure` envelope 与 `ModelFailure` payload 的稳定区分；无 concrete Provider execution evidence | 2026-08-30 |
 | M0-S7B OpenAI-compatible Provider Boundary | 3 | UNDERSTOOD | None for current Provider-boundary slice；无 runtime wiring / live Provider evidence | 2026-08-31 |
 | M0-S7C Text Runtime Composition | 1 | UNDERSTOOD | None for current runtime-composition slice；无 live Provider / BYOK End-to-End evidence | 2026-08-31 |
+| M0-S7D BYOK Connection Verification | 3 | UNDERSTOOD | None for current Backend API slice；无 Hosted TLS / Browser UI / live Provider evidence | 2026-08-31 |
 
 Result：
 
@@ -1020,7 +1021,7 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | L2        | I0                  | 可追踪 imported typed configuration → Spring bean graph → Request + transient Credential → fixed route → bounded Executor task → OpenAI-compatible HTTP Adapter → typed failure 或 validated result；尚无 live Provider 或 BYOK End-to-End evidence |
+| Model Gateway            | L2        | I0                  | 可追踪 authenticated verification API → fixed probe + transient Credential → fixed route → bounded Executor task → OpenAI-compatible HTTP Adapter → safe preset / typed failure；尚无 Hosted TLS、Browser UI、live Provider 或 BYOK End-to-End evidence |
 | Trace                    | UNASSESSED | I0                  |          |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |
