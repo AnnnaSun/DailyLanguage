@@ -864,6 +864,25 @@ L3。
   HTTPS ingress、live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`；M0-S7B
   已提交为 `7f5f59f`。
 
+### M0-S7C confirmed evidence — Text runtime composition
+
+- `application.yml` 强制导入 `model-gateway.yml`，Spring relaxed binding 将 kebab-case deployment values 绑定到
+  `TextGenerationGatewayProperties`，再由 `TextGenerationGatewayConfiguration` 组成 Provider config、
+  no-redirect HttpClient、OpenAI-compatible Adapter、fixed routes、bounded Executor 与 `TextGenerationPort`；
+- DeepSeek 与 OpenAI 的 ProviderId、trusted endpoint 与 ModelId 是配置值变化，继续复用同一个
+  `OpenAiCompatibleTextGenerationAdapter`，没有为兼容厂商新增 Registry、Factory 或重复 Adapter；
+- 用户能够区分默认 4 个 running workers 与 16 个 queued tasks；容量耗尽时 `AbortPolicy` 在 submit 产生
+  `RejectedExecutionException`，`RoutedTextGenerationPort` 将其包装为不携带 cause 的 safe
+  `IllegalStateException`，不会返回 `RATE_LIMITED`，也不会执行 Adapter 或发送 Provider HTTP request；
+- model-call Executor 与未来 M0-S9 Job TaskExecutor 保持独立，避免 Job worker 向同一线程池提交 Provider task
+  后等待自身 pool 造成 starvation / deadlock；对尚未实现的 Job lifecycle 不作为本 slice Ownership 证据；
+- focused configuration 6/6、Model Gateway 67/67、server 207 total / 0 failures / 0 errors /
+  33 environment-skipped、Behavior Flow、git diff check 与 amended Diff Review 已通过；runtime-composition
+  Explain Back 为 `UNDERSTOOD`；
+- 当前已有 Spring module runtime composition，但没有 Browser / HTTPS Credential ingress、Application Workflow、
+  live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`；M0-S7C / S7C-R1
+  implementation 已由用户提交为 `59c3e24`。
+
 ---
 
 ## 11.9 Trace & Eval

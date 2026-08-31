@@ -1000,9 +1000,9 @@ M0-S7C Implementation: COMPLETE
 M0-S7C-R1 Configuration Resource Split: COMPLETE / PASS (focused 6/6；server 207 total / 0 failures /
 0 errors / 33 environment-skipped)
 M0-S7C Verification: PASS (focused 6/6；Model Gateway 67/67；server 207 total / 0 failures / 0 errors / 33 environment-skipped)
-M0-S7C Review: PENDING
-M0-S7C Ownership Check: PENDING
-M0-S7C: REVIEW_PENDING
+M0-S7C Review: COMPLETE (PASS；no blocking findings)
+M0-S7C Ownership Check: COMPLETE (Runtime-composition UNDERSTOOD；Model Gateway remains L2)
+M0-S7C: COMPLETE (`59c3e24`)
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1135,3 +1135,11 @@ Verification:
 当前完成度是 `Module runtime composition complete / End-to-End incomplete`。配置测试证明 Spring bean graph、
 DeepSeek 默认 route、OpenAI config-only replacement、no-redirect HttpClient、bounded executor、未配置 purpose 与
 invalid configuration boundary；没有 Browser Credential 或 live Provider network evidence。
+
+M0-S7C / S7C-R1 已完成 amended Diff Review 与 runtime-composition Ownership Check。用户能够说明
+`application.yml → model-gateway.yml → @ConfigurationProperties → Spring bean graph`，能够区分 4 个 running
+worker、16 个 queued task 与第 21 个 task 的本地 rejection，并确认底层 `RejectedExecutionException` 会在
+`RoutedTextGenerationPort` 包装为 safe `IllegalStateException`，而不是 Provider HTTP 429 的 `RATE_LIMITED`。
+当前仍无 Browser / HTTPS ingress 或 live Provider evidence，因此 Model Gateway 整体 Ownership 保持 L2。
+M0-S7C / S7C-R1 implementation 已由用户提交为 `59c3e24`；本段 Review / Ownership reconciliation
+保留为独立未提交文档修改，Commit Decision 继续由用户负责。

@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7C / REVIEW_PENDING
-> Production baseline: M0-S7B COMPLETE (`7f5f59f`)
+> Current Gate: M0-S7C / COMPLETE
+> Production baseline: M0-S7C COMPLETE (`59c3e24`)
 
 ## Approved Decisions
 
@@ -117,12 +117,15 @@
 29. M0-S7B DeepSeek-first OpenAI-compatible Text Adapter：Scope / Architecture / Security boundary / verification
     PASS；Diff Review 无 blocking finding，Provider-boundary Ownership Check 为 UNDERSTOOD；Model Gateway
     整体保持 L2。
+30. M0-S7C / S7C-R1 OpenAI-compatible Text runtime composition：Scope / Architecture / verification PASS；
+    amended Diff Review 无 blocking finding，runtime-composition Ownership Check 为 UNDERSTOOD；Model Gateway
+    整体保持 L2。
 
 ## Current Slice
 
 ```text
 Selected slice: M0-S7C / S7C-R1 — OpenAI-compatible Text Runtime Composition
-Gate: REVIEW_PENDING
+Gate: COMPLETE
 M0 umbrella scope: APPROVED
 S7C Design: APPROVED
 S7C Scope: APPROVED
@@ -130,18 +133,19 @@ S7C Implementation: COMPLETE
 S7C-R1 Amendment: COMPLETE / PASS (focused 6/6; server 207 total, 0 failures/errors, 33 environment-skipped)
 Verification: PASS (focused 6/6; Model Gateway 67/67; server 207 total, 0 failures/errors, 33 environment-skipped)
 Behavior Flow: CURRENT
-Code Review: PENDING
-Ownership Check: PENDING
-Production baseline: M0-S7B COMPLETE (`7f5f59f`)
-Current target: verify and review the amended S7C runtime composition diff; do not start Provider Preset or Browser ingress
+Code Review: COMPLETE (PASS; no blocking findings)
+Ownership Check: COMPLETE (Runtime-composition UNDERSTOOD; Model Gateway remains L2)
+Production baseline: M0-S7C COMPLETE (`59c3e24`)
+Current target: wait for the documentation reconciliation Commit Decision; do not start Provider Preset or Browser ingress
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7C implementation 与验证已完成，当前停在 `REVIEW_PENDING`。下一步先基于真实 Diff Review runtime
-composition、bounded executor 与配置安全边界；在 Review / Ownership 结束前不进入 Browser / HTTPS
-Credential ingress 或下一 slice。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
+M0-S7C / S7C-R1 implementation 已由用户提交为 `59c3e24`，verification、Diff Review 与 Ownership Check
+均已完成。当前只剩本轮 5 个状态 / Ownership 文档 reconciliation 等待用户 Commit Decision；不得把“下一步”
+解释为自动开始 Provider Preset、Browser / HTTPS Credential ingress 或后续 slice。interactive wait、durable
+Job 与 late-result consume 仍留在 M0-S9。
 
 ## Blockers
 

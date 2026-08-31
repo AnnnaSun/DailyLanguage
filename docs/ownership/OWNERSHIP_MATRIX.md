@@ -393,7 +393,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7B Ownership 确认 OpenAI-compatible request / response mapping、Bearer Credential、no-redirect 与 HTTP failure translation 可追踪；已有 concrete protocol Adapter 的 module-local mocked HTTP evidence，但无 runtime wiring、live Provider 或 BYOK End-to-End evidence |
+| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7C Ownership 确认 imported typed configuration、Spring bean graph、fixed route、bounded executor saturation 与 OpenAI-compatible Provider call chain 可追踪；已有 module-local runtime composition 与 mocked HTTP evidence，但无 live Provider 或 BYOK End-to-End evidence |
 | Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -703,6 +703,7 @@ Human Touch 的目的：
 | M0-S2 Local Infrastructure | 4 | UNDERSTOOD | None for current slice | 2026-08-21 |
 | M0-S6 Model Gateway | 4 | PARTIAL | `ModelResult.Failure` envelope 与 `ModelFailure` payload 的稳定区分；无 concrete Provider execution evidence | 2026-08-30 |
 | M0-S7B OpenAI-compatible Provider Boundary | 3 | UNDERSTOOD | None for current Provider-boundary slice；无 runtime wiring / live Provider evidence | 2026-08-31 |
+| M0-S7C Text Runtime Composition | 1 | UNDERSTOOD | None for current runtime-composition slice；无 live Provider / BYOK End-to-End evidence | 2026-08-31 |
 
 Result：
 
@@ -1019,7 +1020,7 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | L2        | I0                  | 可追踪 Request + transient Credential → fixed route → Executor task → OpenAI-compatible HTTP Adapter → typed failure 或 validated result；尚无 runtime wiring、live Provider 或 BYOK End-to-End evidence |
+| Model Gateway            | L2        | I0                  | 可追踪 imported typed configuration → Spring bean graph → Request + transient Credential → fixed route → bounded Executor task → OpenAI-compatible HTTP Adapter → typed failure 或 validated result；尚无 live Provider 或 BYOK End-to-End evidence |
 | Trace                    | UNASSESSED | I0                  |          |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |
