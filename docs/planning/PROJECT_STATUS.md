@@ -2,8 +2,8 @@
 
 > Last updated: 2026-08-31
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7B / READY_TO_COMMIT
-> Production baseline: M0-S7A COMPLETE (`d8d47ac`)
+> Current Gate: M0-S7B / COMPLETE
+> Production baseline: M0-S7B COMPLETE (`7f5f59f`)
 
 ## Approved Decisions
 
@@ -116,7 +116,7 @@
 
 ```text
 Selected slice: M0-S7B
-Gate: READY_TO_COMMIT
+Gate: COMPLETE
 M0 umbrella scope: APPROVED
 S7B Design: APPROVED
 S7B Scope: APPROVED
@@ -125,15 +125,16 @@ Verification: PASS (focused 18/18; Model Gateway 61/61; server 201 total, 0 fail
 Behavior Flow: CURRENT
 Code Review: COMPLETE (PASS; no blocking findings)
 Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD; Model Gateway remains L2)
-Production baseline: M0-S7A COMPLETE (`d8d47ac`)
-Current target: wait for the human Commit Decision
+Production baseline: M0-S7B COMPLETE (`7f5f59f`)
+Current target: wait for the next M0-S7 slice Design / Scope decision
 Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7B 已达到 `READY_TO_COMMIT`。由用户决定是否 commit；不自动进入 Spring runtime wiring、Browser /
-HTTPS ingress 或第二个 Provider。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
+M0-S7B 已完成并提交为 `7f5f59f`。下一步只能先定义下一个 M0-S7 slice 的 Design / Scope；在人工批准前
+不实现 Spring runtime wiring、Browser / HTTPS ingress 或第二个 Provider。interactive wait、durable Job 与
+late-result consume 仍留在 M0-S9。
 
 ## Blockers
 

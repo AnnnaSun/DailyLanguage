@@ -861,7 +861,8 @@ L3。
   33 environment-skipped、Behavior Flow 与 Diff Review 已通过；Provider-boundary Explain Back 为
   `UNDERSTOOD`；
 - 当前已有 concrete protocol Adapter 的 module-local mocked HTTP evidence，但无 Spring runtime wiring、Browser /
-  HTTPS ingress、live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`。
+  HTTPS ingress、live DeepSeek call 或 BYOK End-to-End evidence，因此 Model Gateway 整体保持 `L2`；M0-S7B
+  已提交为 `7f5f59f`。
 
 ---
 

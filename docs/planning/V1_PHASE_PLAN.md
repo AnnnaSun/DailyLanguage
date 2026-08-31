@@ -993,7 +993,7 @@ M0-S7B Implementation: COMPLETE
 M0-S7B Verification: PASS (focused 18/18；Model Gateway 61/61；server 201 total / 0 failures / 0 errors / 33 environment-skipped)
 M0-S7B Review: COMPLETE (PASS；no blocking findings)
 M0-S7B Ownership Check: COMPLETE (Provider-boundary UNDERSTOOD；Model Gateway remains L2)
-M0-S7B: READY_TO_COMMIT
+M0-S7B: COMPLETE (`7f5f59f`)
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```
@@ -1095,3 +1095,4 @@ M0-S7B 已完成真实 Diff Review 与 Provider-boundary Human Ownership Check�
 `Redirect.NEVER` 在 Adapter construction 阶段阻止 Bearer Credential 随 Provider 返回的 `Location`
 被转发到 configured endpoint 之外。当前没有 Spring runtime wiring、Browser / HTTPS ingress 或 live
 DeepSeek network evidence，因此 Model Gateway 整体 Ownership 保持 L2。
+M0-S7B 已提交为 `7f5f59f`。
