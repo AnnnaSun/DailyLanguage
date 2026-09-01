@@ -5,126 +5,149 @@
 
 ## Handoff Metadata
 
-- Updated At: `2026-09-01 16:42 CST` (`Asia/Shanghai`)
+- Updated At: `2026-09-01 20:02 CST` (`Asia/Shanghai`)
 - Updated By: `Codex`
-- Handoff State: `DESIGN_SCOPE_PENDING`
-- Handoff Reason: `M0-S8 closeout documentation reconciled; M0-S9 first implementation slice still requires approval`
-- Intended Receiver: `User reviewing the M0-S9 first-slice Design / Scope next`
+- Handoff State: `REVIEW_PENDING`
+- Handoff Reason: `Approved scope-local whitespace and test-evidence corrections are implemented and freshly verified`
+- Intended Receiver: `User reviewing the corrected V4 constraint and focused evidence before Ownership closeout`
 
 ## Repository Snapshot
 
-- Branch: `codex/M0S8-structure-output`
-- HEAD: `c9314dd` (`加入 traceid，规范化 安全输出 log`)
-- Worktree before S8 closeout documentation: `CLEAN`
-- Worktree now: `DIRTY with six documentation-only reconciliation files; no Production or test change`
-- Current Product Gate: `M0-S9 / DESIGN_SCOPE_PENDING`
-- Production Baseline: `M0-S8D committed at c9314dd`
-- Stop Point: `Present and approve one M0-S9 implementation slice before changing schema, Production code or API`
+- Branch: `codex/M0S9`
+- HEAD: `a887bbb` (`S8 收尾`)
+- Worktree before M0-S9A: `CLEAN`
+- Worktree now: `DIRTY with three M0-S9A files; no pre-existing uncommitted change`
+- Current Product Gate: `M0-S9 / REVIEW_PENDING`
+- Current Slice: `M0-S9A — Durable ModelCallJob State Schema`
+- Slice Gate: `IMPLEMENTATION / TARGETED VERIFICATION COMPLETE; REVIEW_PENDING`
+- Stop Point: `Do not implement Repository, TaskExecutor, API, typed outcome persistence or another slice`
 
-## M0-S8 Closeout Result
+The six S8 reconciliation files previously described as uncommitted were committed by the user in `a887bbb`. The commit changed
+documentation only; `c9314dd..a887bbb` contains no Production or test change. The prior handoff branch / HEAD / dirty-state snapshot
+was stale and is corrected here.
 
-- Final Status: `PARTIAL`
-- Scope / Implementation: `PASS`
-- Architecture Boundary: `PASS`
-- Verification: `PASS for Model Gateway scope / PARTIAL for wider server regression`
-- Behavior Flow: `CURRENT`
-- Formal Documentation: `RECONCILED`
-- Ownership: `PARTIAL but non-blocking for M0-S9 Design / Scope`
-- M0-S9 technical prerequisites: `READY`
-- M0-S9 implementation authorization: `NOT_APPROVED`
+## Approved Scope
 
-## Planned vs Delivered
+User approved implementation in the current workspace of one schema-only slice:
 
-- S8A `DONE`: provider-neutral `TextOutputSpecification.JsonObject` and fixed OpenAI-compatible
-  `response_format={"type":"json_object"}` transport mapping; no response validation claim.
-- S8B `DONE / MODULE_LOCAL`: strict JSON-object parse, record binding, enum and semantic validation with a safe mutually
-  exclusive `StructuredOutputValidation` result.
-- S8C `DONE / MODULE_LOCAL`: one safe terminal `ModelCallTrace` per non-null Text Generation call, default INFO recorder and
-  fail-open recording.
-- S8D `DONE / MODULE_LOCAL`: explicit same-UUID propagation into the worker / Adapter, normalized unknown finish reason and
-  rate-limited safe diagnostics.
-- Explicitly deferred as designed: Application Workflow integration, Trace persistence, controlled raw-response Debug,
-  retry / fallback, `ModelCallJob`, Learning State mutation, Browser UI and live Provider verification.
+1. add Flyway V4 `model_call_job` durable metadata schema;
+2. enforce UUIDv7 identity, owner and optional same-owner Language Profile relation;
+3. store separate execution / consumption status, workflow version, row version and timestamps;
+4. enforce paired selected Provider / Model identity and finite persisted vocabularies;
+5. verify the schema through one focused PostgreSQL integration test class;
+6. update this handoff and stop at `REVIEW_PENDING`.
 
-## Implementation Reality
+## Explicit Non-scope
 
-```text
-TextGenerationRequest + TextOutputSpecification
-→ OpenAI-compatible request mapping
-→ TextGenerationPort / fixed route / bounded model-call ExecutorService
-→ OpenAI-compatible Adapter
-→ portable TextGenerationResponse
-→ optional module-local StructuredOutputValidator chosen by a future owning Workflow
+- Java Job domain record or transition policy;
+- MyBatis Mapper / XML / Repository;
+- conditional `rowVersion` update, consume-once, stale, confirmation or expiry execution;
+- operation-specific Text result or safe failure persistence;
+- Spring TaskExecutor configuration, transient Credential capture or interactive waiting;
+- Model Gateway behavior, execution timeout, retry or fallback changes;
+- HTTP status query / confirmation API;
+- Planner, Conversation, Evaluator or other Application Workflow integration;
+- Kafka, RabbitMQ, Push Notification or generic workflow engine;
+- Weakness, Level, Mastery, Evidence or other long-term learning-state mutation;
+- commit, push, merge or the next M0-S9 slice.
 
-RoutedTextGenerationPort creates traceId
-→ same traceId crosses Executor task into Adapter / mapper diagnostics
-→ safe terminal ModelCallTrace is recorded
-→ unknown raw finish reason remains portable UNKNOWN
-```
+## Completed Work
 
-- No new Production dependency, database schema, public HTTP API, retry, fallback or learning-state authority was added.
-- Structured Output validation is not yet wired to Planner / Evaluator / Content Workflow; this is a contract and validator
-  foundation, not End-to-End validated artifact consumption.
-- Minimal Trace is currently process-local logging metadata; no durable Trace store exists.
+### Production / Migration
+
+- Added `server/src/main/resources/db/migration/V4__add_model_call_job.sql`.
+- Added `language_profile(id, user_id)` composite uniqueness so the optional Job relation can enforce that
+  `languageProfileId` belongs to the same `userId` at the database boundary.
+- Added `model_call_job` with UUIDv7 identity, owner / workflow / route metadata, separate execution and consumption status,
+  optimistic-lock `rowVersion`, expiry and completion timestamps.
+- Added database checks for controlled purpose / operation / lifecycle vocabularies, paired route identity, non-negative
+  versions, valid completion state and timestamp ordering.
+- Replaced the `BTRIM`-only route / Workflow-step checks with explicit POSIX whitespace-boundary checks so ordinary spaces,
+  tabs and other PostgreSQL whitespace cannot appear at either end.
+- Did not add Credential, Prompt, request payload, raw Provider response, result payload, JSON metadata or arbitrary Map state.
+- Added Chinese PostgreSQL table / column comments for Job identity, ownership, route, Workflow version, optimistic-lock
+  row version, separate lifecycles and expiry-versus-execution-timeout meaning.
+
+### Test
+
+- Added `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobSchemaIntegrationTests.java`.
+- The focused test covers UUIDv7/default lifecycle state, optional Language Profile, cross-owner rejection, paired route
+  identity, route / Workflow-step boundary whitespace, lifecycle vocabulary, non-negative versions, independently isolated
+  completion / expiry timestamp invariants and the exact durable-column allowlist.
 
 ## Verification Evidence
 
-Fresh at the committed S8D gate:
+Fresh for M0-S9A:
 
-- S8D targeted tests: `44/44 PASS`.
-- Model Gateway regression: `95/95 PASS`, without model-id environment overrides.
-- Default runtime composition: `6/6 PASS` for `deepseek-v4-flash`.
-- Server compile: PASS.
-- `git diff --check`: PASS before commit.
+- Server Production compile: `PASS` (`mvn -q -DskipTests compile`).
+- Server test compilation: `PASS` (`mvn -q -DskipTests test`).
+- PostgreSQL: `18.6` using the project pgvector image on temporary host port `55432`.
+- Flyway: `PASS`; four migrations validated and V4 applied successfully from schema version 3 to 4.
+- `ModelCallJobSchemaIntegrationTests`: `15/15 PASS` on the final corrected files.
+- `PersistenceIdentityIntegrationTests`: `10/10 PASS`; the Language Profile composite uniqueness caused no regression.
+- Combined targeted database verification: `25/25 PASS` on the final corrected files.
+- After the SQL comment update, a fresh empty database successfully applied Flyway V1 through V4; PostgreSQL metadata lookup
+  confirmed the `workflow_version`, `row_version` and `expires_at` comments were persisted.
+- The project PostgreSQL container started for verification was stopped afterward; its volume was retained.
+- The temporary `daily_language_s9a_review`, `daily_language_s9a_whitespace_review` and
+  `daily_language_s9a_final_review` databases were deleted after verification; they contained no user data.
 
-Closeout Git evidence:
+Environment-only attempts before the passing run:
 
-- `git status --short`: clean before this required handoff update.
-- `git show --check c9314dd`: PASS.
-- S8 commit chain: `8d11ddd` (S8A), `16635d0` (S8B), `3f8838d` (S8C), `c9314dd` (S8D).
+- Docker daemon was initially stopped.
+- Default host port `5432` was occupied, so the project PostgreSQL verification used `55432` without changing repository config.
+- The first sandboxed database run was blocked by local socket permission; the same command passed with approved local-network access.
 
-Not fresh for S8:
+Not run:
 
-- Full server suite was not rerun during S8. Latest wider evidence remains S7D:
-  `217 total / 0 failures / 0 errors / 33 environment-skipped`.
+- Fresh full server suite was not run for this schema-only slice.
+- Model Gateway regression was not rerun because no Model Gateway source, configuration or behavior changed.
+- Repository, concurrency, TaskExecutor, interactive waiting, restart recovery and consume-once behavior remain unimplemented
+  and therefore unverified.
 
-## Architecture and Documentation Reconciliation
+Prior evidence, not fresh for M0-S9A:
 
-Behavior Flow documents reflect the implemented S8C/S8D call path and are current.
+- M0-S8 Model Gateway regression: `95/95 PASS`.
+- Latest wider server evidence remains S7D: `217 total / 0 failures / 0 errors / 33 environment-skipped`.
 
-Completed documentation-only updates:
+## Uncommitted Changes
 
-- `docs/planning/PROJECT_STATUS.md`: now selects M0-S9 Design / Scope and records the S8A–S8D baseline.
-- `docs/planning/V1_PHASE_PLAN.md`: now records all four S8 commits, verification, Ownership and closeout result.
-- `docs/features/MODEL_GATEWAY.md`: now records the implemented S8B/S8C/S8D decisions and current non-goals.
-- `docs/architecture/MODULE_MAP.md`: now lists module-local Structured Output and Trace implementation reality.
-- `docs/ownership/OWNERSHIP_MATRIX.md`: now records Structured Output L2, Trace / Observability L3 and Model Gateway L2.
+M0-S9A files:
 
-No update is currently required for the general future-state `SYSTEM_OVERVIEW`, `DATA_FLOW` or `AGENT_FLOW`; current
-Behavior Flow documents already carry the implemented call-chain truth without presenting future Workflow as runtime fact.
+- `server/src/main/resources/db/migration/V4__add_model_call_job.sql` — new, Production migration;
+- `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobSchemaIntegrationTests.java` — new test;
+- `docs/planning/CURRENT_HANDOFF.md` — updated current snapshot.
 
-## Ownership and Risks
+Pre-existing uncommitted changes before M0-S9A: `NONE`.
 
-- Model Gateway overall remains `L2`, consistent with the previously accepted non-blocking ownership gap.
-- Structured Output is `L2 / module-local`: parse / shape / enum / semantic boundaries are traceable, but no real owning
-  Workflow has yet operated the validator.
-- Trace / Observability is `L3 / module-local`: the user traced the same UUID across caller / worker / Adapter, explained
-  terminal metadata, fail-open behavior, safe-token versus invalid redaction, and per-route one-minute limiting.
-- Known deferred trade-offs: process-local warning limiter resets on restart; no Trace persistence; no live DeepSeek evidence;
-  no fresh full-server regression.
-- None of these prevents designing the M0-S9 backend foundation, but they prevent an unconditional S8 `PASS` closeout.
+## Decisions, Risks and UNKNOWN
 
-## M0-S9 Dependency Readiness
+- `FACT`: PostgreSQL now has the approved durable Job metadata contract when V4 is applied.
+- `FACT`: execution status and consumption status are separate columns; this slice does not yet implement transition methods.
+- `FACT`: `rowVersion` is stored and constrained but does not yet provide consume-once until a later approved Repository slice
+  performs conditional updates.
+- `FACT`: there is no durable request or result payload in M0-S9A; typed outcome persistence remains a later Scope Decision.
+- `FACT`: Model Gateway and its model-call ExecutorService were not modified.
+- `RISK`: future Java persisted vocabularies must remain synchronized with the V4 database checks through explicit migration.
+- `RISK`: V4 is an additive forward migration; it has no down migration in the current Flyway convention.
+- `RESOLVED`: the user approved replacing `BTRIM`-only checks; the final DDL uses POSIX boundary-whitespace checks and the
+  focused tests reject tab-only, leading-space, trailing-tab and Workflow-step leading-tab cases.
+- `RESOLVED`: completion-state and expiry-order failures are now exercised by independent inserts, so each constraint has
+  isolated failure evidence.
+- `OWNERSHIP EVIDENCE`: the user confirmed understanding of same-owner Profile correlation and the distinction between
+  `workflowVersion`, optimistic-lock `rowVersion` and future consume-once behavior. The corrected whitespace constraint still
+  requires final Diff Review before Ownership closeout.
+- `UNKNOWN`: Repository method shape, legal transition matrix, operation-specific outcome schema and TaskExecutor capacity remain
+  intentionally undecided until later Design / Scope approval.
 
-- Transient Credential execution boundary: `READY`.
-- Provider-neutral Model result / failure: `READY`.
-- Structured Output validation foundation: `READY / MODULE_LOCAL`.
-- Safe Trace metadata foundation: `READY / NON_PERSISTENT`.
-- Approved `MODEL_CALL_JOB.md` detailed design: `READY`.
-- Schema, API, first implementation slice and file scope: `NOT_APPROVED`; require separate Architecture-sensitive
-  Design / Scope before code.
+## User Decisions Required
+
+- Review the corrected V4 boundary-whitespace constraint and its focused tests, then complete Ownership closeout.
+- Commit Decision remains with the user after Review / Ownership; no commit is authorized yet.
+- Any M0-S9B Repository / transition scope requires a separate Architecture-sensitive Design / Scope approval.
 
 ## Next Action
 
-Present the M0-S9 first implementation slice Design / Scope based on the approved `MODEL_CALL_JOB.md`. Do not change schema,
-Production code or API before approval, and do not commit the documentation changes automatically.
+Perform Code Ownership Review of the final M0-S9A Diff, focusing on same-owner composite FK, route / Workflow-step whitespace
+constraints and the separation between Workflow version, row version, execution status and consumption status. Do not start
+M0-S9B or commit automatically.
