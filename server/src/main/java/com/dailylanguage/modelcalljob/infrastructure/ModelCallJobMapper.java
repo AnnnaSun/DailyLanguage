@@ -14,4 +14,9 @@ interface ModelCallJobMapper {
     Optional<StoredModelCallJob> findByIdAndUserId(
             @Param("jobId") UUID jobId,
             @Param("userId") UUID userId);
+
+    Optional<StoredModelCallJob> tryStartExecution(
+            @Param("jobId") UUID jobId,
+            @Param("userId") UUID userId,
+            @Param("expectedRowVersion") long expectedRowVersion);
 }

@@ -46,6 +46,16 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    public Optional<ModelCallJob> tryStartExecution(UUID jobId, UUID userId, long expectedRowVersion) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        return modelCallJobMapper.tryStartExecution(jobId, userId, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
     private static ModelCallJob toDomain(StoredModelCallJob job) {
         return new ModelCallJob(
                 job.id(), job.userId(), Optional.ofNullable(job.languageProfileId()),

@@ -1,6 +1,7 @@
 package com.dailylanguage.modelcalljob.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -83,5 +84,53 @@ class ModelCallJobRepositoryIntegrationTests {
 
         assertThat(modelCallJobRepository.findByIdAndUserId(createdJob.id(), otherUserId)).isEmpty();
         assertThat(modelCallJobRepository.findByIdAndUserId(createdJob.id(), ownerId)).contains(createdJob);
+    }
+
+    @Test
+    void startsExecutionOnlyOnceForExpectedVersion() {
+        UUID userId = userRepository.create();
+        NewModelCallJob newJob = new NewModelCallJob(
+                userId, Optional.empty(), ModelPurpose.PLANNING, ModelOperation.TEXT_GENERATION,
+                Optional.empty(), Optional.empty(), UUID.randomUUID(), "GENERATE_TASK", 0,
+                OffsetDateTime.now().plusHours(1));
+        ModelCallJob createdJob = modelCallJobRepository.create(newJob);
+
+        Optional<ModelCallJob> started = modelCallJobRepository.tryStartExecution(
+                createdJob.id(), userId, createdJob.rowVersion());
+
+        assertThat(started).isPresent().get()
+                .satisfies(job -> {
+                    assertThat(job.executionStatus()).isEqualTo(ModelCallJob.ExecutionStatus.RUNNING);
+                    assertThat(job.consumptionStatus()).isEqualTo(ModelCallJob.ConsumptionStatus.NOT_READY);
+                    assertThat(job.rowVersion()).isEqualTo(1);
+                    assertThat(job.completedAt()).isEmpty();
+                });
+        assertThat(modelCallJobRepository.tryStartExecution(createdJob.id(), userId, createdJob.rowVersion()))
+                .isEmpty();
+        assertThat(modelCallJobRepository.findByIdAndUserId(createdJob.id(), userId))
+                .isEqualTo(started);
+    }
+
+    @Test
+    void doesNotStartExecutionForAnotherUser() {
+        UUID ownerId = userRepository.create();
+        UUID otherUserId = userRepository.create();
+        NewModelCallJob newJob = new NewModelCallJob(
+                ownerId, Optional.empty(), ModelPurpose.PLANNING, ModelOperation.TEXT_GENERATION,
+                Optional.empty(), Optional.empty(), UUID.randomUUID(), "GENERATE_TASK", 0,
+                OffsetDateTime.now().plusHours(1));
+        ModelCallJob createdJob = modelCallJobRepository.create(newJob);
+
+        assertThat(modelCallJobRepository.tryStartExecution(
+                createdJob.id(), otherUserId, createdJob.rowVersion())).isEmpty();
+        assertThat(modelCallJobRepository.findByIdAndUserId(createdJob.id(), ownerId)).contains(createdJob);
+    }
+
+    @Test
+    void rejectsNegativeExpectedRowVersion() {
+        assertThatThrownBy(() -> modelCallJobRepository.tryStartExecution(
+                UUID.randomUUID(), UUID.randomUUID(), -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("expectedRowVersion must not be negative");
     }
 }

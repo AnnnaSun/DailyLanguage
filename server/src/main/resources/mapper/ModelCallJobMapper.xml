@@ -56,4 +56,15 @@
         WHERE id = #{jobId, jdbcType=OTHER}
           AND user_id = #{userId, jdbcType=OTHER}
     </select>
+
+    <select id="tryStartExecution" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET execution_status = 'RUNNING',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'CREATED'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+        RETURNING <include refid="jobColumns"/>
+    </select>
 </mapper>

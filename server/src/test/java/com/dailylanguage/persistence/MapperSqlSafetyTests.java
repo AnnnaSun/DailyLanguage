@@ -53,6 +53,7 @@ class MapperSqlSafetyTests {
                 .contains("#{providerId, jdbcType=VARCHAR}")
                 .contains("#{modelId, jdbcType=VARCHAR}")
                 .contains("#{workflowId, jdbcType=OTHER}")
+                .contains("#{expectedRowVersion, jdbcType=BIGINT}")
                 .contains("#{expiresAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}")
                 .doesNotContain("${");
     }
