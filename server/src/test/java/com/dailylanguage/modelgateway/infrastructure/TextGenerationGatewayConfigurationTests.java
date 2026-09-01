@@ -34,6 +34,8 @@ import com.dailylanguage.modelgateway.text.execution.FixedTextGenerationRoutes;
 import com.dailylanguage.modelgateway.text.execution.TextGenerationRoute;
 import com.dailylanguage.modelgateway.text.openaicompatible.OpenAiCompatibleProviderConfig;
 import com.dailylanguage.modelgateway.text.openaicompatible.OpenAiCompatibleTextGenerationAdapter;
+import com.dailylanguage.modelgateway.trace.LoggingModelCallTraceRecorder;
+import com.dailylanguage.modelgateway.trace.ModelCallTraceRecorder;
 import tools.jackson.databind.json.JsonMapper;
 
 class TextGenerationGatewayConfigurationTests {
@@ -52,7 +54,9 @@ class TextGenerationGatewayConfigurationTests {
                     .hasNotFailed()
                     .hasSingleBean(TextGenerationPort.class)
                     .hasSingleBean(OpenAiCompatibleTextGenerationAdapter.class)
-                    .hasSingleBean(FixedTextGenerationRoutes.class);
+                    .hasSingleBean(FixedTextGenerationRoutes.class)
+                    .hasSingleBean(ModelCallTraceRecorder.class)
+                    .hasSingleBean(LoggingModelCallTraceRecorder.class);
 
             OpenAiCompatibleProviderConfig providerConfig =
                     context.getBean(OpenAiCompatibleProviderConfig.class);

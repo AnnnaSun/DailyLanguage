@@ -1,8 +1,8 @@
 # Text Generation Credential Propagation Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M0-S7A`
-- Last Verified: `2026-08-30`
+- Feature / Slice: `M0-S7A / M0-S8C`
+- Last Verified: `2026-09-01`
 - Entry: `TextGenerationPort.generateText(request, credential)`
 
 ## 1. Behavior Boundary
@@ -11,9 +11,9 @@
 Provider-scoped Credential 与 provider-neutral `TextGenerationRequest` 分开传入，Gateway 选择 fixed route、
 验证 Provider identity，并通过 model-call `ExecutorService` 显式传给 operation-specific Adapter。
 
-成功结果是 fake 或未来 concrete Adapter 返回的 `ModelResult<TextGenerationResponse>`。当前 Flow 不包含
-Browser / HTTPS Credential ingress、concrete Provider HTTP / SDK、Application Workflow、Structured Output、
-Trace persistence 或 `ModelCallJob`，因此不是 BYOK End-to-End behavior。
+Gateway 的最终 `ModelResult<TextGenerationResponse>` 会在返回调用方前形成一次安全的 terminal
+`ModelCallTrace`，默认写入 INFO log。当前 Flow 不包含 Browser / HTTPS Credential ingress、Application Workflow、
+Trace persistence、跨线程 Trace-ID propagation 或 `ModelCallJob`，因此不是 BYOK End-to-End behavior。
 
 ## 2. Main Call Chain
 
@@ -24,15 +24,18 @@ sequenceDiagram
     participant Routes as FixedTextGenerationRoutes
     participant Executor as Model-call ExecutorService
     participant Adapter as TextGenerationProviderAdapter
+    participant Recorder as ModelCallTraceRecorder
 
     Caller->>Port: generateText(request, credential)
     Port->>Routes: findRoute(request.purpose())
     alt route 不存在
         Routes-->>Port: Optional.empty()
+        Port->>Recorder: MODEL_FAILURE / CAPABILITY_UNAVAILABLE
         Port-->>Caller: Failure(CAPABILITY_UNAVAILABLE, no route identity)
     else route 已选择
         Routes-->>Port: TextGenerationRoute
         alt credential.providerId 与 route.providerId 不匹配
+            Port->>Recorder: MODEL_FAILURE / CREDENTIAL_UNAVAILABLE
             Port-->>Caller: Failure(CREDENTIAL_UNAVAILABLE, selected route identity)
         else Credential 匹配
             Port->>Executor: submit task capturing credential
@@ -40,6 +43,7 @@ sequenceDiagram
             Adapter-->>Executor: ModelResult or typed Provider failure
             Executor-->>Port: Future result / timeout / execution failure
             Port->>Port: translate failure and validate route identity
+            Port->>Recorder: terminal safe ModelCallTrace
             Port-->>Caller: ModelResult<TextGenerationResponse>
         end
     end
@@ -51,11 +55,13 @@ sequenceDiagram
 - `TransientProviderCredential` 只保存当前调用的 `ProviderId` 与 opaque secret；`toString()` 始终 redacted。
 - Gateway 只校验 Credential 是否属于 selected Provider，不持久化、不缓存，也不把 secret 放入 result / failure。
 - Adapter 是唯一允许读取 `credential.secret()` 的边界，且只应用于构造当前外部请求。
+- `ModelCallTrace` 只保存 purpose、可用的 route identity、latency、status、typed failure、normalized finish
+  reason 与 portable usage；默认 recorder 只把这些 metadata 写入 INFO log。
 - 当前行为不读取或修改 PostgreSQL、Redis、Session、Language Profile 或任何 Learning State。
 
 timeout 后的 `future.cancel(true)` 仍是 best effort。它不证明 worker 已停止，也不保证 Credential 立即从
-JVM heap 消失；Gateway 当前不把它写入 durable state、Trace、Log、Gateway exception message 或
-`ModelFailure`。未来 concrete Adapter 同样必须遵守该 secret boundary。
+JVM heap 消失；Gateway 不把 Credential 写入 durable state、Trace、Log、Gateway exception message 或
+`ModelFailure`。concrete Adapter 同样必须遵守该 secret boundary。
 
 ## 4. State Transition
 
@@ -67,7 +73,9 @@ JVM heap 消失；Gateway 当前不把它写入 durable state、Trace、Log、Ga
 - Credential Provider mismatch：返回带 selected route identity 的 `CREDENTIAL_UNAVAILABLE`，不提交 Adapter task。
 - Provider 实际拒绝 Credential：Adapter 使用 typed `AUTHENTICATION_FAILED`，Gateway 安全归一化。
 - final deadline：best-effort cancel，并返回 route-aware `TIMEOUT`。
-- unclassified exception、executor rejection、null result 或 route identity mismatch：保持 fail fast，且不携带 secret。
+- unclassified exception、executor rejection、null result 或 route identity mismatch：记录不携带 secret 的
+  `INTERNAL_FAILURE`，然后保持原有 fail-fast contract。
+- recorder 的 runtime failure 只写安全 WARN，不能替换原 `ModelResult` 或异常。
 
 ## 6. Verification Evidence
 
@@ -76,8 +84,10 @@ JVM heap 消失；Gateway 当前不把它写入 durable state、Trace、Log、Ga
 - `RoutedTextGenerationPortTests.propagatesTheMatchingCredentialToTheAdapterWorkerExactlyOnce`
 - `RoutedTextGenerationPortTests.returnsCredentialUnavailableWithoutSubmittingAMismatchedCredential`
 - `RoutedTextGenerationPortTests.hidesAnUnclassifiedRuntimeExceptionMessageAndCause`
-- Model Gateway regression: `43/43 PASS` on 2026-08-30
-- Server regression: `183 tests, 0 failures, 0 errors, 33 environment-skipped` on 2026-08-30
+- `ModelCallTraceRuntimeTests`: success、pre-route failure、internal failure 与 recorder fail-open；
+- `LoggingModelCallTraceRecorderTests`: INFO metadata 与 Credential / Prompt / generated text non-disclosure；
+- S8C focused tests: `24/24 PASS`；Model Gateway regression: `91/91 PASS`；server compile: PASS；
+- latest wider server regression remains S7D evidence: `217 total / 0 failures / 0 errors / 33 environment-skipped`。
 
 ## 7. Source References
 
@@ -86,3 +96,7 @@ JVM heap 消失；Gateway 当前不把它写入 durable state、Trace、Log、Ga
 - `server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java`
 - `server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java`
 - `server/src/main/java/com/dailylanguage/modelgateway/result/ModelFailureKind.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/trace/ModelCallTrace.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/trace/ModelCallTraceRecorder.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/trace/LoggingModelCallTraceRecorder.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/trace/`

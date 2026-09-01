@@ -198,6 +198,6 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 
 | Behavior | Document Status | Feature / Slice | Document |
 |---|---|---|---|
-| Text Generation Credential Propagation | IMPLEMENTED | M0-S7A | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |
+| Text Generation Credential Propagation | IMPLEMENTED | M0-S7A / M0-S8C | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |
 | OpenAI-compatible Text Provider Call | IMPLEMENTED | M0-S7B / M0-S7C | [`text-generation-openai-compatible-provider.md`](text-generation-openai-compatible-provider.md) |
-| Model Provider Connection Verification | IMPLEMENTED | M0-S7D | [`model-provider-connection-verification.md`](model-provider-connection-verification.md) |
+| Model Provider Connection Verification | IMPLEMENTED | M0-S7D / M0-S8C | [`model-provider-connection-verification.md`](model-provider-connection-verification.md) |

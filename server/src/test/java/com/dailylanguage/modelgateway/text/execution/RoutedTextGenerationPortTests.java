@@ -30,6 +30,7 @@ import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 import com.dailylanguage.modelgateway.text.TextGenerationResponse;
 import com.dailylanguage.modelgateway.text.TextMessage;
 import com.dailylanguage.modelgateway.text.TextOutputSpecification;
+import com.dailylanguage.modelgateway.trace.ModelCallTraceRecorder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +45,7 @@ class RoutedTextGenerationPortTests {
             ModelPurpose.CONVERSATION,
             List.of(new TextMessage(TextMessage.Role.USER, "Help me order food.")),
             TextOutputSpecification.plainText());
+    private static final ModelCallTraceRecorder NO_OP_TRACE_RECORDER = trace -> { };
 
     private final ExecutorService modelCallExecutor = Executors.newCachedThreadPool();
 
@@ -91,7 +93,8 @@ class RoutedTextGenerationPortTests {
     void returnsCapabilityUnavailableBeforeRouteSelection() {
         var port = new RoutedTextGenerationPort(
                 new FixedTextGenerationRoutes(Map.of()),
-                modelCallExecutor);
+                modelCallExecutor,
+                NO_OP_TRACE_RECORDER);
 
         assertThat(port.generateText(REQUEST, CREDENTIAL)).isEqualTo(ModelResult.failure(
                 ModelFailure.withoutRoute(ModelFailureKind.CAPABILITY_UNAVAILABLE)));
@@ -302,7 +305,8 @@ class RoutedTextGenerationPortTests {
         var route = new TextGenerationRoute(PROVIDER_ID, MODEL_ID, adapter, executionTimeout);
         return new RoutedTextGenerationPort(
                 new FixedTextGenerationRoutes(Map.of(routeKey, route)),
-                executor);
+                executor,
+                NO_OP_TRACE_RECORDER);
     }
 
     private static ModelResult<TextGenerationResponse> successfulResponse(
