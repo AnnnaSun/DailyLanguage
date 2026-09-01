@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-31
+> Last updated: 2026-09-01
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S8A / REVIEW_PENDING
-> Production baseline: M0-S7D COMPLETE (`4deed20`)
+> Current Gate: M0-S9 / DESIGN_SCOPE_PENDING
+> Production baseline: M0-S8D COMPLETE (`c9314dd`)
 
 ## Approved Decisions
 
@@ -80,6 +80,14 @@
 - M0-S7D Design / Scope 已批准：提供 authenticated fixed Provider preset 查询与 CSRF-protected connection
   verification；Credential 只通过 `X-Model-Provider-Credential` 进入当前内存调用链，path `providerId` 不能覆盖
   route、Model、endpoint 或 Adapter。当前不引入 dynamic Provider / Model selection、Registry 或 UI。
+- M0-S8A–S8B 已完成 provider-neutral JsonObject request transport 与 module-local strict Structured Output
+  validation；validation 通过 Java record binding、enum 与 deterministic semantic rule 形成 safe typed result，
+  但尚未接入 Planner / Evaluator / Content Workflow。
+- M0-S8C–S8D 已完成 Text Generation module-local minimal Trace 与 unknown finish-reason diagnostics：同一 UUID
+  显式跨越 caller / Executor worker / Adapter，terminal Trace 只记录安全 metadata；未知 raw reason 保持
+  portable `UNKNOWN`，并经过 allowlist、redaction 与 per-route rate limit 后输出 WARN。
+- M0-S8 不持久化 Trace，不记录 Credential、Prompt、generated text 或 Provider raw response，不引入 retry、
+  fallback、Application Workflow 或 `ModelCallJob`。
 
 ## Completed Review
 
@@ -126,45 +134,48 @@
 31. M0-S7D DeepSeek-first BYOK Connection Verification：Scope / Architecture / Security boundary / verification PASS；
     Diff Review 无 blocking finding，Backend API Ownership Check 为 UNDERSTOOD；Model Gateway 与 BYOK /
     Provider Configuration 均保持 L2；已由用户提交为 `4deed20`。
+32. M0-S8A JsonObject transport contract：Scope / Architecture / verification / Review / focused Ownership 完成；
+    已提交为 `8d11ddd`。
+33. M0-S8B strict Structured Output validation boundary：parse / shape / enum / semantic validation 与 safe typed
+    result 完成；已提交为 `16635d0`。
+34. M0-S8C safe terminal Model-call Trace：metadata contract、INFO recorder、fail-open 与 Flow sync 完成；
+    已提交为 `3f8838d`。
+35. M0-S8D same-Trace-ID Provider diagnostics：safe allowlist / redaction、concurrent per-route rate limit、Review、
+    Ownership 与 default-model verification reconciliation 完成；已提交为 `c9314dd`。
 
 ## Current Gate
 
 ```text
-Selected phase: M0-S8 — Structured Output and minimal Trace walking skeleton
-Gate: S8A REVIEW_PENDING
-M0 umbrella scope: APPROVED
-S7D Design: APPROVED
-S7D Scope: APPROVED
-S7D Implementation: COMPLETE (`4deed20`)
-Verification: PASS (focused 16/16; Model Gateway 77/77; server 217 total, 0 failures/errors, 33 environment-skipped)
+Selected phase: M0-S9 — Model Call Job foundation
+Gate: DESIGN_SCOPE_PENDING
+M0-S8A: COMPLETE (`8d11ddd`)
+M0-S8B: COMPLETE (`16635d0`)
+M0-S8C: COMPLETE (`3f8838d`)
+M0-S8D: COMPLETE (`c9314dd`)
+Verification: PASS for Model Gateway scope (95/95; default runtime composition 6/6; server compile)
+Wider server regression: NOT_RUN for S8; latest S7D evidence is 217 total, 0 failures/errors, 33 environment-skipped
 Behavior Flow: CURRENT
-Code Review: PASS (no blocking findings)
-Ownership Check: COMPLETE (Backend API flow UNDERSTOOD; Model Gateway and BYOK / Provider Configuration remain L2)
-M0-S7 integrated closeout: PARTIAL / ACCEPTED (`ba923d9`; non-blocking L2 Ownership gap)
-M0-S8 umbrella direction: PROPOSED; later Trace slices require separate Design / Scope approval
-S8A Design: APPROVED
-S8A Scope: APPROVED
-S8A Implementation: COMPLETE (uncommitted)
-S8A Verification: PASS (focused 11/11; Model Gateway 79/79; server compile; git diff check)
-S8A Completion Level: JSON Object transport contract complete / Structured Output validation pending S8B
-Production baseline: M0-S7D COMPLETE (`4deed20`)
-Current target: review the two-file S8A production Diff; do not start S8B
-Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
+Code Review: PASS (S8A-S8D no blocking findings)
+M0-S8 integrated closeout: PARTIAL / ACCEPTED for progression to S9 Design / Scope
+Ownership: Structured Output L2 module-local; Trace / Observability L3 module-local; Model Gateway remains L2
+Completion level: S8 foundations complete; no Application Workflow integration or Trace persistence
+Production baseline: M0-S8D COMPLETE (`c9314dd`)
+Current target: define and approve only the first M0-S9 implementation slice
+Dependency: approved `docs/features/MODEL_CALL_JOB.md` Detailed Design
 ```
 
 ## Next Action
 
-执行 M0-S8A Diff Review，重点检查 PlainText payload 不变、JsonObject 只映射固定 `response_format`、
-以及 S8A 没有误称已完成 response validation。Review 前不开始 S8B、Trace persistence、Browser UI
-或 live Provider verification。
-interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
+基于已批准 `MODEL_CALL_JOB.md` 提出 M0-S9 第一个 implementation slice 的 Design / Scope，明确 schema、
+execution / consumption state boundary、TaskExecutor 与 Gateway Executor 分离、transient Credential lifecycle、
+验证范围和 stop point。等待批准前不修改 schema、Production code 或 API。
 
 ## Blockers
 
-None. M0-S7 的 transient Credential execution goal 已完成；Model Gateway 与 BYOK / Provider Configuration
-Ownership 仍为 L2，integrated closeout 的非阻塞 `PARTIAL` 结论已由用户接受。当前已有 authenticated Backend
-Credential API ingress，但没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent Workflow 或
-live DeepSeek Credential / network verification，因此只能宣称 Backend API ingress complete，不能宣称完整产品
-BYOK End-to-End complete。
+None for M0-S9 Design / Scope. M0-S9 implementation scope、schema、API 与 file boundary 尚未批准。
+Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output 只有 module-local validation，
+Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent
+Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured
+Output / Trace End-to-End complete。
 Hosted model-call 与 password-hash capacity 仍为
 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

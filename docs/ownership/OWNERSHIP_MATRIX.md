@@ -393,14 +393,14 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
-| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7D Ownership 确认 authenticated verification entry、fixed route authority、transient Credential propagation、bounded executor、OpenAI-compatible Provider call 与 safe result boundary 可追踪；已有 Backend API 与 mocked HTTP evidence，但无 Hosted TLS、Browser UI、live Provider 或 BYOK End-to-End evidence |
-| Structured Output                 | A                 | UNASSESSED        | L4        | L5               |          |
+| Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7D–S8D Ownership 确认 authenticated verification、fixed route、transient Credential、bounded executor、OpenAI-compatible call、Structured Output seam、terminal Trace 与 safe diagnostics 可追踪；无 Hosted TLS、Browser UI、live Provider、Application Workflow 或 BYOK End-to-End evidence |
+| Structured Output                 | A                 | L2                | L4        | L5               | M0-S8A/S8B 已能追踪 JsonObject transport、strict parse / record shape / enum / semantic validation 与 Valid / Invalid envelope；尚无 Planner / Evaluator / Content Workflow 集成或真实状态保护操作证据 |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
 | RAG / Retrieval                   | A                 | UNASSESSED        | L4        | L5               |          |
 | Prompt Architecture               | A                 | UNASSESSED        | L3        | L4               |          |
 | Prompt / Rubric / Context Version | A                 | UNASSESSED        | L3        | L4               |          |
-| Trace / Observability             | A                 | UNASSESSED        | L3        | L5               |          |
+| Trace / Observability             | A                 | L3                | L3        | L5               | M0-S8C/S8D 已能解释同一 UUID 的 caller / worker / Adapter propagation、terminal metadata、recorder fail-open、raw finish-reason allowlist / redaction 与 per-route rate limit；尚无 durable Trace、OpenTelemetry 或跨 Workflow correlation 操作证据 |
 | Eval System                       | A                 | UNASSESSED        | L3        | L5               |          |
 | BYOK / Provider Configuration     | A                 | L2                | L3        | L4               | M0-S7A–S7D 已能追踪 provider-scoped Credential 从 authenticated header 进入 fixed route、Executor task 与 Adapter 的 transient flow，并理解 mismatch-before-submit、no persistence、no automatic retry 与 generated-text discard；缺 Browser / TLS / live Provider operation evidence |
 | Agent Loop Guardrails             | A                 | UNASSESSED        | L3        | L5               |          |
@@ -1021,8 +1021,8 @@ L5
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
 | Tool Gateway             | UNASSESSED | I0                  |          |
-| Model Gateway            | L2        | I0                  | 可追踪 authenticated verification API → fixed probe + transient Credential → fixed route → bounded Executor task → OpenAI-compatible HTTP Adapter → safe preset / typed failure；尚无 Hosted TLS、Browser UI、live Provider 或 BYOK End-to-End evidence |
-| Trace                    | UNASSESSED | I0                  |          |
+| Model Gateway            | L2        | I1                  | 可追踪 authenticated verification API → transient Credential → fixed route → bounded Executor → OpenAI-compatible Adapter → safe result / Trace；尚不能以真实 Hosted / live Provider / Workflow operation defend End-to-End behavior |
+| Trace                    | L3        | I2                  | 可解释 module-local terminal Trace、async UUID propagation、fail-open 与安全 diagnostics；尚无 persistence、OpenTelemetry、跨 Workflow correlation 或 production operation evidence |
 | Eval                     | UNASSESSED | I0                  |          |
 | Content Pipeline         | UNASSESSED | I0                  |          |
 | Multi-language Isolation | UNASSESSED | I0                  |          |

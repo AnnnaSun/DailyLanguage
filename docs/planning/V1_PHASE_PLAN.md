@@ -228,8 +228,10 @@ M0-S8 设计 minimal Trace 时，必须显式处理 Provider raw finish reason�
 - 受控 Debug 必须定义环境开关、访问控制与保留期限；
 - 即使开启受控诊断，也不得记录完整 Provider raw response、Prompt、Conversation、Credential 或其他 Secret。
 
-以上只保留 S8 的设计约束；具体 allowlist、长度、rate limit、digest、日志级别与 Debug 开关留到 S8
-Scope / Architecture Decision，不在 S6C 实现。
+S8D 已实现当前 V1 module-local policy：safe token 使用 `[A-Za-z0-9._-]{1,64}`，非法或超长值只记录
+UTF-16 length 与 SHA-256 digest；每个 Provider / Model route 一分钟最多一条 WARN，使用代码版本
+`openai-compatible-text-v1` 与同一 Model-call Trace ID。限流为 process-local 且 restart 后重置；diagnostics
+fail-open。受控 Debug 开关没有进入 S8，未来引入仍需单独 Security Decision。
 
 #### M0-S9 Approved Model Call Job Decision
 
@@ -1012,10 +1014,17 @@ M0-S7D Review: COMPLETE (PASS；no blocking findings)
 M0-S7D Ownership Check: COMPLETE (Backend API flow UNDERSTOOD；Model Gateway and BYOK / Provider Configuration remain L2)
 M0-S7D: COMPLETE (`4deed20`)
 M0-S7 Integrated Closeout: PARTIAL / ACCEPTED (`ba923d9`; non-blocking L2 Ownership gap)
-M0-S8 Umbrella Direction: PROPOSED (later Trace slices require separate approval)
-M0-S8A Design / Scope: APPROVED
-M0-S8A Implementation: COMPLETE / REVIEW_PENDING
-M0-S8A Verification: PASS (focused 11/11；Model Gateway 79/79；server compile)
+M0-S8A JsonObject Transport: COMPLETE (`8d11ddd`)
+M0-S8B Structured Output Validation: COMPLETE (`16635d0`；module-local contract)
+M0-S8C Minimal Model-call Trace: COMPLETE (`3f8838d`；safe logging metadata, no persistence)
+M0-S8D Unknown Finish-reason Diagnostics: COMPLETE (`c9314dd`)
+M0-S8 Verification: PASS (Model Gateway 95/95；default runtime composition 6/6；server compile)
+M0-S8 Wider Server Regression: NOT_RUN (latest S7D evidence: 217 total / 0 failures / 0 errors /
+33 environment-skipped)
+M0-S8 Review: COMPLETE (S8A-S8D no blocking findings；Behavior Flow CURRENT)
+M0-S8 Ownership: PARTIAL (Structured Output L2 module-local；Trace / Observability L3 module-local；
+Model Gateway remains L2)
+M0-S8 Integrated Closeout: PARTIAL / ACCEPTED for progression to M0-S9 Design / Scope
 M0-S9 Detailed Design: APPROVED
 M0-S9 Implementation Scope: NOT_APPROVED
 ```

@@ -2,11 +2,12 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)；S7B COMPLETE (`7f5f59f`)；S7C COMPLETE (`59c3e24`)
-> Phase: M0-S6 / M0-S7
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A–S7D COMPLETE；S8A–S8D COMPLETE (`8d11ddd` / `16635d0` / `3f8838d` / `c9314dd`)
+> Phase: M0-S6 / M0-S7 / M0-S8
 
-本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
-Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
+本文固化 M0-S6–S8 的 Model Gateway、Structured Output 与 minimal Trace 责任边界。它定义后续 Text、
+Vision、Speech、Image 与 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的
+Operation 或 Application Workflow。
 
 ## 1. Core responsibility
 
@@ -364,14 +365,51 @@ D55 Gateway 不为 JsonObject 自动修改 Prompt，不自动 repair / retry / f
     message 中明确要求 JSON，并在 S8B 完成前不得把 response text 当作 validated artifact。
 ```
 
-## 16. Explicit S6–S8A non-goals
+## 16. M0-S8B approved Structured Output validation decisions
+
+```text
+D56 StructuredOutputValidator 只接受 JSON object，并严格绑定到调用方声明的 Java record；malformed JSON、
+    non-object、unknown / missing field、duplicate key、trailing token 与 binding failure 均不能产生 typed value。
+D57 StructuredOutputValidation 使用互斥 Valid / Invalid envelope；Invalid 只携带 MALFORMED_JSON、
+    SHAPE_INVALID、ENUM_INVALID 或 SEMANTIC_INVALID，不携带 generated text、Jackson exception 或 cause。
+D58 enum token 由 Java enum contract 裁决；typed binding 后由调用方提供的 deterministic Predicate 执行
+    semantic validation。Predicate 返回 false 为 SEMANTIC_INVALID；Predicate 自身异常仍是 programming failure。
+D59 S8B 是可复用的 module-local validation boundary，不自动修改 Prompt、不 repair / retry，也不持久化结果；
+    Planner / Evaluator / Content 等 owning Workflow 进入对应 Phase 后负责调用与消费。
+```
+
+## 17. M0-S8C approved minimal Trace decisions
+
+```text
+D60 RoutedTextGenerationPort 对每个 non-null Text Generation call 创建一个 UUID Trace ID，并在 terminal result
+    或 unexpected internal failure 路径形成一个 ModelCallTrace；pre-route failure 可以没有 route identity。
+D61 Trace 只保存 purpose、optional Provider / Model、gateway latency、status、typed failure、normalized finish
+    reason 与 portable usage；不保存 request、generated text、Credential、raw response 或 exception detail。
+D62 默认 LoggingModelCallTraceRecorder 以 INFO 输出安全 metadata。Recorder RuntimeException 被隔离，不能替换
+    原 ModelResult 或原 programming failure；S8C 不实现 Trace persistence、OpenTelemetry 或 metric storage。
+```
+
+## 18. M0-S8D approved unknown finish-reason diagnostic decisions
+
+```text
+D63 S8C 创建的同一 UUID 通过显式 method parameter 与 Executor lambda 传入 Adapter / mapper；不使用
+    ThreadLocal、MDC、AOP 或通用 execution-context wrapper。
+D64 stop、length 与 content_filter 映射为 portable known finish reason 且不记录 raw value。missing 或其他值
+    保持 portable UNKNOWN；missing 只记录分类，safe token `[A-Za-z0-9._-]{1,64}` 可以原样记录，其他值只记录
+    UTF-16 length 与 SHA-256 digest。
+D65 diagnostics 使用代码版本 `openai-compatible-text-v1`，按 selected Provider / Model route 进行 process-local、
+    concurrency-safe 的一分钟 WARN 限流；restart 后重置。diagnostics RuntimeException fail-open，不改变 response。
+D66 S8D 不把 raw finish reason 写入 response、terminal Trace、metric 或 persistence，也不引入受控 Debug、
+    retry / fallback、Job correlation 或新的 Production dependency。
+```
+
+## 19. Explicit S6–S8 non-goals
 
 - Browser local/session Credential storage、rotation 或 UI；
 - live DeepSeek network verification；
 - 第二个 Provider configuration 或 native Provider protocol；
-- Structured Output parse / shape / enum / semantic validation；
+- Planner、Evaluator、Conversation 或 Content Workflow，包括 Structured Output 的 End-to-End consumption；
 - Trace persistence；
-- Planner、Evaluator、Conversation 或 Content Workflow；
 - Speech、Vision、Image、Embedding Port implementation；
 - automatic retry、fallback、health router 或 circuit breaker；
 - Model Call Job persistence、interactive wait、late-result recovery 或用户 confirmation；
