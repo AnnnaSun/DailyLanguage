@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
@@ -45,12 +46,13 @@ public final class OpenAiCompatibleTextGenerationAdapter implements TextGenerati
 
     @Override
     public ModelResult<TextGenerationResponse> generateText(
+            UUID traceId,
             ProviderId providerId,
             ModelId modelId,
             TextGenerationRequest request,
             TransientProviderCredential credential,
             Duration executionTimeout) throws ModelProviderCallException {
-        validateCall(providerId, modelId, request, credential, executionTimeout);
+        validateCall(traceId, providerId, modelId, request, credential, executionTimeout);
         String requestBody = payloadMapper.writeRequest(modelId, request);
         HttpRequest providerRequest = buildProviderRequest(credential, executionTimeout, requestBody);
         HttpResponse<String> providerResponse = send(providerRequest);
@@ -63,16 +65,22 @@ public final class OpenAiCompatibleTextGenerationAdapter implements TextGenerati
         if (responseBody == null) {
             throw new ModelProviderCallException(ModelFailureKind.PROVIDER_FAILURE);
         }
-        TextGenerationResponse response = payloadMapper.readResponse(providerId, modelId, responseBody);
+        TextGenerationResponse response = payloadMapper.readResponse(
+                traceId,
+                providerId,
+                modelId,
+                responseBody);
         return ModelResult.success(response);
     }
 
     private void validateCall(
+            UUID traceId,
             ProviderId providerId,
             ModelId modelId,
             TextGenerationRequest request,
             TransientProviderCredential credential,
             Duration executionTimeout) {
+        Objects.requireNonNull(traceId, "traceId must not be null");
         Objects.requireNonNull(providerId, "providerId must not be null");
         Objects.requireNonNull(modelId, "modelId must not be null");
         Objects.requireNonNull(request, "request must not be null");

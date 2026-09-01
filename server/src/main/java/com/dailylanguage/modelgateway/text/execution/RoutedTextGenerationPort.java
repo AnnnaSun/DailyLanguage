@@ -56,7 +56,7 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
         UUID traceId = UUID.randomUUID();
         long startedAtNanos = System.nanoTime();
         try {
-            ModelResult<TextGenerationResponse> result = executeRoutedCall(request, credential);
+            ModelResult<TextGenerationResponse> result = executeRoutedCall(traceId, request, credential);
             recordTrace(ModelCallTrace.fromResult(
                     traceId,
                     request.purpose(),
@@ -74,6 +74,7 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
     }
 
     private ModelResult<TextGenerationResponse> executeRoutedCall(
+            UUID traceId,
             TextGenerationRequest request,
             TransientProviderCredential credential) {
         var route = routes.findRoute(request.purpose());
@@ -89,7 +90,7 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
                     selectedRoute.modelId()));
         }
 
-        var result = executeAdapter(selectedRoute, request, credential);
+        var result = executeAdapter(traceId, selectedRoute, request, credential);
         validateResultRoute(selectedRoute, result);
         return result;
     }
@@ -112,12 +113,14 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
     }
 
     private ModelResult<TextGenerationResponse> executeAdapter(
+            UUID traceId,
             TextGenerationRoute selectedRoute,
             TextGenerationRequest request,
             TransientProviderCredential credential) {
         Future<ModelResult<TextGenerationResponse>> future;
         try {
             future = modelCallExecutor.submit(() -> selectedRoute.adapter().generateText(
+                    traceId,
                     selectedRoute.providerId(),
                     selectedRoute.modelId(),
                     request,

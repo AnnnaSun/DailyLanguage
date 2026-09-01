@@ -1,7 +1,7 @@
 # Text Generation Credential Propagation Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M0-S7A / M0-S8C`
+- Feature / Slice: `M0-S7A / M0-S8C / M0-S8D`
 - Last Verified: `2026-09-01`
 - Entry: `TextGenerationPort.generateText(request, credential)`
 
@@ -12,8 +12,9 @@ Provider-scoped Credential 与 provider-neutral `TextGenerationRequest` 分开�
 验证 Provider identity，并通过 model-call `ExecutorService` 显式传给 operation-specific Adapter。
 
 Gateway 的最终 `ModelResult<TextGenerationResponse>` 会在返回调用方前形成一次安全的 terminal
-`ModelCallTrace`，默认写入 INFO log。当前 Flow 不包含 Browser / HTTPS Credential ingress、Application Workflow、
-Trace persistence、跨线程 Trace-ID propagation 或 `ModelCallJob`，因此不是 BYOK End-to-End behavior。
+`ModelCallTrace`，默认写入 INFO log。S8D 将同一个 Trace ID 显式传入 Executor task 与 Adapter，用于关联安全的
+Provider diagnostics。当前 Flow 不包含 Browser / HTTPS Credential ingress、Application Workflow、Trace persistence
+或 `ModelCallJob`，因此不是 BYOK End-to-End behavior。
 
 ## 2. Main Call Chain
 
@@ -39,7 +40,7 @@ sequenceDiagram
             Port-->>Caller: Failure(CREDENTIAL_UNAVAILABLE, selected route identity)
         else Credential 匹配
             Port->>Executor: submit task capturing credential
-            Executor->>Adapter: generateText(providerId, modelId, request, credential, timeout)
+            Executor->>Adapter: generateText(traceId, providerId, modelId, request, credential, timeout)
             Adapter-->>Executor: ModelResult or typed Provider failure
             Executor-->>Port: Future result / timeout / execution failure
             Port->>Port: translate failure and validate route identity
@@ -57,6 +58,8 @@ sequenceDiagram
 - Adapter 是唯一允许读取 `credential.secret()` 的边界，且只应用于构造当前外部请求。
 - `ModelCallTrace` 只保存 purpose、可用的 route identity、latency、status、typed failure、normalized finish
   reason 与 portable usage；默认 recorder 只把这些 metadata 写入 INFO log。
+- Trace ID 通过 lambda parameter 显式跨越 caller / worker boundary；不使用 ThreadLocal、MDC 或 AOP，也不携带
+  Credential、Prompt 或 generated text。
 - 当前行为不读取或修改 PostgreSQL、Redis、Session、Language Profile 或任何 Learning State。
 
 timeout 后的 `future.cancel(true)` 仍是 best effort。它不证明 worker 已停止，也不保证 Credential 立即从
@@ -86,7 +89,9 @@ JVM heap 消失；Gateway 不把 Credential 写入 durable state、Trace、Log�
 - `RoutedTextGenerationPortTests.hidesAnUnclassifiedRuntimeExceptionMessageAndCause`
 - `ModelCallTraceRuntimeTests`: success、pre-route failure、internal failure 与 recorder fail-open；
 - `LoggingModelCallTraceRecorderTests`: INFO metadata 与 Credential / Prompt / generated text non-disclosure；
-- S8C focused tests: `24/24 PASS`；Model Gateway regression: `91/91 PASS`；server compile: PASS；
+- `ModelCallTraceRuntimeTests.recordsSafeSuccessMetadataWithoutChangingTheModelResult`: worker 与 terminal Trace 使用
+  同一个 UUID；
+- S8D targeted tests: `44/44 PASS`；Model Gateway regression: `95/95 PASS`；server compile: PASS；
 - latest wider server regression remains S7D evidence: `217 total / 0 failures / 0 errors / 33 environment-skipped`。
 
 ## 7. Source References

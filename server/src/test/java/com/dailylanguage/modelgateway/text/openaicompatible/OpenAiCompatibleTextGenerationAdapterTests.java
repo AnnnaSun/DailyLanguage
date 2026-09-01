@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
@@ -45,6 +46,7 @@ class OpenAiCompatibleTextGenerationAdapterTests {
     private static final ModelId MODEL_ID = new ModelId("deepseek-model");
     private static final URI ENDPOINT = URI.create("https://api.deepseek.com/chat/completions");
     private static final Duration EXECUTION_TIMEOUT = Duration.ofSeconds(20);
+    private static final UUID TRACE_ID = UUID.fromString("6e699faf-f09b-46cf-9657-1b302296c71c");
     private static final String SECRET = "deepseek-test-secret";
     private static final TransientProviderCredential CREDENTIAL =
             new TransientProviderCredential(DEEPSEEK_PROVIDER_ID, SECRET);
@@ -69,7 +71,7 @@ class OpenAiCompatibleTextGenerationAdapterTests {
                 """, Map.of());
 
         ModelResult<TextGenerationResponse> result = adapter(httpClient).generateText(
-                DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT);
+                TRACE_ID, DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT);
 
         assertThat(result).isEqualTo(ModelResult.success(new TextGenerationResponse(
                 DEEPSEEK_PROVIDER_ID,
@@ -164,7 +166,12 @@ class OpenAiCompatibleTextGenerationAdapterTests {
         ModelProviderCallException failure = catchThrowableOfType(
                 ModelProviderCallException.class,
                 () -> adapter(httpClient).generateText(
-                        DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, unsafeCredential, EXECUTION_TIMEOUT));
+                        TRACE_ID,
+                        DEEPSEEK_PROVIDER_ID,
+                        MODEL_ID,
+                        REQUEST,
+                        unsafeCredential,
+                        EXECUTION_TIMEOUT));
 
         assertThat(failure.kind()).isEqualTo(ModelFailureKind.AUTHENTICATION_FAILED);
         assertThat(failure.getMessage()).isNull();
@@ -191,6 +198,7 @@ class OpenAiCompatibleTextGenerationAdapterTests {
 
         assertThatIllegalStateException()
                 .isThrownBy(() -> adapter.generateText(
+                        TRACE_ID,
                         new ProviderId("openai"),
                         MODEL_ID,
                         REQUEST,
@@ -199,6 +207,7 @@ class OpenAiCompatibleTextGenerationAdapterTests {
                 .withMessage("adapter provider does not match configured provider");
         assertThatIllegalStateException()
                 .isThrownBy(() -> adapter.generateText(
+                        TRACE_ID,
                         DEEPSEEK_PROVIDER_ID,
                         MODEL_ID,
                         REQUEST,
@@ -224,7 +233,7 @@ class OpenAiCompatibleTextGenerationAdapterTests {
 
         assertThatIllegalStateException()
                 .isThrownBy(() -> adapter(httpClient).generateText(
-                        DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT))
+                        TRACE_ID, DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT))
                 .withMessage("provider HTTP call was interrupted")
                 .withNoCause();
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
@@ -307,6 +316,6 @@ class OpenAiCompatibleTextGenerationAdapterTests {
         return catchThrowableOfType(
                 ModelProviderCallException.class,
                 () -> adapter(httpClient).generateText(
-                        DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT));
+                        TRACE_ID, DEEPSEEK_PROVIDER_ID, MODEL_ID, REQUEST, CREDENTIAL, EXECUTION_TIMEOUT));
     }
 }

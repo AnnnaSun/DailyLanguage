@@ -5,129 +5,174 @@
 
 ## Handoff Metadata
 
-- Updated At: `2026-09-01 13:51 CST` (`Asia/Shanghai`)
+- Updated At: `2026-09-01 16:28 CST` (`Asia/Shanghai`)
 - Updated By: `Codex`
 - Handoff State: `READY_TO_COMMIT`
-- Handoff Reason: `M0-S8C Code Review, Behavior Flow sync and focused Ownership Check complete`
-- Intended Receiver: `User or the next Agent selected by the user`
+- Handoff Reason: `S8D Code Review, verification, Behavior Flow sync and focused Ownership Check are complete`
+- Intended Receiver: `User making the S8D Commit Decision`
 
 ## Repository Snapshot
 
 - Branch: `codex/M0S8-structure-output`
-- HEAD: `16635d0` (`StructuredOutput验证`)
-- Worktree Summary: `DIRTY; uncommitted M0-S8C code/tests, this handoff update, and one pre-existing user configuration change`
-- Current Product Gate: `M0-S8C / READY_TO_COMMIT`
-- Production Baseline: `M0-S8B committed at 16635d0`
-- Slice Gate: `Code Review PASS; Behavior Flow CURRENT; Ownership UNDERSTOOD`
-- Stop Point: `Wait for the user's Commit Decision; do not start S8D or commit automatically`
+- HEAD: `3f8838d` (`将调用信息记录至 log 日志`)
+- Worktree Summary: `DIRTY with the uncommitted M0-S8D implementation, tests, Behavior Flow sync and this handoff`
+- Current Product Gate: `M0-S8D / READY_TO_COMMIT`
+- Production Baseline: `M0-S8C committed at 3f8838d`
+- Stop Point: `Wait for the user's Commit Decision; do not commit automatically or start another slice`
 
 ## Approved Scope
 
-- Create one safe `ModelCallTrace` for each non-null `TextGenerationPort.generateText(...)` call.
-- Record purpose, optional selected Provider / Model identity, Gateway latency, result status, typed failure kind,
-  normalized finish reason and optional portable token usage.
-- Add a narrow `ModelCallTraceRecorder` observability boundary and a default INFO-level logging implementation.
-- Record terminal `ModelResult` and unexpected internal failure without changing the original result or exception contract.
-- Keep observability fail-open: a recorder runtime failure must not replace the Model call result.
+Goal:
+
+- Preserve the provider-neutral `UNKNOWN` finish reason while making missing or unfamiliar Provider raw finish reasons safely
+  diagnosable and correlatable with the terminal S8C Trace.
+
+Implemented flow:
+
+```text
+RoutedTextGenerationPort creates UUID traceId
+→ Executor task explicitly passes traceId to TextGenerationProviderAdapter
+→ OpenAiCompatibleTextGenerationAdapter passes traceId to payload mapper
+→ mapper normalizes known finish reason without warning
+→ missing / unknown finish reason remains portable UNKNOWN
+→ OpenAiCompatibleFinishReasonDiagnostics emits at most one safe WARN per Provider / Model per minute
+→ terminal ModelCallTrace uses the same traceId
+```
+
+Diagnostic policy:
+
+- Known `stop`, `length` and `content_filter`: no raw diagnostic log.
+- Missing raw value: `classification=MISSING`; no raw value.
+- Unknown value matching `[A-Za-z0-9._-]{1,64}`: `classification=SAFE_TOKEN` and the safe token.
+- Invalid, control-character or overlength value: `classification=INVALID`, UTF-16 raw length and SHA-256 digest only.
+- WARN includes safe route identity, Trace ID and code-owned Adapter version `openai-compatible-text-v1`.
+- Fixed process-local limit: one warning per selected Provider / Model per minute, concurrency-safe.
+- Diagnostic computation and logging are fail-open and cannot replace the normalized `UNKNOWN` response.
 
 Explicit non-scope:
 
-- PostgreSQL / Redis Trace persistence, OpenTelemetry or HTTP access logging.
-- Request messages, generated text, Credential, Authorization header, Provider raw response or exception details in Trace / Log.
-- Provider raw finish-reason diagnostics, rate-limited warning policy or Adapter version; these remain S8D.
-- Propagating this Trace ID into the Executor worker / Adapter / outbound Provider request.
-- Retry, fallback, ModelCallJob, Application Workflow or Learning State mutation.
+- Trace persistence, metrics, OpenTelemetry, MDC, ThreadLocal, AOP or a general execution-context wrapper;
+- raw-response Debug switch, configurable or distributed rate limiter;
+- retry / fallback, Structured Output Workflow integration, `ModelCallJob` or Learning State mutation;
+- public HTTP API, database schema, dependencies or model-call executor policy changes.
 
 ## Completed Work
 
-- Added typed `ModelCallTrace` invariants and success / model-failure / internal-failure construction.
-- Added `ModelCallTraceRecorder` and `LoggingModelCallTraceRecorder` with safe INFO metadata.
-- Wrapped `RoutedTextGenerationPort` result and exception paths with one terminal Trace record.
-- Preserved fail-open behavior when the recorder throws a runtime exception.
-- Wired the default recorder through `TextGenerationGatewayConfiguration`.
-- Added runtime, safe-log, fail-open and Spring composition tests; updated direct port test construction.
-- Completed read-only S8C Diff Review with no blocking code findings.
-- Updated and source-checked the two affected Behavior Flow documents against the implemented terminal Trace boundary.
+Production files:
+
+- `RoutedTextGenerationPort.java`: passes its existing UUID through the routed call and Executor lambda.
+- `TextGenerationProviderAdapter.java`: internal SPI now receives the UUID explicitly.
+- `OpenAiCompatibleTextGenerationAdapter.java`: validates and forwards the UUID to response mapping.
+- `OpenAiCompatibleTextPayloadMapper.java`: reports only missing or unknown raw finish reasons and still returns `UNKNOWN`.
+- `OpenAiCompatibleFinishReasonDiagnostics.java`: applies classification, redaction, SHA-256 correlation, per-route concurrent
+  rate limiting and fail-open logging.
+
+Tests:
+
+- Updated direct Adapter lambdas and calls for the internal SPI signature.
+- Added worker-to-terminal Trace UUID equality evidence in `ModelCallTraceRuntimeTests`.
+- Added four focused diagnostics tests covering known-value silence, missing/safe/invalid classification, raw non-disclosure,
+  fail-open, per-route time-window behavior and concurrent suppression.
+
+Documentation:
+
+- Updated `docs/flow/README.md` index.
+- Updated `text-generation-credential-propagation.md` with explicit cross-thread Trace-ID propagation.
+- Updated `text-generation-openai-compatible-provider.md` with the implemented diagnostics boundary and evidence.
 
 ## Review Result
 
-- Scope: `MATCH`; the pre-existing `model-gateway.yml` edit is excluded from S8C.
-- Code Review: `PASS`; no blocking findings found.
-- Architecture: `PASS`; provider-neutral Gateway boundary remains intact and no persistence/dependency/schema change exists.
-- Extensibility Fit: `RIGHT_SIZED`; the recorder interface is the concrete observability/test boundary, not a Provider abstraction.
-- Cross-cutting Mechanism: `EXPLICIT COMPONENT`; no AOP, interceptor or hidden context propagation was introduced.
-- Security: `PASS`; Trace payload contains typed metadata only and tests reject Credential, Prompt and generated text leakage.
-- Reliability: `PASS`; recorder runtime failure is isolated from the original `ModelResult` / exception contract.
-- Behavior Flow: `CURRENT`; Credential propagation and connection verification now show the terminal safe Trace / INFO log,
-  fail-open behavior, non-persistence boundary and Gateway-before rejection boundary.
-- Ownership Check: `UNDERSTOOD`; the user traced route selection, Provider identity validation, Executor submission and
-  terminal recording, identified allowed Trace metadata and prohibited sensitive data, and confirmed the fail-open ordering:
-  `executeRoutedCall` creates the original result before recorder failure is caught, so the caller still receives that result.
+- Scope: `MATCH`; S8D changed the five approved Production files plus direct tests and Flow documentation.
+- Production Code Review: `PASS`; no blocking correctness, security, concurrency or Architecture finding in S8D logic.
+- Architecture: `PASS`; explicit UUID propagation and one concrete protocol diagnostics component match the approved design.
+- Extensibility Fit: `RIGHT_SIZED`; no general diagnostics framework or hidden async context was introduced.
+- Cross-cutting Mechanism: `EXPLICIT COMPONENT`; no AOP, ThreadLocal or MDC.
+- Review Finding: `RESOLVED`; two default-route assertions and the existing Flow runtime-composition line now use the
+  committed `deepseek-v4-flash` default.
+- Code Review: `PASS`; no blocking findings remain.
+- Behavior Flow: `CURRENT` after the authorized correction.
+- Verification: `PASS`; current defaults are covered without model-id environment overrides.
+- Ownership Check: `UNDERSTOOD`; the user traced UUID creation through routed execution into the Adapter and terminal Trace,
+  distinguished known / safe unknown / invalid finish-reason handling, and explained the per-route one-minute limiter.
+  The final clarification established that a suppressed same-route event returns before classification/logging, while an
+  event after the window is classified and logged normally.
 
 ## Verification Evidence
 
-Fresh S8C evidence:
+Fresh S8D evidence:
 
-- Focused Trace / routing / configuration tests: `24/24 PASS`.
-- Model Gateway regression: `91/91 PASS`.
-- Server production compile: `PASS`.
-- `git diff --check`: `PASS` after the S8C Flow sync and required handoff update.
+- Targeted S8D tests: `44/44 PASS`, `0 failures`, `0 errors`, `0 skipped`.
+- Model Gateway regression: `95/95 PASS`, `0 failures`, `0 errors`, `0 skipped`, without model-id environment overrides.
+- Server compile: `mvn -q -DskipTests compile` PASS after the final Production changes.
+- `git diff --check`: PASS after the final handoff update.
 
-Prior evidence:
+Fresh review evidence:
 
-- Latest wider server regression remains the M0-S7D evidence: `217 total / 0 failures / 0 errors / 33 environment-skipped`.
+- Initial `TextGenerationGatewayConfigurationTests` run exposed the stale `deepseek-chat` expectation: `6 run / 1 failure`.
+- After the authorized correction, `TextGenerationGatewayConfigurationTests`: `6/6 PASS` without model-id overrides.
+- After the correction, Model Gateway regression: `95/95 PASS` without model-id overrides.
 
-Not run / not claimed:
+Not run:
 
-- Full server regression was not rerun for S8C.
-- No live DeepSeek network call or real Credential verification.
-- No Browser UI, Hosted TLS/channel enforcement, Trace persistence or multi-component Trace-ID propagation verification.
-- Tests used explicit environment overrides to isolate the pre-existing user model-ID configuration change; they do not
-  establish live availability of `deepseek-v4-flash`.
+- Full server test suite was not rerun because this slice is isolated to Model Gateway behavior and the approved
+  verification plan selected targeted plus Model Gateway regression.
+
+Prior wider evidence, not fresh for S8D:
+
+- S7D wider server regression: `217 total / 0 failures / 0 errors / 33 environment-skipped`.
 
 ## Uncommitted Changes
 
-M0-S8C production changes:
+Current S8D Production changes:
 
-- `server/src/main/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayConfiguration.java`
 - `server/src/main/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPort.java`
-- `server/src/main/java/com/dailylanguage/modelgateway/trace/ModelCallTrace.java`
-- `server/src/main/java/com/dailylanguage/modelgateway/trace/ModelCallTraceRecorder.java`
-- `server/src/main/java/com/dailylanguage/modelgateway/trace/LoggingModelCallTraceRecorder.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/execution/TextGenerationProviderAdapter.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextGenerationAdapter.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextPayloadMapper.java`
+- `server/src/main/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleFinishReasonDiagnostics.java` (new)
 
-M0-S8C test changes:
+Current S8D test changes:
 
-- `server/src/test/java/com/dailylanguage/modelgateway/infrastructure/TextGenerationGatewayConfigurationTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/application/ProviderConnectionVerificationServiceTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/execution/FixedTextGenerationRoutesTests.java`
 - `server/src/test/java/com/dailylanguage/modelgateway/text/execution/RoutedTextGenerationPortTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/execution/TextGenerationRouteTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextGenerationAdapterTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleTextPayloadMapperTests.java`
+- `server/src/test/java/com/dailylanguage/modelgateway/text/openaicompatible/OpenAiCompatibleFinishReasonDiagnosticsTests.java` (new)
 - `server/src/test/java/com/dailylanguage/modelgateway/trace/ModelCallTraceRuntimeTests.java`
-- `server/src/test/java/com/dailylanguage/modelgateway/trace/LoggingModelCallTraceRecorderTests.java`
 
-Required handoff maintenance:
-
-- `docs/planning/CURRENT_HANDOFF.md`
-
-M0-S8C Behavior Flow synchronization:
+Current S8D documentation / handoff changes:
 
 - `docs/flow/README.md`
 - `docs/flow/text-generation-credential-propagation.md`
-- `docs/flow/model-provider-connection-verification.md`
+- `docs/flow/text-generation-openai-compatible-provider.md`
+- `docs/planning/CURRENT_HANDOFF.md`
 
-Pre-existing user change, not part of S8C and not modified by Codex:
-
-- `server/src/main/resources/model-gateway.yml`: default route Model IDs changed from `deepseek-chat` to
-  `deepseek-v4-flash`.
+Before S8D implementation, only the approved Design / Scope update in `CURRENT_HANDOFF.md` was uncommitted. No other
+pre-existing user-owned work was present.
 
 ## Decisions, Risks and UNKNOWN
 
-- The default INFO entry is a terminal Model-call summary, not an HTTP access log or a full distributed call-chain log.
-- Calls rejected before `RoutedTextGenerationPort` do not produce this Model-call Trace.
-- Unexpected internal failures currently record `INTERNAL_FAILURE` without Provider / Model identity; typed routed
-  `ModelFailure` results retain their route identity.
-- UNKNOWN: live DeepSeek support for the user's configured `deepseek-v4-flash` model ID.
-- UNKNOWN: Hosted TLS/channel enforcement and Browser-local Credential behavior.
-- Commit Decision remains with the user; no commit was created.
+- The internal Adapter SPI signature change and explicit UUID propagation match the approved Architecture / Scope.
+- No raw finish reason enters the portable response, terminal Trace, metrics or persistence.
+- SHA-256 digest supports correlation but does not make low-entropy raw values secret; therefore only invalid values use
+  the digest while allowlisted protocol-like tokens may be logged directly.
+- The rate limiter is process-local and resets on restart; this is intentional for the approved S8D boundary.
+- The fixed one-minute window is not based on production measurement.
+- UNKNOWN: live DeepSeek finish-reason variants and actual warning frequency.
+- The committed `deepseek-v4-flash` defaults, configuration assertions and Behavior Flow now agree.
+- Commit Decision remains with the user; no automatic commit is authorized.
+
+## Human Review Focus
+
+1. `RoutedTextGenerationPort`: one UUID is created before routing and explicitly captured by the Executor task, while the
+   same value forms the terminal Trace.
+2. `OpenAiCompatibleTextPayloadMapper`: known values stay quiet; missing and unknown values alone enter diagnostics and
+   still normalize to `UNKNOWN`.
+3. `OpenAiCompatibleFinishReasonDiagnostics`: safe-token allowlist, invalid raw non-disclosure, per-route one-minute
+   concurrency behavior and fail-open boundary.
 
 ## Next Action
 
-User decides whether and how to commit the S8C code, tests, Behavior Flow and handoff update. Keep the pre-existing
-`server/src/main/resources/model-gateway.yml` change separate unless the user explicitly includes it. Do not start S8D.
+Wait for the user's S8D Commit Decision. Do not commit automatically or begin another slice / M0-S9.

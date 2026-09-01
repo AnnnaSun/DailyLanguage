@@ -65,7 +65,7 @@ class RoutedTextGenerationPortTests {
         var receivedTimeout = new AtomicReference<Duration>();
         AtomicReference<Thread> adapterThread = new AtomicReference<>();
         Thread callerThread = Thread.currentThread();
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             calls.incrementAndGet();
             receivedProviderId.set(providerId);
             receivedModelId.set(modelId);
@@ -103,7 +103,7 @@ class RoutedTextGenerationPortTests {
     @Test
     void returnsCredentialUnavailableWithoutSubmittingAMismatchedCredential() {
         AtomicInteger calls = new AtomicInteger();
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             calls.incrementAndGet();
             return successfulResponse(providerId, modelId);
         };
@@ -124,7 +124,8 @@ class RoutedTextGenerationPortTests {
 
     @Test
     void propagatesARouteAwareAdapterFailure() {
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> ModelResult.failure(
+        TextGenerationProviderAdapter adapter =
+                (traceId, providerId, modelId, request, credential, timeout) -> ModelResult.failure(
                 ModelFailure.forRoute(
                         ModelFailureKind.TEMPORARY_UNAVAILABLE,
                         providerId,
@@ -141,7 +142,7 @@ class RoutedTextGenerationPortTests {
     @Test
     void translatesTypedProviderFailureWithSelectedRouteAndRetryAfter() {
         var retryAfter = Duration.ofSeconds(12);
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             throw new ModelProviderCallException(ModelFailureKind.RATE_LIMITED, retryAfter);
         };
 
@@ -155,7 +156,7 @@ class RoutedTextGenerationPortTests {
 
     @Test
     void translatesOnlyExplicitProviderFailureClassification() {
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             throw new ModelProviderCallException(ModelFailureKind.PROVIDER_FAILURE);
         };
 
@@ -171,7 +172,7 @@ class RoutedTextGenerationPortTests {
         var calls = new AtomicInteger();
         var release = new CountDownLatch(1);
         var interrupted = new CountDownLatch(1);
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             calls.incrementAndGet();
             try {
                 release.await();
@@ -195,16 +196,19 @@ class RoutedTextGenerationPortTests {
 
     @Test
     void rejectsAdapterResultsForADifferentOrMissingRoute() {
-        TextGenerationProviderAdapter mismatchedSuccess = (providerId, modelId, request, credential, timeout) ->
+        TextGenerationProviderAdapter mismatchedSuccess =
+                (traceId, providerId, modelId, request, credential, timeout) ->
                 ModelResult.success(new TextGenerationResponse(
                         new ProviderId("different-provider"),
                         modelId,
                         "text",
                         TextGenerationResponse.FinishReason.COMPLETED,
                         Optional.empty()));
-        TextGenerationProviderAdapter missingFailureRoute = (providerId, modelId, request, credential, timeout) ->
+        TextGenerationProviderAdapter missingFailureRoute =
+                (traceId, providerId, modelId, request, credential, timeout) ->
                 ModelResult.failure(ModelFailure.withoutRoute(ModelFailureKind.PROVIDER_FAILURE));
-        TextGenerationProviderAdapter mismatchedFailureRoute = (providerId, modelId, request, credential, timeout) ->
+        TextGenerationProviderAdapter mismatchedFailureRoute =
+                (traceId, providerId, modelId, request, credential, timeout) ->
                 ModelResult.failure(ModelFailure.forRoute(
                         ModelFailureKind.PROVIDER_FAILURE,
                         new ProviderId("different-provider"),
@@ -223,7 +227,8 @@ class RoutedTextGenerationPortTests {
 
     @Test
     void rejectsNullAdapterResultAsAProgrammingError() {
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> null;
+        TextGenerationProviderAdapter adapter =
+                (traceId, providerId, modelId, request, credential, timeout) -> null;
 
         assertThatNullPointerException()
                 .isThrownBy(() -> routedPort(adapter).generateText(REQUEST, CREDENTIAL))
@@ -232,7 +237,7 @@ class RoutedTextGenerationPortTests {
 
     @Test
     void hidesAnUnclassifiedRuntimeExceptionMessageAndCause() {
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             throw new IllegalArgumentException(credential.secret());
         };
 
@@ -248,7 +253,7 @@ class RoutedTextGenerationPortTests {
     @Test
     void restoresCallerInterruptAndFailsFast() {
         var release = new CountDownLatch(1);
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             try {
                 release.await();
                 return successfulResponse(providerId, modelId);
@@ -271,7 +276,8 @@ class RoutedTextGenerationPortTests {
     void failsFastWhenTheExecutorRejectsTheProviderTask() {
         var rejectingExecutor = Executors.newSingleThreadExecutor();
         rejectingExecutor.shutdown();
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) ->
+        TextGenerationProviderAdapter adapter =
+                (traceId, providerId, modelId, request, credential, timeout) ->
                 successfulResponse(providerId, modelId);
         var port = routedPort(adapter, EXECUTION_TIMEOUT, rejectingExecutor);
 
@@ -286,7 +292,7 @@ class RoutedTextGenerationPortTests {
     @Test
     void doesNotConvertAnErrorIntoAnOperationalFailure() {
         var error = new AssertionError("fatal provider error");
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             throw error;
         };
 

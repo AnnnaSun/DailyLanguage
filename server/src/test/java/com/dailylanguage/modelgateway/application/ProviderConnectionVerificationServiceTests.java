@@ -93,7 +93,7 @@ class ProviderConnectionVerificationServiceTests {
 
     private static FixedTextGenerationRoutes verificationRoutes() {
         TextGenerationProviderAdapter unusedAdapter =
-                (providerId, modelId, request, credential, executionTimeout) -> {
+                (traceId, providerId, modelId, request, credential, executionTimeout) -> {
                     throw new AssertionError("preset lookup must not execute the adapter");
                 };
         TextGenerationRoute route = new TextGenerationRoute(

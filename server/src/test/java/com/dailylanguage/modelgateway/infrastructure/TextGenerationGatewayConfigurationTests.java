@@ -68,7 +68,7 @@ class TextGenerationGatewayConfigurationTests {
             TextGenerationRoute conversationRoute = routes.findRoute(ModelPurpose.CONVERSATION)
                     .orElseThrow();
             assertThat(conversationRoute.providerId()).isEqualTo(new ProviderId("deepseek"));
-            assertThat(conversationRoute.modelId()).isEqualTo(new ModelId("deepseek-chat"));
+            assertThat(conversationRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
             assertThat(conversationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
             assertThat(conversationRoute.adapter())
                     .isSameAs(context.getBean(OpenAiCompatibleTextGenerationAdapter.class));
@@ -76,7 +76,7 @@ class TextGenerationGatewayConfigurationTests {
                             ModelPurpose.CONNECTION_VERIFICATION)
                     .orElseThrow();
             assertThat(verificationRoute.providerId()).isEqualTo(new ProviderId("deepseek"));
-            assertThat(verificationRoute.modelId()).isEqualTo(new ModelId("deepseek-chat"));
+            assertThat(verificationRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
             assertThat(verificationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
             assertThat(verificationRoute.adapter()).isSameAs(conversationRoute.adapter());
             assertThat(routes.findRoute(ModelPurpose.PLANNING)).isEmpty();

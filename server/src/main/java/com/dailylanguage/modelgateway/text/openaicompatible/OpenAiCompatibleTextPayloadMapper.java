@@ -2,6 +2,7 @@ package com.dailylanguage.modelgateway.text.openaicompatible;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
@@ -22,12 +23,22 @@ import tools.jackson.databind.json.JsonMapper;
 final class OpenAiCompatibleTextPayloadMapper {
 
     private final JsonMapper jsonMapper;
+    private final OpenAiCompatibleFinishReasonDiagnostics finishReasonDiagnostics;
 
     OpenAiCompatibleTextPayloadMapper(JsonMapper jsonMapper) {
+        this(jsonMapper, new OpenAiCompatibleFinishReasonDiagnostics());
+    }
+
+    OpenAiCompatibleTextPayloadMapper(
+            JsonMapper jsonMapper,
+            OpenAiCompatibleFinishReasonDiagnostics finishReasonDiagnostics) {
         JsonMapper sourceMapper = java.util.Objects.requireNonNull(jsonMapper, "jsonMapper must not be null");
         this.jsonMapper = sourceMapper.rebuild()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
+        this.finishReasonDiagnostics = java.util.Objects.requireNonNull(
+                finishReasonDiagnostics,
+                "finishReasonDiagnostics must not be null");
     }
 
     String writeRequest(ModelId modelId, TextGenerationRequest request) {
@@ -54,9 +65,11 @@ final class OpenAiCompatibleTextPayloadMapper {
     }
 
     TextGenerationResponse readResponse(
+            UUID traceId,
             ProviderId selectedProviderId,
             ModelId selectedModelId,
             String responseBody) throws ModelProviderCallException {
+        java.util.Objects.requireNonNull(traceId, "traceId must not be null");
         ChatResponse response;
         try {
             response = jsonMapper.readValue(responseBody, ChatResponse.class);
@@ -73,7 +86,11 @@ final class OpenAiCompatibleTextPayloadMapper {
         }
 
         String text = choice.message().content() == null ? "" : choice.message().content();
-        TextGenerationResponse.FinishReason finishReason = mapFinishReason(choice.finish_reason());
+        TextGenerationResponse.FinishReason finishReason = mapFinishReason(
+                traceId,
+                selectedProviderId,
+                selectedModelId,
+                choice.finish_reason());
         Optional<ModelUsage> usage = readUsage(response.usage());
         return new TextGenerationResponse(
                 selectedProviderId,
@@ -91,15 +108,23 @@ final class OpenAiCompatibleTextPayloadMapper {
         };
     }
 
-    private static TextGenerationResponse.FinishReason mapFinishReason(String finishReason) {
+    private TextGenerationResponse.FinishReason mapFinishReason(
+            UUID traceId,
+            ProviderId providerId,
+            ModelId modelId,
+            String finishReason) {
         if (finishReason == null) {
+            finishReasonDiagnostics.reportUnknown(traceId, providerId, modelId, null);
             return TextGenerationResponse.FinishReason.UNKNOWN;
         }
         return switch (finishReason) {
             case "stop" -> TextGenerationResponse.FinishReason.COMPLETED;
             case "length" -> TextGenerationResponse.FinishReason.LENGTH_LIMIT;
             case "content_filter" -> TextGenerationResponse.FinishReason.CONTENT_FILTERED;
-            default -> TextGenerationResponse.FinishReason.UNKNOWN;
+            default -> {
+                finishReasonDiagnostics.reportUnknown(traceId, providerId, modelId, finishReason);
+                yield TextGenerationResponse.FinishReason.UNKNOWN;
+            }
         };
     }
 

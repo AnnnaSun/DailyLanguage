@@ -22,7 +22,8 @@ class FixedTextGenerationRoutesTests {
     private static final ProviderId PROVIDER_ID = new ProviderId("openai-compatible");
     private static final ModelId MODEL_ID = new ModelId("organization/model:v1");
     private static final Duration EXECUTION_TIMEOUT = Duration.ofSeconds(30);
-    private static final TextGenerationProviderAdapter ADAPTER = (providerId, modelId, request, credential, timeout) ->
+    private static final TextGenerationProviderAdapter ADAPTER =
+            (traceId, providerId, modelId, request, credential, timeout) ->
             ModelResult.failure(ModelFailure.forRoute(
                     ModelFailureKind.TEMPORARY_UNAVAILABLE,
                     providerId,

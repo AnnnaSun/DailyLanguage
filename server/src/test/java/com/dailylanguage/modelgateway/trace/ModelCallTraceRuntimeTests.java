@@ -8,8 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.result.ModelFailure;
@@ -54,13 +56,16 @@ class ModelCallTraceRuntimeTests {
     @Test
     void recordsSafeSuccessMetadataWithoutChangingTheModelResult() {
         List<ModelCallTrace> traces = new ArrayList<>();
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) ->
-                ModelResult.success(new TextGenerationResponse(
+        AtomicReference<UUID> workerTraceId = new AtomicReference<>();
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
+            workerTraceId.set(traceId);
+            return ModelResult.success(new TextGenerationResponse(
                         providerId,
                         modelId,
                         "generated verification text must not enter trace",
                         TextGenerationResponse.FinishReason.COMPLETED,
                         Optional.of(new ModelUsage(8, 3))));
+        };
         RoutedTextGenerationPort port = routedPort(adapter, traces::add);
 
         ModelResult<TextGenerationResponse> result = port.generateText(REQUEST, CREDENTIAL);
@@ -68,6 +73,7 @@ class ModelCallTraceRuntimeTests {
         assertThat(result).isInstanceOf(ModelResult.Success.class);
         assertThat(traces).hasSize(1);
         ModelCallTrace trace = traces.getFirst();
+        assertThat(workerTraceId).hasValue(trace.traceId());
         assertThat(trace.purpose()).isEqualTo(ModelPurpose.CONNECTION_VERIFICATION);
         assertThat(trace.providerId()).contains(PROVIDER_ID);
         assertThat(trace.modelId()).contains(MODEL_ID);
@@ -102,7 +108,7 @@ class ModelCallTraceRuntimeTests {
     @Test
     void recordsInternalFailureAndPreservesTheOriginalExceptionContract() {
         List<ModelCallTrace> traces = new ArrayList<>();
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) -> {
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) -> {
             throw new IllegalArgumentException(credential.secret());
         };
         RoutedTextGenerationPort port = routedPort(adapter, traces::add);
@@ -121,7 +127,7 @@ class ModelCallTraceRuntimeTests {
 
     @Test
     void traceRecorderFailureDoesNotReplaceASuccessfulModelResult() {
-        TextGenerationProviderAdapter adapter = (providerId, modelId, request, credential, timeout) ->
+        TextGenerationProviderAdapter adapter = (traceId, providerId, modelId, request, credential, timeout) ->
                 ModelResult.success(new TextGenerationResponse(
                         providerId,
                         modelId,
