@@ -293,7 +293,7 @@ class ModelCallJobSchemaIntegrationTests {
     }
 
     @Test
-    void limitsDurableJobStateToApprovedMetadata() {
+    void limitsDurableJobStateToApprovedMetadataAndSafeFailure() {
         List<String> columnNames = jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -318,7 +318,10 @@ class ModelCallJobSchemaIntegrationTests {
                 "row_version",
                 "created_at",
                 "completed_at",
-                "expires_at");
+                "expires_at",
+                "failure_kind",
+                "failure_retry_after_seconds",
+                "failure_retry_after_nanos");
     }
 
     private UUID insertJob(
