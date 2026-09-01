@@ -67,4 +67,34 @@
           AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
         RETURNING <include refid="jobColumns"/>
     </select>
+
+    <select id="tryCompleteTextGeneration" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET provider_id = #{providerId, jdbcType=VARCHAR},
+            model_id = #{modelId, jdbcType=VARCHAR},
+            execution_status = 'SUCCEEDED',
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND model_operation = 'TEXT_GENERATION'
+          AND execution_status = 'RUNNING'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND (
+              (provider_id IS NULL AND model_id IS NULL)
+              OR (provider_id = #{providerId, jdbcType=VARCHAR} AND model_id = #{modelId, jdbcType=VARCHAR})
+          )
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <insert id="insertTextGenerationResult">
+        INSERT INTO model_call_text_generation_result (
+            job_id, generated_text, finish_reason, input_tokens, output_tokens
+        )
+        VALUES (
+            #{jobId, jdbcType=OTHER}, #{generatedText, jdbcType=VARCHAR},
+            #{finishReason, jdbcType=VARCHAR}, #{inputTokens, jdbcType=BIGINT},
+            #{outputTokens, jdbcType=BIGINT}
+        )
+    </insert>
 </mapper>

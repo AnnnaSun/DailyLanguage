@@ -19,4 +19,8 @@ interface ModelCallJobMapper {
             @Param("jobId") UUID jobId,
             @Param("userId") UUID userId,
             @Param("expectedRowVersion") long expectedRowVersion);
+
+    Optional<StoredModelCallJob> tryCompleteTextGeneration(TextGenerationSuccessRow success);
+
+    int insertTextGenerationResult(TextGenerationSuccessRow success);
 }

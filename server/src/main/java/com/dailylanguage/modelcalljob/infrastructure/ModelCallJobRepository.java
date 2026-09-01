@@ -6,13 +6,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.dailylanguage.modelcalljob.domain.ModelCallJob;
 import com.dailylanguage.modelcalljob.domain.NewModelCallJob;
+import com.dailylanguage.modelgateway.result.ModelUsage;
 import com.dailylanguage.modelgateway.routing.ModelId;
 import com.dailylanguage.modelgateway.routing.ModelOperation;
 import com.dailylanguage.modelgateway.routing.ModelPurpose;
 import com.dailylanguage.modelgateway.routing.ProviderId;
+import com.dailylanguage.modelgateway.text.TextGenerationResponse;
 
 @Repository
 public class ModelCallJobRepository {
@@ -56,6 +59,39 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    @Transactional
+    public Optional<ModelCallJob> tryRecordTextGenerationSuccess(
+            UUID jobId,
+            UUID userId,
+            long expectedRowVersion,
+            TextGenerationResponse response) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        Objects.requireNonNull(response, "response must not be null");
+
+        TextGenerationSuccessRow success = new TextGenerationSuccessRow(
+                jobId,
+                userId,
+                expectedRowVersion,
+                response.providerId().value(),
+                response.modelId().value(),
+                response.text(),
+                response.finishReason().name(),
+                response.usage().map(ModelUsage::inputTokens).orElse(null),
+                response.usage().map(ModelUsage::outputTokens).orElse(null));
+        Optional<StoredModelCallJob> completedJob = modelCallJobMapper.tryCompleteTextGeneration(success);
+        if (completedJob.isEmpty()) {
+            return Optional.empty();
+        }
+        if (modelCallJobMapper.insertTextGenerationResult(success) != 1) {
+            throw new IllegalStateException("text generation result was not inserted");
+        }
+        return completedJob.map(ModelCallJobRepository::toDomain);
+    }
+
     private static ModelCallJob toDomain(StoredModelCallJob job) {
         return new ModelCallJob(
                 job.id(), job.userId(), Optional.ofNullable(job.languageProfileId()),
@@ -80,4 +116,10 @@ record StoredModelCallJob(
         String providerId, String modelId, UUID workflowId, String workflowStepId, long workflowVersion,
         String executionStatus, String consumptionStatus, long rowVersion,
         OffsetDateTime createdAt, OffsetDateTime completedAt, OffsetDateTime expiresAt) {
+}
+
+record TextGenerationSuccessRow(
+        UUID jobId, UUID userId, long expectedRowVersion,
+        String providerId, String modelId, String generatedText, String finishReason,
+        Long inputTokens, Long outputTokens) {
 }
