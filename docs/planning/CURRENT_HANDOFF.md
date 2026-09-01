@@ -5,149 +5,123 @@
 
 ## Handoff Metadata
 
-- Updated At: `2026-09-01 20:02 CST` (`Asia/Shanghai`)
+- Updated At: `2026-09-01 20:09 CST` (`Asia/Shanghai`)
 - Updated By: `Codex`
-- Handoff State: `REVIEW_PENDING`
-- Handoff Reason: `Approved scope-local whitespace and test-evidence corrections are implemented and freshly verified`
-- Intended Receiver: `User reviewing the corrected V4 constraint and focused evidence before Ownership closeout`
+- Handoff State: `DESIGN_SCOPE_PENDING`
+- Handoff Reason: `User committed M0-S9A and explicitly requested entry into M0-S9B`
+- Intended Receiver: `User deciding the proposed M0-S9B Architecture-sensitive Design / Scope`
 
 ## Repository Snapshot
 
 - Branch: `codex/M0S9`
-- HEAD: `a887bbb` (`S8 收尾`)
-- Worktree before M0-S9A: `CLEAN`
-- Worktree now: `DIRTY with three M0-S9A files; no pre-existing uncommitted change`
-- Current Product Gate: `M0-S9 / REVIEW_PENDING`
-- Current Slice: `M0-S9A — Durable ModelCallJob State Schema`
-- Slice Gate: `IMPLEMENTATION / TARGETED VERIFICATION COMPLETE; REVIEW_PENDING`
-- Stop Point: `Do not implement Repository, TaskExecutor, API, typed outcome persistence or another slice`
+- HEAD: `14be507` (`新建 job table`)
+- Worktree before this handoff update: `CLEAN`
+- Worktree now: `DIRTY only because this handoff snapshot was refreshed`
+- Current Product Gate: `M0-S9 / S9B DESIGN_SCOPE_PENDING`
+- Current Slice: `PROPOSED M0-S9B — Durable Job Creation and Owner-scoped Read`
+- Slice Gate: `DESIGN PROPOSED; IMPLEMENTATION SCOPE NOT_APPROVED`
+- Stop Point: `Do not modify Production code, schema, mapper or tests until the user approves S9B Scope`
 
-The six S8 reconciliation files previously described as uncommitted were committed by the user in `a887bbb`. The commit changed
-documentation only; `c9314dd..a887bbb` contains no Production or test change. The prior handoff branch / HEAD / dirty-state snapshot
-was stale and is corrected here.
+The previous snapshot still reported `a887bbb`, a dirty S9A worktree and `REVIEW_PENDING`. Git now proves that the user committed
+the complete S9A Diff as `14be507` and the worktree was clean before this handoff refresh. The user then explicitly requested
+entry into S9B, which authorizes S9B Design / Scope but does not silently authorize implementation.
 
-## Approved Scope
+`PROJECT_STATUS.md` and the M0-S9 gate section of `V1_PHASE_PLAN.md` still describe the pre-S9A state. They are stale for the
+S9A commit fact and must not be used to deny the verified Git state; formal reconciliation remains pending.
 
-User approved implementation in the current workspace of one schema-only slice:
+## Prior Slice: M0-S9A
 
-1. add Flyway V4 `model_call_job` durable metadata schema;
-2. enforce UUIDv7 identity, owner and optional same-owner Language Profile relation;
-3. store separate execution / consumption status, workflow version, row version and timestamps;
-4. enforce paired selected Provider / Model identity and finite persisted vocabularies;
-5. verify the schema through one focused PostgreSQL integration test class;
-6. update this handoff and stop at `REVIEW_PENDING`.
+- State: `COMMITTED / ACCEPTED FOR PROGRESSION TO S9B DESIGN`
+- Commit: `14be507`
+- Added PostgreSQL V4 `model_call_job` metadata schema and same-owner Language Profile composite FK.
+- Added separate execution / consumption status, Workflow version, optimistic-lock row version and timestamp invariants.
+- Added SQL table / column comments and boundary-whitespace checks that cover ordinary spaces and tab-like whitespace.
+- Persisted no Credential, request, Prompt, raw Provider response, typed result payload or arbitrary metadata Map.
+- Fresh final verification before commit: Flyway V1 through V4 `PASS`; ModelCallJob schema `15/15 PASS`;
+  persistence identity regression `10/10 PASS`; combined `25/25 PASS`.
+- Fresh full server suite was not run for S9A.
 
-## Explicit Non-scope
+## Proposed M0-S9B Scope
 
-- Java Job domain record or transition policy;
-- MyBatis Mapper / XML / Repository;
-- conditional `rowVersion` update, consume-once, stale, confirmation or expiry execution;
-- operation-specific Text result or safe failure persistence;
-- Spring TaskExecutor configuration, transient Credential capture or interactive waiting;
-- Model Gateway behavior, execution timeout, retry or fallback changes;
-- HTTP status query / confirmation API;
-- Planner, Conversation, Evaluator or other Application Workflow integration;
-- Kafka, RabbitMQ, Push Notification or generic workflow engine;
-- Weakness, Level, Mastery, Evidence or other long-term learning-state mutation;
-- commit, push, merge or the next M0-S9 slice.
+### Goal
 
-## Completed Work
+Add the smallest executable Java persistence boundary that can create the approved initial Job state and read it only through
+owner-scoped identity. S9B does not implement lifecycle transition or runtime execution.
 
-### Production / Migration
+### Production Files
 
-- Added `server/src/main/resources/db/migration/V4__add_model_call_job.sql`.
-- Added `language_profile(id, user_id)` composite uniqueness so the optional Job relation can enforce that
-  `languageProfileId` belongs to the same `userId` at the database boundary.
-- Added `model_call_job` with UUIDv7 identity, owner / workflow / route metadata, separate execution and consumption status,
-  optimistic-lock `rowVersion`, expiry and completion timestamps.
-- Added database checks for controlled purpose / operation / lifecycle vocabularies, paired route identity, non-negative
-  versions, valid completion state and timestamp ordering.
-- Replaced the `BTRIM`-only route / Workflow-step checks with explicit POSIX whitespace-boundary checks so ordinary spaces,
-  tabs and other PostgreSQL whitespace cannot appear at either end.
-- Did not add Credential, Prompt, request payload, raw Provider response, result payload, JSON metadata or arbitrary Map state.
-- Added Chinese PostgreSQL table / column comments for Job identity, ownership, route, Workflow version, optimistic-lock
-  row version, separate lifecycles and expiry-versus-execution-timeout meaning.
+Target maximum: five main Production files and no migration:
 
-### Test
+1. `server/src/main/java/com/dailylanguage/modelcalljob/domain/ModelCallJob.java`;
+2. `server/src/main/java/com/dailylanguage/modelcalljob/domain/NewModelCallJob.java`;
+3. `server/src/main/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobRepository.java`;
+4. `server/src/main/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobMapper.java`;
+5. `server/src/main/resources/mapper/ModelCallJobMapper.xml`.
 
-- Added `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobSchemaIntegrationTests.java`.
-- The focused test covers UUIDv7/default lifecycle state, optional Language Profile, cross-owner rejection, paired route
-  identity, route / Workflow-step boundary whitespace, lifecycle vocabulary, non-negative versions, independently isolated
-  completion / expiry timestamp invariants and the exact durable-column allowlist.
+Target Production changed LOC: `<= 250`. If explicit safe mapping cannot stay inside that budget, stop and split the Domain
+contract from Repository implementation instead of compressing responsibilities or hiding types for file-count reasons.
 
-## Verification Evidence
+### Expected Behavior
 
-Fresh for M0-S9A:
+- `NewModelCallJob` accepts owner, optional Language Profile, purpose / operation, optional paired route identity, Workflow
+  reference/version and expiry; it carries no Credential or arbitrary payload.
+- Repository creation lets PostgreSQL assign UUIDv7, `CREATED`, `NOT_READY`, `rowVersion=0` and `createdAt`, then returns a
+  typed `ModelCallJob` snapshot.
+- Provider / Model remain both present or both absent; the API does not represent a partial route.
+- Public lookup requires both `jobId` and owner `userId`; another user receives no Job snapshot.
+- The Java state exposes execution and consumption as separate typed vocabularies and treats `rowVersion` as read-only in S9B.
 
-- Server Production compile: `PASS` (`mvn -q -DskipTests compile`).
-- Server test compilation: `PASS` (`mvn -q -DskipTests test`).
-- PostgreSQL: `18.6` using the project pgvector image on temporary host port `55432`.
-- Flyway: `PASS`; four migrations validated and V4 applied successfully from schema version 3 to 4.
-- `ModelCallJobSchemaIntegrationTests`: `15/15 PASS` on the final corrected files.
-- `PersistenceIdentityIntegrationTests`: `10/10 PASS`; the Language Profile composite uniqueness caused no regression.
-- Combined targeted database verification: `25/25 PASS` on the final corrected files.
-- After the SQL comment update, a fresh empty database successfully applied Flyway V1 through V4; PostgreSQL metadata lookup
-  confirmed the `workflow_version`, `row_version` and `expires_at` comments were persisted.
-- The project PostgreSQL container started for verification was stopped afterward; its volume was retained.
-- The temporary `daily_language_s9a_review`, `daily_language_s9a_whitespace_review` and
-  `daily_language_s9a_final_review` databases were deleted after verification; they contained no user data.
+### Explicit Non-scope
 
-Environment-only attempts before the passing run:
+- lifecycle transition matrix or conditional update;
+- incrementing `rowVersion`, consume-once, confirmation, discard, stale or expiry execution;
+- safe typed result / failure tables or payload persistence;
+- route selection or route mutation;
+- Spring TaskExecutor, interactive wait, transient Credential capture or restart recovery;
+- Model Gateway changes or reuse of its `ExecutorService`;
+- HTTP status / polling / confirmation API;
+- Planner, Conversation, Evaluator or other Workflow integration;
+- schema V5, retry, fallback, Kafka, RabbitMQ or learning-state mutation;
+- commit or any later S9 slice.
 
-- Docker daemon was initially stopped.
-- Default host port `5432` was occupied, so the project PostgreSQL verification used `55432` without changing repository config.
-- The first sandboxed database run was blocked by local socket permission; the same command passed with approved local-network access.
+## Proposed Verification
 
-Not run:
+- Focused unit tests for Java route-pair, version, Workflow-step and timestamp invariants without duplicating every database
+  constraint case.
+- Fresh PostgreSQL integration tests for create / round-trip mapping, UUIDv7 and database defaults, optional Profile / route,
+  and owner-scoped read denial.
+- Extend mapper SQL safety evidence for prepared parameter binding; no `${}` or annotation SQL.
+- Rerun `ModelCallJobSchemaIntegrationTests` and `PersistenceIdentityIntegrationTests` as targeted regression.
+- Server compile; no full server suite unless implementation changes a shared boundary or targeted evidence exposes a wider risk.
 
-- Fresh full server suite was not run for this schema-only slice.
-- Model Gateway regression was not rerun because no Model Gateway source, configuration or behavior changed.
-- Repository, concurrency, TaskExecutor, interactive waiting, restart recovery and consume-once behavior remain unimplemented
-  and therefore unverified.
+## Architecture / Data / Concurrency / Security Notes
 
-Prior evidence, not fresh for M0-S9A:
-
-- M0-S8 Model Gateway regression: `95/95 PASS`.
-- Latest wider server evidence remains S7D: `217 total / 0 failures / 0 errors / 33 environment-skipped`.
-
-## Uncommitted Changes
-
-M0-S9A files:
-
-- `server/src/main/resources/db/migration/V4__add_model_call_job.sql` — new, Production migration;
-- `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobSchemaIntegrationTests.java` — new test;
-- `docs/planning/CURRENT_HANDOFF.md` — updated current snapshot.
-
-Pre-existing uncommitted changes before M0-S9A: `NONE`.
+- Architecture: new `modelcalljob` module depends only on portable Model Gateway routing vocabulary; Model Gateway does not
+  depend on Job and is not modified.
+- Data: PostgreSQL remains authority; S9B adds no schema and callers cannot choose initial lifecycle status or row version.
+- Concurrency: `rowVersion` is returned but never updated; S9B makes no consume-once claim.
+- Security: every public read is owner-scoped; Credential, Prompt, request and raw result are absent from domain and mapper.
+- Extensibility Fit: direct typed records + Repository / Mapper are sufficient for the current persisted variation; no generic
+  Job payload, Factory, Registry, base class or workflow engine.
 
 ## Decisions, Risks and UNKNOWN
 
-- `FACT`: PostgreSQL now has the approved durable Job metadata contract when V4 is applied.
-- `FACT`: execution status and consumption status are separate columns; this slice does not yet implement transition methods.
-- `FACT`: `rowVersion` is stored and constrained but does not yet provide consume-once until a later approved Repository slice
-  performs conditional updates.
-- `FACT`: there is no durable request or result payload in M0-S9A; typed outcome persistence remains a later Scope Decision.
-- `FACT`: Model Gateway and its model-call ExecutorService were not modified.
-- `RISK`: future Java persisted vocabularies must remain synchronized with the V4 database checks through explicit migration.
-- `RISK`: V4 is an additive forward migration; it has no down migration in the current Flyway convention.
-- `RESOLVED`: the user approved replacing `BTRIM`-only checks; the final DDL uses POSIX boundary-whitespace checks and the
-  focused tests reject tab-only, leading-space, trailing-tab and Workflow-step leading-tab cases.
-- `RESOLVED`: completion-state and expiry-order failures are now exercised by independent inserts, so each constraint has
-  isolated failure evidence.
-- `OWNERSHIP EVIDENCE`: the user confirmed understanding of same-owner Profile correlation and the distinction between
-  `workflowVersion`, optimistic-lock `rowVersion` and future consume-once behavior. The corrected whitespace constraint still
-  requires final Diff Review before Ownership closeout.
-- `UNKNOWN`: Repository method shape, legal transition matrix, operation-specific outcome schema and TaskExecutor capacity remain
-  intentionally undecided until later Design / Scope approval.
+- `FACT`: S9A is committed at `14be507`; current worktree was clean before this handoff refresh.
+- `FACT`: the current source has schema and tests only; no `modelcalljob` Java Production package exists yet.
+- `PROPOSED`: S9B combines typed initial state with create / owner-scoped read because schema is already stable and no
+  concurrency transition is included.
+- `RISK`: Java enums and V4 database vocabulary must remain aligned; focused round-trip tests must expose drift.
+- `RISK`: MyBatis mapping of nullable route / Profile values must not bypass the paired-route invariant.
+- `UNKNOWN`: exact legal lifecycle transitions, outcome schema, TaskExecutor capacity and recovery policy remain later Scope
+  Decisions.
 
 ## User Decisions Required
 
-- Review the corrected V4 boundary-whitespace constraint and its focused tests, then complete Ownership closeout.
-- Commit Decision remains with the user after Review / Ownership; no commit is authorized yet.
-- Any M0-S9B Repository / transition scope requires a separate Architecture-sensitive Design / Scope approval.
+- Approve, reject or amend the proposed S9B Scope and five-file boundary.
+- S9B implementation remains unauthorized until that decision.
+- Commit Decision remains with the user after a later implementation Review / Ownership gate.
 
 ## Next Action
 
-Perform Code Ownership Review of the final M0-S9A Diff, focusing on same-owner composite FK, route / Workflow-step whitespace
-constraints and the separation between Workflow version, row version, execution status and consumption status. Do not start
-M0-S9B or commit automatically.
+Wait for the user's S9B Design / Scope decision. If approved, implement only typed initial Job state plus PostgreSQL create and
+owner-scoped read, run the listed targeted verification, update this handoff and stop at `REVIEW_PENDING`.

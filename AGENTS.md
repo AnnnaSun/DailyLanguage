@@ -1319,17 +1319,20 @@ Codex 与 Zcode 每次接手 repository work 时，必须在 `AGENTS.md` 之后�
 `CURRENT_HANDOFF.md` 中的陈述与 Git、source、tests 或正式决策冲突时，以后者为事实依据；接手 Agent
 必须把冲突标记为 `UNKNOWN` 或 stale，并在影响范围内停止修改，不能静默选择一个版本或覆盖未提交工作。
 
-### 34.2 Required Maintenance / 必须维护的时机
+### 34.2 Conditional Maintenance / 条件维护
 
-Codex 与 Zcode 都必须在以下时机更新 `CURRENT_HANDOFF.md`：
+`CURRENT_HANDOFF.md` 不再因为普通 Slice Stop Point、commit、Scope Decision、新验证结果或 Worktree 变化而
+自动更新。Codex 与 Zcode 只在以下情况更新：
 
-- 主动把工作交给另一个 Agent 前；
-- 当前 Slice 停在 `REVIEW_PENDING`、`READY_TO_COMMIT`、`COMPLETE`、`BLOCKED` 或其他明确 Stop Point 时；
-- 准备因额度、Context、session 或工具限制结束当前工作时；
-- commit、用户 Scope Decision、新验证结果或 Worktree 变化使现有快照失真时。
+- 当前工作的 Agent 准备停止或交接，并且能够确认它自己的剩余额度严格低于 `10%`；
+- 用户明确要求创建或刷新 handoff snapshot。
 
-更新应是当前 Slice 的最后一项 documentation action，并在最终回复前完成。更新后如果又修改了代码、文档、
-验证结果或 commit，必须再次同步。Commit 仍由用户决定；维护 handoff 不授权 Agent 自动 commit。
+Codex 与 Zcode 只能判断各自额度，不能推断另一个 Agent 的剩余额度。当前环境没有暴露可读取的额度百分比时，
+Agent 不得根据 Context 长度、运行时间、token 使用量或主观感觉猜测 `<10%`；只有 host 明确提供的 usage signal、
+用户提供的 `/status` / usage dashboard 结果，或用户直接说明额度低于 `10%`，才能触发额度型 handoff 更新。
+
+满足条件时，更新应是离开前的最后一项 documentation action。更新后如果又修改了代码、文档、验证结果或
+commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定；维护 handoff 不授权 Agent 自动 commit。
 
 如果额度突然耗尽导致离开者无法更新，接手 Agent 必须先根据 Git 与正式文档重建快照，将
 `Handoff State` 标记为 `RECOVERED`，并把无法确认的意图、验证或 ownership 标记为 `UNKNOWN`。
