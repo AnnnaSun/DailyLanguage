@@ -5,8 +5,11 @@ app:
         provider-id: ${MODEL_GATEWAY_PROVIDER_ID:deepseek}
         chat-completions-endpoint: ${MODEL_GATEWAY_CHAT_COMPLETIONS_ENDPOINT:https://api.deepseek.com/chat/completions}
       routes:
+        connection-verification:
+          model-id: ${MODEL_GATEWAY_CONNECTION_VERIFICATION_MODEL_ID:deepseek-v4-flash}
+          execution-timeout: ${MODEL_GATEWAY_CONNECTION_VERIFICATION_EXECUTION_TIMEOUT:30s}
         conversation:
-          model-id: ${MODEL_GATEWAY_CONVERSATION_MODEL_ID:deepseek-chat}
+          model-id: ${MODEL_GATEWAY_CONVERSATION_MODEL_ID:deepseek-v4-flash}
           execution-timeout: ${MODEL_GATEWAY_CONVERSATION_EXECUTION_TIMEOUT:30s}
       executor:
         workers: ${MODEL_GATEWAY_TEXT_EXECUTOR_WORKERS:4}

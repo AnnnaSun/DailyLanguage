@@ -25,6 +25,8 @@ import com.dailylanguage.modelgateway.text.execution.RoutedTextGenerationPort;
 import com.dailylanguage.modelgateway.text.execution.TextGenerationRoute;
 import com.dailylanguage.modelgateway.text.openaicompatible.OpenAiCompatibleProviderConfig;
 import com.dailylanguage.modelgateway.text.openaicompatible.OpenAiCompatibleTextGenerationAdapter;
+import com.dailylanguage.modelgateway.trace.LoggingModelCallTraceRecorder;
+import com.dailylanguage.modelgateway.trace.ModelCallTraceRecorder;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -99,9 +101,15 @@ public class TextGenerationGatewayConfiguration {
     }
 
     @Bean
+    ModelCallTraceRecorder modelCallTraceRecorder() {
+        return new LoggingModelCallTraceRecorder();
+    }
+
+    @Bean
     TextGenerationPort textGenerationPort(
             FixedTextGenerationRoutes routes,
-            @Qualifier(MODEL_CALL_EXECUTOR) ExecutorService modelCallExecutor) {
-        return new RoutedTextGenerationPort(routes, modelCallExecutor);
+            @Qualifier(MODEL_CALL_EXECUTOR) ExecutorService modelCallExecutor,
+            ModelCallTraceRecorder traceRecorder) {
+        return new RoutedTextGenerationPort(routes, modelCallExecutor, traceRecorder);
     }
 }

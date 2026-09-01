@@ -2,11 +2,12 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A COMPLETE (`d8d47ac`)；S7B COMPLETE (`7f5f59f`)；S7C REVIEW_PENDING
-> Phase: M0-S6 / M0-S7
+> Implementation scope: S6A–S6E COMPLETE；S6F PARTIAL / accepted non-blocking L2 gap；S7A–S7D COMPLETE；S8A–S8D COMPLETE (`8d11ddd` / `16635d0` / `3f8838d` / `c9314dd`)
+> Phase: M0-S6 / M0-S7 / M0-S8
 
-本文固化 M0-S6 的 Model Gateway 责任边界。它定义后续 Text、Vision、Speech、Image 与
-Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的 Operation。
+本文固化 M0-S6–S8 的 Model Gateway、Structured Output 与 minimal Trace 责任边界。它定义后续 Text、
+Vision、Speech、Image 与 Embedding model capability 如何进入系统，但不提前实现尚未进入当前 slice 的
+Operation 或 Application Workflow。
 
 ## 1. Core responsibility
 
@@ -323,8 +324,8 @@ D39 TextGenerationGatewayProperties 只绑定 trusted deployment values：OpenAI
     purpose routes 与 executor capacity；Credential 不进入 model-gateway.yml、properties 或 Spring bean state。
 D40 Spring composition 暴露真实 TextGenerationPort，并把同一个 OpenAiCompatibleTextGenerationAdapter 绑定到
     configured routes；DeepSeek / OpenAI 的兼容协议差异只通过配置值表达，不复制 Provider Adapter。
-D41 当前只配置 CONVERSATION → deepseek / deepseek-chat / 30s；未配置 purpose 在提交 task 前返回
-    CAPABILITY_UNAVAILABLE，不推断或创建隐式 route。
+D41 S7C 初始只配置 CONVERSATION → deepseek / deepseek-chat / 30s；S7D 增加独立
+    CONNECTION_VERIFICATION route。未配置 purpose 在提交 task 前返回 CAPABILITY_UNAVAILABLE，不推断或创建隐式 route。
 D42 model-call ExecutorService 是独立 bounded fixed platform-thread pool，默认 4 workers / 16 queue，使用
     AbortPolicy fail fast；不得与 M0-S9 Job TaskExecutor 共用，Hosted capacity confirmation 留到 M6。
 D43 Spring 创建的 JDK HttpClient 固定 Redirect.NEVER；Application startup 不发起 Provider network request。
@@ -333,14 +334,82 @@ D45 application.yml 必须显式导入 model-gateway.yml；配置资源拆分只
     environment override、typed binding 或 runtime behavior。
 ```
 
-## 14. Explicit S6 / S7 non-goals
+## 14. M0-S7D approved Backend Credential ingress decisions
 
-- Browser / HTTPS Credential ingress、Credential storage、rotation 或 UI；
+```text
+D46 authenticated GET /api/model-provider-presets 只暴露当前 CONNECTION_VERIFICATION fixed route 的 ProviderId /
+    ModelId，不暴露 endpoint、protocol、Credential 或 Provider-specific options。
+D47 authenticated + CSRF-protected POST /api/model-provider-presets/{providerId}/verify 只从
+    X-Model-Provider-Credential header 接收 transient secret；不使用 JSON Credential DTO。
+D48 path providerId 只创建 Provider-scoped TransientProviderCredential，不能选择或覆盖 route、ModelId、endpoint
+    或 Adapter；selected route 仍由 CONNECTION_VERIFICATION purpose 与 trusted configuration 决定。
+D49 ProviderConnectionVerificationService 使用固定 probe request，客户端不能提交任意 Prompt；Provider 成功输出
+    在 Service boundary 丢弃，只返回 selected ProviderId / ModelId。
+D50 connection verification 不持久化状态、不自动 retry / fallback，也不创建 ModelCallJob；Gateway typed failure
+    映射为稳定 HTTP status / code，response 不包含 secret、generated text、raw response 或 exception detail。
+D51 S7D 只实现 Backend authenticated Credential API ingress；Hosted HTTPS / TLS 属于 deployment boundary，当前
+    尚无 channel verification。Browser local/session storage UI 与 live Provider verification 也未实现，因而不能
+    宣称完整产品 BYOK End-to-End evidence。
+```
+
+## 15. M0-S8A approved JSON Object request decisions
+
+```text
+D52 TextOutputSpecification 增加 provider-neutral JsonObject singleton；不携带 schema string、
+    Provider option Map 或业务 DTO type。
+D53 OpenAI-compatible mapper 只在 JsonObject specification 下发送
+    response_format={"type":"json_object"}；PlainText request payload 保持不变。
+D54 S8A 是 JSON Object transport contract，不解析或验证 Provider 生成内容；parse / shape /
+    enum / semantic failure 由 S8B 的 StructuredOutputFailure boundary 负责，不扩展 ModelFailureKind。
+D55 Gateway 不为 JsonObject 自动修改 Prompt，不自动 repair / retry / fallback；调用方必须在
+    message 中明确要求 JSON，并在 S8B 完成前不得把 response text 当作 validated artifact。
+```
+
+## 16. M0-S8B approved Structured Output validation decisions
+
+```text
+D56 StructuredOutputValidator 只接受 JSON object，并严格绑定到调用方声明的 Java record；malformed JSON、
+    non-object、unknown / missing field、duplicate key、trailing token 与 binding failure 均不能产生 typed value。
+D57 StructuredOutputValidation 使用互斥 Valid / Invalid envelope；Invalid 只携带 MALFORMED_JSON、
+    SHAPE_INVALID、ENUM_INVALID 或 SEMANTIC_INVALID，不携带 generated text、Jackson exception 或 cause。
+D58 enum token 由 Java enum contract 裁决；typed binding 后由调用方提供的 deterministic Predicate 执行
+    semantic validation。Predicate 返回 false 为 SEMANTIC_INVALID；Predicate 自身异常仍是 programming failure。
+D59 S8B 是可复用的 module-local validation boundary，不自动修改 Prompt、不 repair / retry，也不持久化结果；
+    Planner / Evaluator / Content 等 owning Workflow 进入对应 Phase 后负责调用与消费。
+```
+
+## 17. M0-S8C approved minimal Trace decisions
+
+```text
+D60 RoutedTextGenerationPort 对每个 non-null Text Generation call 创建一个 UUID Trace ID，并在 terminal result
+    或 unexpected internal failure 路径形成一个 ModelCallTrace；pre-route failure 可以没有 route identity。
+D61 Trace 只保存 purpose、optional Provider / Model、gateway latency、status、typed failure、normalized finish
+    reason 与 portable usage；不保存 request、generated text、Credential、raw response 或 exception detail。
+D62 默认 LoggingModelCallTraceRecorder 以 INFO 输出安全 metadata。Recorder RuntimeException 被隔离，不能替换
+    原 ModelResult 或原 programming failure；S8C 不实现 Trace persistence、OpenTelemetry 或 metric storage。
+```
+
+## 18. M0-S8D approved unknown finish-reason diagnostic decisions
+
+```text
+D63 S8C 创建的同一 UUID 通过显式 method parameter 与 Executor lambda 传入 Adapter / mapper；不使用
+    ThreadLocal、MDC、AOP 或通用 execution-context wrapper。
+D64 stop、length 与 content_filter 映射为 portable known finish reason 且不记录 raw value。missing 或其他值
+    保持 portable UNKNOWN；missing 只记录分类，safe token `[A-Za-z0-9._-]{1,64}` 可以原样记录，其他值只记录
+    UTF-16 length 与 SHA-256 digest。
+D65 diagnostics 使用代码版本 `openai-compatible-text-v1`，按 selected Provider / Model route 进行 process-local、
+    concurrency-safe 的一分钟 WARN 限流；restart 后重置。diagnostics RuntimeException fail-open，不改变 response。
+D66 S8D 不把 raw finish reason 写入 response、terminal Trace、metric 或 persistence，也不引入受控 Debug、
+    retry / fallback、Job correlation 或新的 Production dependency。
+```
+
+## 19. Explicit S6–S8 non-goals
+
+- Browser local/session Credential storage、rotation 或 UI；
 - live DeepSeek network verification；
 - 第二个 Provider configuration 或 native Provider protocol；
-- Structured Output validation；
+- Planner、Evaluator、Conversation 或 Content Workflow，包括 Structured Output 的 End-to-End consumption；
 - Trace persistence；
-- Planner、Evaluator、Conversation 或 Content Workflow；
 - Speech、Vision、Image、Embedding Port implementation；
 - automatic retry、fallback、health router 或 circuit breaker；
 - Model Call Job persistence、interactive wait、late-result recovery 或用户 confirmation；

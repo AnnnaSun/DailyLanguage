@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-08-31
+> Last updated: 2026-09-01
 > Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S7C / REVIEW_PENDING
-> Production baseline: M0-S7B COMPLETE (`7f5f59f`)
+> Current Gate: M0-S9 / DESIGN_SCOPE_PENDING
+> Production baseline: M0-S8D COMPLETE (`c9314dd`)
 
 ## Approved Decisions
 
@@ -77,6 +77,17 @@
   不与 M0-S9 Job TaskExecutor 共用，Hosted capacity 仍留到 M6 在目标硬件确认。
 - M0-S7C-R1 configuration resource split 已批准：`application.yml` 显式导入 `model-gateway.yml`；只调整
   Model Gateway deployment properties 的文件组织，不改变 key、默认值、environment override 或 runtime behavior。
+- M0-S7D Design / Scope 已批准：提供 authenticated fixed Provider preset 查询与 CSRF-protected connection
+  verification；Credential 只通过 `X-Model-Provider-Credential` 进入当前内存调用链，path `providerId` 不能覆盖
+  route、Model、endpoint 或 Adapter。当前不引入 dynamic Provider / Model selection、Registry 或 UI。
+- M0-S8A–S8B 已完成 provider-neutral JsonObject request transport 与 module-local strict Structured Output
+  validation；validation 通过 Java record binding、enum 与 deterministic semantic rule 形成 safe typed result，
+  但尚未接入 Planner / Evaluator / Content Workflow。
+- M0-S8C–S8D 已完成 Text Generation module-local minimal Trace 与 unknown finish-reason diagnostics：同一 UUID
+  显式跨越 caller / Executor worker / Adapter，terminal Trace 只记录安全 metadata；未知 raw reason 保持
+  portable `UNKNOWN`，并经过 allowlist、redaction 与 per-route rate limit 后输出 WARN。
+- M0-S8 不持久化 Trace，不记录 Credential、Prompt、generated text 或 Provider raw response，不引入 retry、
+  fallback、Application Workflow 或 `ModelCallJob`。
 
 ## Completed Review
 
@@ -117,35 +128,54 @@
 29. M0-S7B DeepSeek-first OpenAI-compatible Text Adapter：Scope / Architecture / Security boundary / verification
     PASS；Diff Review 无 blocking finding，Provider-boundary Ownership Check 为 UNDERSTOOD；Model Gateway
     整体保持 L2。
+30. M0-S7C / S7C-R1 OpenAI-compatible Text runtime composition：Scope / Architecture / verification PASS；
+    amended Diff Review 无 blocking finding，runtime-composition Ownership Check 为 UNDERSTOOD；Model Gateway
+    整体保持 L2。
+31. M0-S7D DeepSeek-first BYOK Connection Verification：Scope / Architecture / Security boundary / verification PASS；
+    Diff Review 无 blocking finding，Backend API Ownership Check 为 UNDERSTOOD；Model Gateway 与 BYOK /
+    Provider Configuration 均保持 L2；已由用户提交为 `4deed20`。
+32. M0-S8A JsonObject transport contract：Scope / Architecture / verification / Review / focused Ownership 完成；
+    已提交为 `8d11ddd`。
+33. M0-S8B strict Structured Output validation boundary：parse / shape / enum / semantic validation 与 safe typed
+    result 完成；已提交为 `16635d0`。
+34. M0-S8C safe terminal Model-call Trace：metadata contract、INFO recorder、fail-open 与 Flow sync 完成；
+    已提交为 `3f8838d`。
+35. M0-S8D same-Trace-ID Provider diagnostics：safe allowlist / redaction、concurrent per-route rate limit、Review、
+    Ownership 与 default-model verification reconciliation 完成；已提交为 `c9314dd`。
 
-## Current Slice
+## Current Gate
 
 ```text
-Selected slice: M0-S7C / S7C-R1 — OpenAI-compatible Text Runtime Composition
-Gate: REVIEW_PENDING
-M0 umbrella scope: APPROVED
-S7C Design: APPROVED
-S7C Scope: APPROVED
-S7C Implementation: COMPLETE
-S7C-R1 Amendment: COMPLETE / PASS (focused 6/6; server 207 total, 0 failures/errors, 33 environment-skipped)
-Verification: PASS (focused 6/6; Model Gateway 67/67; server 207 total, 0 failures/errors, 33 environment-skipped)
+Selected phase: M0-S9 — Model Call Job foundation
+Gate: DESIGN_SCOPE_PENDING
+M0-S8A: COMPLETE (`8d11ddd`)
+M0-S8B: COMPLETE (`16635d0`)
+M0-S8C: COMPLETE (`3f8838d`)
+M0-S8D: COMPLETE (`c9314dd`)
+Verification: PASS for Model Gateway scope (95/95; default runtime composition 6/6; server compile)
+Wider server regression: NOT_RUN for S8; latest S7D evidence is 217 total, 0 failures/errors, 33 environment-skipped
 Behavior Flow: CURRENT
-Code Review: PENDING
-Ownership Check: PENDING
-Production baseline: M0-S7B COMPLETE (`7f5f59f`)
-Current target: verify and review the amended S7C runtime composition diff; do not start Provider Preset or Browser ingress
-Dependency: approved `docs/features/MODEL_GATEWAY.md` Detailed Design
+Code Review: PASS (S8A-S8D no blocking findings)
+M0-S8 integrated closeout: PARTIAL / ACCEPTED for progression to S9 Design / Scope
+Ownership: Structured Output L2 module-local; Trace / Observability L3 module-local; Model Gateway remains L2
+Completion level: S8 foundations complete; no Application Workflow integration or Trace persistence
+Production baseline: M0-S8D COMPLETE (`c9314dd`)
+Current target: define and approve only the first M0-S9 implementation slice
+Dependency: approved `docs/features/MODEL_CALL_JOB.md` Detailed Design
 ```
 
 ## Next Action
 
-M0-S7C implementation 与验证已完成，当前停在 `REVIEW_PENDING`。下一步先基于真实 Diff Review runtime
-composition、bounded executor 与配置安全边界；在 Review / Ownership 结束前不进入 Browser / HTTPS
-Credential ingress 或下一 slice。interactive wait、durable Job 与 late-result consume 仍留在 M0-S9。
+基于已批准 `MODEL_CALL_JOB.md` 提出 M0-S9 第一个 implementation slice 的 Design / Scope，明确 schema、
+execution / consumption state boundary、TaskExecutor 与 Gateway Executor 分离、transient Credential lifecycle、
+验证范围和 stop point。等待批准前不修改 schema、Production code 或 API。
 
 ## Blockers
 
-None. 当前已有 Spring bean / route / Executor production wiring，但没有 Browser / HTTPS Credential ingress、
-Application Workflow 或 live DeepSeek Credential / network verification，因此不能宣称 BYOK End-to-End complete。
+None for M0-S9 Design / Scope. M0-S9 implementation scope、schema、API 与 file boundary 尚未批准。
+Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output 只有 module-local validation，
+Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent
+Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured
+Output / Trace End-to-End complete。
 Hosted model-call 与 password-hash capacity 仍为
 `PROVISIONAL`，按既定 Scope 在 M6 目标硬件验证。

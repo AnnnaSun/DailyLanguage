@@ -37,6 +37,17 @@ class TextGenerationRequestTests {
     }
 
     @Test
+    void exposesJsonObjectAsAProviderNeutralOutputSpecification() {
+        TextGenerationRequest request = new TextGenerationRequest(
+                ModelPurpose.CONVERSATION,
+                List.of(new TextMessage(TextMessage.Role.USER, "Return a JSON object.")),
+                TextOutputSpecification.jsonObject());
+
+        assertThat(request.outputSpecification())
+                .isEqualTo(TextOutputSpecification.JsonObject.INSTANCE);
+    }
+
+    @Test
     void rejectsMissingOrInvalidRequestComponents() {
         var message = new TextMessage(TextMessage.Role.USER, "Hello");
 

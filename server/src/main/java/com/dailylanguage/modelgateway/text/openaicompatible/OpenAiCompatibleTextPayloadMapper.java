@@ -2,6 +2,7 @@ package com.dailylanguage.modelgateway.text.openaicompatible;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
@@ -11,6 +12,7 @@ import com.dailylanguage.modelgateway.routing.ProviderId;
 import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 import com.dailylanguage.modelgateway.text.TextGenerationResponse;
 import com.dailylanguage.modelgateway.text.TextMessage;
+import com.dailylanguage.modelgateway.text.TextOutputSpecification;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -21,20 +23,40 @@ import tools.jackson.databind.json.JsonMapper;
 final class OpenAiCompatibleTextPayloadMapper {
 
     private final JsonMapper jsonMapper;
+    private final OpenAiCompatibleFinishReasonDiagnostics finishReasonDiagnostics;
 
     OpenAiCompatibleTextPayloadMapper(JsonMapper jsonMapper) {
+        this(jsonMapper, new OpenAiCompatibleFinishReasonDiagnostics());
+    }
+
+    OpenAiCompatibleTextPayloadMapper(
+            JsonMapper jsonMapper,
+            OpenAiCompatibleFinishReasonDiagnostics finishReasonDiagnostics) {
         JsonMapper sourceMapper = java.util.Objects.requireNonNull(jsonMapper, "jsonMapper must not be null");
         this.jsonMapper = sourceMapper.rebuild()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
+        this.finishReasonDiagnostics = java.util.Objects.requireNonNull(
+                finishReasonDiagnostics,
+                "finishReasonDiagnostics must not be null");
     }
 
     String writeRequest(ModelId modelId, TextGenerationRequest request) {
         List<ChatMessage> messages = request.messages().stream()
                 .map(message -> new ChatMessage(mapRole(message.role()), message.content()))
                 .toList();
+        Object providerRequest = switch (request.outputSpecification()) {
+            case TextOutputSpecification.PlainText ignored ->
+                    new ChatRequest(modelId.value(), false, messages);
+            case TextOutputSpecification.JsonObject ignored ->
+                    new JsonObjectChatRequest(
+                            modelId.value(),
+                            false,
+                            messages,
+                            new ResponseFormat("json_object"));
+        };
         try {
-            return jsonMapper.writeValueAsString(new ChatRequest(modelId.value(), false, messages));
+            return jsonMapper.writeValueAsString(providerRequest);
         }
         catch (JacksonException exception) {
             // Prompt 可能出现在 serialization exception 中，因此不传播 message 或 cause。
@@ -43,9 +65,11 @@ final class OpenAiCompatibleTextPayloadMapper {
     }
 
     TextGenerationResponse readResponse(
+            UUID traceId,
             ProviderId selectedProviderId,
             ModelId selectedModelId,
             String responseBody) throws ModelProviderCallException {
+        java.util.Objects.requireNonNull(traceId, "traceId must not be null");
         ChatResponse response;
         try {
             response = jsonMapper.readValue(responseBody, ChatResponse.class);
@@ -62,7 +86,11 @@ final class OpenAiCompatibleTextPayloadMapper {
         }
 
         String text = choice.message().content() == null ? "" : choice.message().content();
-        TextGenerationResponse.FinishReason finishReason = mapFinishReason(choice.finish_reason());
+        TextGenerationResponse.FinishReason finishReason = mapFinishReason(
+                traceId,
+                selectedProviderId,
+                selectedModelId,
+                choice.finish_reason());
         Optional<ModelUsage> usage = readUsage(response.usage());
         return new TextGenerationResponse(
                 selectedProviderId,
@@ -80,15 +108,23 @@ final class OpenAiCompatibleTextPayloadMapper {
         };
     }
 
-    private static TextGenerationResponse.FinishReason mapFinishReason(String finishReason) {
+    private TextGenerationResponse.FinishReason mapFinishReason(
+            UUID traceId,
+            ProviderId providerId,
+            ModelId modelId,
+            String finishReason) {
         if (finishReason == null) {
+            finishReasonDiagnostics.reportUnknown(traceId, providerId, modelId, null);
             return TextGenerationResponse.FinishReason.UNKNOWN;
         }
         return switch (finishReason) {
             case "stop" -> TextGenerationResponse.FinishReason.COMPLETED;
             case "length" -> TextGenerationResponse.FinishReason.LENGTH_LIMIT;
             case "content_filter" -> TextGenerationResponse.FinishReason.CONTENT_FILTERED;
-            default -> TextGenerationResponse.FinishReason.UNKNOWN;
+            default -> {
+                finishReasonDiagnostics.reportUnknown(traceId, providerId, modelId, finishReason);
+                yield TextGenerationResponse.FinishReason.UNKNOWN;
+            }
         };
     }
 
@@ -110,6 +146,16 @@ final class OpenAiCompatibleTextPayloadMapper {
     }
 
     private record ChatRequest(String model, boolean stream, List<ChatMessage> messages) {
+    }
+
+    private record JsonObjectChatRequest(
+            String model,
+            boolean stream,
+            List<ChatMessage> messages,
+            ResponseFormat response_format) {
+    }
+
+    private record ResponseFormat(String type) {
     }
 
     private record ChatMessage(String role, String content) {

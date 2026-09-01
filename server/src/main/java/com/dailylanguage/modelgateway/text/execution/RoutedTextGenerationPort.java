@@ -1,6 +1,8 @@
 package com.dailylanguage.modelgateway.text.execution;
 
+import java.time.Duration;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -8,6 +10,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.dailylanguage.modelgateway.credential.TransientProviderCredential;
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
@@ -17,22 +22,29 @@ import com.dailylanguage.modelgateway.result.ModelResult;
 import com.dailylanguage.modelgateway.text.TextGenerationPort;
 import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 import com.dailylanguage.modelgateway.text.TextGenerationResponse;
+import com.dailylanguage.modelgateway.trace.ModelCallTrace;
+import com.dailylanguage.modelgateway.trace.ModelCallTraceRecorder;
 
 /**
  * 使用 fixed route 执行单次 Text Generation，并在最终 deadline 内归一化已知 Provider operational failure。
  */
 public final class RoutedTextGenerationPort implements TextGenerationPort {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(RoutedTextGenerationPort.class);
+
     private final FixedTextGenerationRoutes routes;
     private final ExecutorService modelCallExecutor;
+    private final ModelCallTraceRecorder traceRecorder;
 
     public RoutedTextGenerationPort(
             FixedTextGenerationRoutes routes,
-            ExecutorService modelCallExecutor) {
+            ExecutorService modelCallExecutor,
+            ModelCallTraceRecorder traceRecorder) {
         this.routes = Objects.requireNonNull(routes, "routes must not be null");
         this.modelCallExecutor = Objects.requireNonNull(
                 modelCallExecutor,
                 "modelCallExecutor must not be null");
+        this.traceRecorder = Objects.requireNonNull(traceRecorder, "traceRecorder must not be null");
     }
 
     @Override
@@ -41,6 +53,30 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
             TransientProviderCredential credential) {
         Objects.requireNonNull(request, "request must not be null");
         Objects.requireNonNull(credential, "credential must not be null");
+        UUID traceId = UUID.randomUUID();
+        long startedAtNanos = System.nanoTime();
+        try {
+            ModelResult<TextGenerationResponse> result = executeRoutedCall(traceId, request, credential);
+            recordTrace(ModelCallTrace.fromResult(
+                    traceId,
+                    request.purpose(),
+                    elapsedSince(startedAtNanos),
+                    result));
+            return result;
+        }
+        catch (RuntimeException | Error failure) {
+            recordTrace(ModelCallTrace.internalFailure(
+                    traceId,
+                    request.purpose(),
+                    elapsedSince(startedAtNanos)));
+            throw failure;
+        }
+    }
+
+    private ModelResult<TextGenerationResponse> executeRoutedCall(
+            UUID traceId,
+            TextGenerationRequest request,
+            TransientProviderCredential credential) {
         var route = routes.findRoute(request.purpose());
         if (route.isEmpty()) {
             return ModelResult.failure(ModelFailure.withoutRoute(ModelFailureKind.CAPABILITY_UNAVAILABLE));
@@ -54,18 +90,37 @@ public final class RoutedTextGenerationPort implements TextGenerationPort {
                     selectedRoute.modelId()));
         }
 
-        var result = executeAdapter(selectedRoute, request, credential);
+        var result = executeAdapter(traceId, selectedRoute, request, credential);
         validateResultRoute(selectedRoute, result);
         return result;
     }
 
+    private void recordTrace(ModelCallTrace trace) {
+        try {
+            traceRecorder.record(trace);
+        }
+        catch (RuntimeException exception) {
+            // Observability failure 不能改变原 Model result；只记录安全的 traceId 与 exception type。
+            LOGGER.warn(
+                    "Model call trace recording failed traceId={} exceptionType={}",
+                    trace.traceId(),
+                    exception.getClass().getName());
+        }
+    }
+
+    private static Duration elapsedSince(long startedAtNanos) {
+        return Duration.ofNanos(Math.max(0L, System.nanoTime() - startedAtNanos));
+    }
+
     private ModelResult<TextGenerationResponse> executeAdapter(
+            UUID traceId,
             TextGenerationRoute selectedRoute,
             TextGenerationRequest request,
             TransientProviderCredential credential) {
         Future<ModelResult<TextGenerationResponse>> future;
         try {
             future = modelCallExecutor.submit(() -> selectedRoute.adapter().generateText(
+                    traceId,
                     selectedRoute.providerId(),
                     selectedRoute.modelId(),
                     request,

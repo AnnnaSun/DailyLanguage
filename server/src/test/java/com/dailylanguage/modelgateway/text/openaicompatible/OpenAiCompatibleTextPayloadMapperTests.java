@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.dailylanguage.modelgateway.execution.ModelProviderCallException;
 import com.dailylanguage.modelgateway.result.ModelFailureKind;
@@ -23,6 +24,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
 
     private static final ProviderId DEEPSEEK_PROVIDER_ID = new ProviderId("deepseek");
     private static final ModelId SELECTED_MODEL_ID = new ModelId("deepseek-model");
+    private static final UUID TRACE_ID = UUID.fromString("6e699faf-f09b-46cf-9657-1b302296c71c");
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final OpenAiCompatibleTextPayloadMapper payloadMapper =
@@ -47,6 +49,22 @@ class OpenAiCompatibleTextPayloadMapperTests {
         assertThat(payload.at("/messages/1/role").stringValue()).isEqualTo("user");
         assertThat(payload.at("/messages/2/role").stringValue()).isEqualTo("assistant");
         assertThat(payload.at("/messages/0/content").stringValue()).isEqualTo("Reply naturally.");
+        assertThat(payload.has("response_format")).isFalse();
+    }
+
+    @Test
+    void requestsOpenAiCompatibleJsonObjectModeForThePortableSpecification() throws Exception {
+        TextGenerationRequest request = new TextGenerationRequest(
+                ModelPurpose.CONVERSATION,
+                List.of(new TextMessage(TextMessage.Role.USER, "Return a JSON object.")),
+                TextOutputSpecification.jsonObject());
+
+        JsonNode payload = jsonMapper.readTree(payloadMapper.writeRequest(SELECTED_MODEL_ID, request));
+
+        assertThat(payload.at("/response_format/type").stringValue()).isEqualTo("json_object");
+        assertThat(payload.get("model").stringValue()).isEqualTo(SELECTED_MODEL_ID.value());
+        assertThat(payload.get("stream").asBoolean()).isFalse();
+        assertThat(payload.get("messages")).hasSize(1);
     }
 
     @Test
@@ -63,6 +81,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
                 """;
 
         TextGenerationResponse response = payloadMapper.readResponse(
+                TRACE_ID,
                 DEEPSEEK_PROVIDER_ID,
                 SELECTED_MODEL_ID,
                 responseBody);
@@ -94,6 +113,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
                 """;
 
         TextGenerationResponse response = payloadMapper.readResponse(
+                TRACE_ID,
                 DEEPSEEK_PROVIDER_ID,
                 SELECTED_MODEL_ID,
                 responseBody);
@@ -113,6 +133,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
         ModelProviderCallException failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                 ModelProviderCallException.class,
                 () -> payloadMapper.readResponse(
+                        TRACE_ID,
                         DEEPSEEK_PROVIDER_ID,
                         SELECTED_MODEL_ID,
                         unsafeResponseBody));
@@ -129,6 +150,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
         ModelProviderCallException failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                 ModelProviderCallException.class,
                 () -> payloadMapper.readResponse(
+                        TRACE_ID,
                         DEEPSEEK_PROVIDER_ID,
                         SELECTED_MODEL_ID,
                         unsafeResponseBody));
@@ -144,6 +166,7 @@ class OpenAiCompatibleTextPayloadMapperTests {
                 {"choices": [{"message": {"content": "text"}, "finish_reason": "%s"}]}
                 """.formatted(rawFinishReason);
         return payloadMapper.readResponse(
+                TRACE_ID,
                 DEEPSEEK_PROVIDER_ID,
                 SELECTED_MODEL_ID,
                 responseBody).finishReason();
