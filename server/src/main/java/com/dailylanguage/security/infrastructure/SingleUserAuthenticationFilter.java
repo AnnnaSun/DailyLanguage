@@ -22,11 +22,11 @@ import com.dailylanguage.security.domain.UserContext;
  * Self-hosted singleton mode 的认证适配器：直接建立与 Hosted login 相同的 UserContext principal，
  * 使后续 Domain / authorization path 不需要按部署模式分叉。
  */
-final class SingleUserAuthenticationFilter extends OncePerRequestFilter {
+public final class SingleUserAuthenticationFilter extends OncePerRequestFilter {
 
     private final PersistentSingleUser persistentSingleUser;
 
-    SingleUserAuthenticationFilter(PersistentSingleUser persistentSingleUser) {
+    public SingleUserAuthenticationFilter(PersistentSingleUser persistentSingleUser) {
         this.persistentSingleUser = Objects.requireNonNull(
                 persistentSingleUser,
                 "persistentSingleUser must not be null");

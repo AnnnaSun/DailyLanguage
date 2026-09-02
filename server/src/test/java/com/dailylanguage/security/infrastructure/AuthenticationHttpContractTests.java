@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticationProvider;
 import com.dailylanguage.security.api.CurrentUserController;
+import com.dailylanguage.security.config.SecurityConfiguration;
 import com.dailylanguage.security.domain.UserContext;
 
 import static org.assertj.core.api.Assertions.assertThat;

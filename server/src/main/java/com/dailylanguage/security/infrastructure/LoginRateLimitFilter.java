@@ -17,14 +17,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 只拦截 login POST，并在进入 AuthenticationProvider / Argon2 前执行 Redis Rate Limit。
  * Redis 不可用时 fail closed，避免绕过资源保护继续做 password verification。
  */
-final class LoginRateLimitFilter extends OncePerRequestFilter {
+public final class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginRateLimitFilter.class);
 
     private final RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter;
     private final AuthenticationHttpResponseWriter authenticationHttpResponseWriter;
 
-    LoginRateLimitFilter(
+    public LoginRateLimitFilter(
             RedisAuthenticationAttemptRateLimiter authenticationAttemptRateLimiter,
             AuthenticationHttpResponseWriter authenticationHttpResponseWriter) {
         this.authenticationAttemptRateLimiter = Objects.requireNonNull(

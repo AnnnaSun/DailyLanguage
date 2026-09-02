@@ -21,7 +21,7 @@ import com.dailylanguage.authentication.infrastructure.LocalPasswordAuthenticati
 import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
 import com.dailylanguage.security.infrastructure.PersistentSingleUser;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
-import com.dailylanguage.security.infrastructure.SecurityConfiguration;
+import com.dailylanguage.security.config.SecurityConfiguration;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;

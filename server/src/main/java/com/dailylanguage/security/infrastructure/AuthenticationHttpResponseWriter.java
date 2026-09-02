@@ -30,15 +30,15 @@ public final class AuthenticationHttpResponseWriter {
         this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper must not be null");
     }
 
-    void writeInvalidCredentials(HttpServletResponse response) throws IOException {
+    public void writeInvalidCredentials(HttpServletResponse response) throws IOException {
         writeError(response, HttpStatus.UNAUTHORIZED, INVALID_CREDENTIALS);
     }
 
-    void writeUnauthenticated(HttpServletResponse response) throws IOException {
+    public void writeUnauthenticated(HttpServletResponse response) throws IOException {
         writeError(response, HttpStatus.UNAUTHORIZED, UNAUTHENTICATED);
     }
 
-    void writeAuthenticationUnavailable(HttpServletResponse response) throws IOException {
+    public void writeAuthenticationUnavailable(HttpServletResponse response) throws IOException {
         writeError(response, HttpStatus.SERVICE_UNAVAILABLE, AUTHENTICATION_UNAVAILABLE);
     }
 
