@@ -257,13 +257,24 @@ M0-S9 在 S7 transient Credential 与 S8 Structured Output / Trace foundation �
 - interactive wait timeout 只切换为 pending，不取消仍在最终 execution deadline 内的后台调用；
 - execution 与 consumption status 分离；`workflowVersion` 判断 stale，`rowVersion` 保护 consume-once；
 - PostgreSQL 保存 durable status / safe typed result，`Spring TaskExecutor` 执行当前内存任务；
+- Application Workflow 通过 operation-specific typed submission boundary 提交任务，不直接依赖
+  `TaskExecutor`、`Executor`、`Runnable` 或 broker API；当前 V1 adapter 仍是 bounded in-process
+  `TaskExecutor`；
+- submission `ACCEPTED` 只表示 execution boundary 已接纳任务；capacity rejection 必须显式返回，不能被误报为
+  Provider success 或 Job completion；
 - BYOK Credential 不进入 DB、Redis、Trace、Log 或 durable task payload；
 - 不引入 Kafka / RabbitMQ、automatic retry、Push Notification 或 generic workflow engine；
 - Planner / Evaluator 等内部结果由 owning Workflow 自动消费或标记 stale；用户可感知结果可以进入站内
   confirmation，但不得未经确认自动继续后续 Operation。
 
 Detailed Design 已批准并记录在 [`MODEL_CALL_JOB.md`](../features/MODEL_CALL_JOB.md)。M0-S9 implementation
-slice、schema、API 与 file scope 仍需在 S8 完成后单独批准；本决定不扩大当前 M0-S6E implementation。
+保持 slice-gated：每个尚未实现的 schema、API 与 file scope 仍需在修改前单独批准，不能由 Detailed Design
+自动授权。
+
+2026-09-02 amendment：批准以 typed submission boundary 隔离当前 in-process execution mechanism，并保留未来
+durable backlog 的替换口；不批准 Kafka、RabbitMQ、database-backed dispatcher、Credential persistence 或
+generic workflow engine。正式 Architecture Decision 见
+[`ADR-0004`](../adr/0004-model-call-job-submission-and-durable-backlog-boundary.md)。
 
 ### M0 Slice Control
 
@@ -1041,7 +1052,8 @@ M0-S8 Ownership: PARTIAL (Structured Output L2 module-local；Trace / Observabil
 Model Gateway remains L2)
 M0-S8 Integrated Closeout: PARTIAL / ACCEPTED for progression to M0-S9 Design / Scope
 M0-S9 Detailed Design: APPROVED
-M0-S9 Implementation Scope: NOT_APPROVED
+M0-S9 Implementation: IN_PROGRESS / SLICE-GATED（S9A–S9J 已提交；S9K1 REVIEW_PENDING；完整状态
+reconciliation 留在 M0-S9 closeout）
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与

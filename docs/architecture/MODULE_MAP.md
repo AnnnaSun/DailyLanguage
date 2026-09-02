@@ -1943,9 +1943,13 @@ Basic.
 
 Architecture:
 
-    Spring TaskExecutor
-    +
-    DB Job State
+    Application Workflow
+        ↓
+    Typed Job Submission Boundary
+        ↓
+    Spring TaskExecutor adapter
+        +
+    PostgreSQL Job State
 
 Targets:
 
@@ -1961,12 +1965,15 @@ Model Call Job owns:
 - PostgreSQL execution / consumption status；
 - stable `jobId`、workflow reference/version、optimistic-lock `rowVersion` 与 expiry；
 - interactive pending、late-result persistence 与 consume-once；
-- TaskExecutor execution using transient in-memory Credential。
+- operation-specific typed submission contract 与显式 capacity rejection；
+- TaskExecutor execution using transient in-memory Credential；
+- transport-agnostic Worker，使未来 execution mechanism 的替换优先收敛在 submission / dispatch boundary。
 
 Model Call Job must not:
 
 - persist Credential；
 - decide Provider routing、Gateway failure taxonomy 或 Learning State mutation；
+- expose `TaskExecutor`、`Executor`、`Runnable` 或 broker API to Application Workflow；
 - treat Kafka as queryable Job state；
 - automatically retry an outcome-unknown Provider call。
 
@@ -1975,6 +1982,10 @@ Kafka:
 `BACKLOG — scale driven`
 
 Do not introduce Kafka only for engineering display.
+
+`ADR-0004` 只批准 typed submission boundary 与未来 durable backlog evolution seam；V1 当前 adapter 仍是
+bounded in-process `TaskExecutor`。Kafka、RabbitMQ、database-backed dispatcher 与 durable Credential
+distribution 均未获批准。
 
 ---
 

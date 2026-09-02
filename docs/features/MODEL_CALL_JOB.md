@@ -2,7 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-08-30
-> Implementation scope: NOT_APPROVED
+> Architecture amendment: 2026-09-02 — typed submission boundary and durable backlog evolution seam
+> Implementation scope: SLICE-GATED
 > Foundation phase: M0-S9
 
 本文定义 V1 如何保存响应较慢但最终成功的 Model result，并让 Application Workflow 在结果仍有效时继续。
@@ -19,7 +20,9 @@ Application Workflow
         ↓
 Create ModelCallJob in PostgreSQL
         ↓
-Spring TaskExecutor + transient in-memory Credential
+Typed Model Operation Job Submission
+        ↓
+Spring TaskExecutor adapter + transient in-memory Credential
         ↓
 Typed Model Operation Port
         ↓
@@ -143,13 +146,21 @@ recovery policy 终止。
 V1 baseline：
 
 ```text
-Spring TaskExecutor
+Typed Job Submission Boundary
++ Spring TaskExecutor adapter
 + PostgreSQL Job State
 + bounded in-app polling
 ```
 
+Application Workflow 不直接依赖 Spring `TaskExecutor`、`Executor`、`Runnable` 或 broker client，而是依赖
+operation-specific typed submission boundary。当前 V1 adapter 使用 `modelCallJobTaskExecutor` 执行 Worker；
+`ACCEPTED` 只表示当前 execution boundary 已接纳任务，不表示 Provider 调用成功或 Job 已完成。Capacity
+rejection 必须显式返回，不能被吞掉或误报为 accepted；已创建 Job 的 rejection compensation 由独立 slice
+定义。
+
 这里的 TaskExecutor 只负责 Application / Job orchestration。Gateway final deadline 使用独立注入的 model-call
 ExecutorService；具体 bean、pool sizing 与 lifecycle configuration 在对应 implementation scope 中决定。
+Worker 保持 transport-agnostic，PostgreSQL 继续作为 Job status、typed result 与 consumption state authority。
 
 Kafka 不进入 V1 Model Call Job path。Kafka 不会自动截获 Provider response；仍需要存活的 Worker 收到响应
 并发布事件。Kafka message key 只提供 partition / ordering / correlation，不是 UI 可按 jobId 查询的业务
@@ -157,6 +168,14 @@ Kafka 不进入 V1 Model Call Job path。Kafka 不会自动截获 Provider respo
 
 只有真实出现跨实例吞吐、多消费者、replay、work queue / DLQ、per-profile ordering 或 DB-backed Job
 瓶颈时，才依据 `IDEA-002` 重新评估 Kafka / RabbitMQ。
+
+当前已批准保留 submission mechanism 的替换边界，但不代表 durable backlog 已获批准。未来采用
+database-backed dispatcher、Kafka 或 RabbitMQ 仍需独立 Architecture Decision。若 durable execution 依赖平台
+持有 Credential，还必须先批准 Secret Manager、rotation、access control 与 audit 等 Security Architecture。
+Transient BYOK 下的 restart invariant 不变：缺少 Credential 的 `RUNNING` Job 不得自动 retry。
+
+本节的正式决策轨迹见
+[`ADR-0004`](../adr/0004-model-call-job-submission-and-durable-backlog-boundary.md)。
 
 ## 8. V1 scope and phase
 

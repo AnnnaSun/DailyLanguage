@@ -31,6 +31,10 @@
 存储；Kafka delivery / exactly-once 不覆盖 transaction 外的 Provider side effect；BYOK Credential 也不得
 进入 topic。V1 因此继续由 PostgreSQL 保存 Job authority 与 typed result，由 TaskExecutor 执行当前内存任务。
 
+2026-09-02 已批准 `ADR-0004`：V1 在 Application Workflow 与 execution infrastructure 之间保留
+operation-specific typed submission boundary，当前 adapter 仍是 bounded in-process `TaskExecutor`。该边界只降低
+未来替换 submission mechanism 的影响范围，不增加当前吞吐，也不把本条目提升为已批准实现。
+
 ### Post-V1 Review
 
 V1 完成后，根据真实运行数据和瓶颈重新评估：
