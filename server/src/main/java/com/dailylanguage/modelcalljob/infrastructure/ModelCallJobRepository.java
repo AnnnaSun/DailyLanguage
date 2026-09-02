@@ -71,6 +71,19 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    public Optional<ModelCallJob> tryRecordSubmissionRejection(
+            UUID jobId,
+            UUID userId,
+            long expectedRowVersion) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        return modelCallJobMapper.tryRecordSubmissionRejection(jobId, userId, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
     @Transactional
     public Optional<ModelCallJob> tryRecordTextGenerationSuccess(
             UUID jobId,

@@ -90,7 +90,8 @@ Execution lifecycle 与 result consumption lifecycle 分离，避免一个 enum 
 
 ```text
 Execution Status:
-CREATED → RUNNING → SUCCEEDED
+CREATED → SUBMISSION_REJECTED
+        → RUNNING → SUCCEEDED
                   → FAILED
                   → TIMED_OUT
                   → OUTCOME_UNKNOWN
@@ -107,6 +108,8 @@ NOT_READY → PENDING_CONFIRMATION → CONSUMED
 - `EXPIRED`：结果超过允许保留或处理的时间；
 - `DISCARDED`：用户明确拒绝；
 - `CONSUMED`：Application Workflow 已使用该结果；
+- `SUBMISSION_REJECTED`：execution boundary 未接纳任务，Provider 未调用；这是 Job terminal state，
+  不属于 `ModelFailure`；
 - `OUTCOME_UNKNOWN`：Backend 无法确认 Provider execution outcome，例如进程在外部调用期间终止。
 
 ## 5. Completion policy by owning workflow
@@ -155,8 +158,9 @@ Typed Job Submission Boundary
 Application Workflow 不直接依赖 Spring `TaskExecutor`、`Executor`、`Runnable` 或 broker client，而是依赖
 operation-specific typed submission boundary。当前 V1 adapter 使用 `modelCallJobTaskExecutor` 执行 Worker；
 `ACCEPTED` 只表示当前 execution boundary 已接纳任务，不表示 Provider 调用成功或 Job 已完成。Capacity
-rejection 必须显式返回，不能被吞掉或误报为 accepted；已创建 Job 的 rejection compensation 由独立 slice
-定义。
+rejection 必须显式返回，不能被吞掉或误报为 accepted。S9K2 提供 owner-scoped、rowVersion-protected 的
+`CREATED → SUBMISSION_REJECTED` persistence transition；Application create + submit wiring 由后续独立 slice
+完成。
 
 这里的 TaskExecutor 只负责 Application / Job orchestration。Gateway final deadline 使用独立注入的 model-call
 ExecutorService；具体 bean、pool sizing 与 lifecycle configuration 在对应 implementation scope 中决定。

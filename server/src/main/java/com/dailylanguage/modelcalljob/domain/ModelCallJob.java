@@ -96,7 +96,7 @@ public record ModelCallJob(
     }
 
     public enum ExecutionStatus {
-        CREATED, RUNNING, SUCCEEDED, FAILED, TIMED_OUT, OUTCOME_UNKNOWN;
+        CREATED, RUNNING, SUCCEEDED, FAILED, TIMED_OUT, OUTCOME_UNKNOWN, SUBMISSION_REJECTED;
 
         boolean isTerminal() {
             return this != CREATED && this != RUNNING;

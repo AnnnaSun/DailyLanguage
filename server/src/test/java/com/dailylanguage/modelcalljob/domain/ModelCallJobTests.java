@@ -78,6 +78,27 @@ class ModelCallJobTests {
     }
 
     @Test
+    void acceptsSubmissionRejectedAsTerminalWithoutModelFailure() {
+        OffsetDateTime createdAt = OffsetDateTime.now();
+
+        assertThatCode(() -> persistedJob(
+                        ModelCallJob.ExecutionStatus.SUBMISSION_REJECTED,
+                        Optional.empty(),
+                        Optional.of(createdAt.plusSeconds(1)),
+                        createdAt,
+                        createdAt.plusHours(1)))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> persistedJob(
+                        ModelCallJob.ExecutionStatus.SUBMISSION_REJECTED,
+                        Optional.empty(),
+                        Optional.empty(),
+                        createdAt,
+                        createdAt.plusHours(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("completedAt must match terminal executionStatus");
+    }
+
+    @Test
     void rejectsInvalidPersistedTimestamps() {
         OffsetDateTime createdAt = OffsetDateTime.now();
 

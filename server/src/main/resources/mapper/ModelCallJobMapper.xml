@@ -94,6 +94,19 @@
         RETURNING <include refid="jobColumns"/>
     </select>
 
+    <select id="tryRecordSubmissionRejection"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET execution_status = 'SUBMISSION_REJECTED',
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'CREATED'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
     <select id="tryCompleteTextGeneration" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
         UPDATE model_call_job
         SET provider_id = #{providerId, jdbcType=VARCHAR},
