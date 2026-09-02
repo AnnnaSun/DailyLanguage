@@ -201,3 +201,4 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | Text Generation Credential Propagation | IMPLEMENTED | M0-S7A / M0-S8C / M0-S8D | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |
 | OpenAI-compatible Text Provider Call | IMPLEMENTED | M0-S7B / M0-S7C / M0-S8A / M0-S8D | [`text-generation-openai-compatible-provider.md`](text-generation-openai-compatible-provider.md) |
 | Model Provider Connection Verification | IMPLEMENTED | M0-S7D / M0-S8C | [`model-provider-connection-verification.md`](model-provider-connection-verification.md) |
+| Text Generation Job Start | IMPLEMENTED | M0-S9K1 / M0-S9K2 / M0-S9K3 | [`text-generation-job-start.md`](text-generation-job-start.md) |

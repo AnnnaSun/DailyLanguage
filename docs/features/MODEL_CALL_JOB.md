@@ -159,8 +159,9 @@ Application Workflow 不直接依赖 Spring `TaskExecutor`、`Executor`、`Runna
 operation-specific typed submission boundary。当前 V1 adapter 使用 `modelCallJobTaskExecutor` 执行 Worker；
 `ACCEPTED` 只表示当前 execution boundary 已接纳任务，不表示 Provider 调用成功或 Job 已完成。Capacity
 rejection 必须显式返回，不能被吞掉或误报为 accepted。S9K2 提供 owner-scoped、rowVersion-protected 的
-`CREATED → SUBMISSION_REJECTED` persistence transition；Application create + submit wiring 由后续独立 slice
-完成。
+`CREATED → SUBMISSION_REJECTED` persistence transition；S9K3 的 operation-specific Application start
+component 负责先创建 Job，再构造 transient work item 并提交。该入口禁止加入调用方事务，确保 Worker
+开始认领前 Job 已对其他数据库连接可见；capacity rejection 只有在终态成功持久化后才返回。
 
 这里的 TaskExecutor 只负责 Application / Job orchestration。Gateway final deadline 使用独立注入的 model-call
 ExecutorService；具体 bean、pool sizing 与 lifecycle configuration 在对应 implementation scope 中决定。
