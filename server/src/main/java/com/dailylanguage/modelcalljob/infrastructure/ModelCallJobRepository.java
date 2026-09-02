@@ -52,6 +52,15 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    public Optional<TextGenerationResponse> findTextGenerationResultByJobIdAndUserId(
+            UUID jobId,
+            UUID userId) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        return modelCallJobMapper.findTextGenerationResultByJobIdAndUserId(jobId, userId)
+                .map(ModelCallJobRepository::toTextGenerationResponse);
+    }
+
     public Optional<ModelCallJob> tryStartExecution(UUID jobId, UUID userId, long expectedRowVersion) {
         Objects.requireNonNull(jobId, "jobId must not be null");
         Objects.requireNonNull(userId, "userId must not be null");
@@ -151,6 +160,18 @@ public class ModelCallJobRepository {
                 retryAfter));
     }
 
+    private static TextGenerationResponse toTextGenerationResponse(StoredTextGenerationResult result) {
+        Optional<ModelUsage> usage = result.inputTokens() == null
+                ? Optional.empty()
+                : Optional.of(new ModelUsage(result.inputTokens(), result.outputTokens()));
+        return new TextGenerationResponse(
+                new ProviderId(result.providerId()),
+                new ModelId(result.modelId()),
+                result.generatedText(),
+                TextGenerationResponse.FinishReason.valueOf(result.finishReason()),
+                usage);
+    }
+
     private static long toWholeRetryAfterSeconds(Duration retryAfter) {
         long completeSeconds = retryAfter.getSeconds();
         return retryAfter.getNano() == 0
@@ -171,6 +192,15 @@ record StoredModelCallJob(
         String executionStatus, String consumptionStatus, String failureKind,
         Long failureRetryAfterSeconds, long rowVersion,
         OffsetDateTime createdAt, OffsetDateTime completedAt, OffsetDateTime expiresAt) {
+}
+
+record StoredTextGenerationResult(
+        String providerId,
+        String modelId,
+        String generatedText,
+        String finishReason,
+        Long inputTokens,
+        Long outputTokens) {
 }
 
 record TextGenerationSuccessRow(

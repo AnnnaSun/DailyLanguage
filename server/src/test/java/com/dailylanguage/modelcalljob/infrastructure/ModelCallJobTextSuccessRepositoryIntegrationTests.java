@@ -73,6 +73,60 @@ class ModelCallJobTextSuccessRepositoryIntegrationTests {
     }
 
     @Test
+    void readsStoredTextGenerationResultForOwner() {
+        UUID userId = userRepository.create();
+        ModelCallJob runningJob = createAndStartJob(
+                userId, ModelOperation.TEXT_GENERATION, Optional.empty(), Optional.empty());
+        TextGenerationResponse response = new TextGenerationResponse(
+                PROVIDER_ID,
+                MODEL_ID,
+                "Stored result",
+                TextGenerationResponse.FinishReason.LENGTH_LIMIT,
+                Optional.of(new ModelUsage(12, 7)));
+        modelCallJobRepository.tryRecordTextGenerationSuccess(
+                runningJob.id(), userId, runningJob.rowVersion(), response).orElseThrow();
+
+        assertThat(modelCallJobRepository.findTextGenerationResultByJobIdAndUserId(
+                runningJob.id(), userId)).contains(response);
+    }
+
+    @Test
+    void readsStoredTextGenerationResultWithoutUsage() {
+        UUID userId = userRepository.create();
+        ModelCallJob runningJob = createAndStartJob(
+                userId, ModelOperation.TEXT_GENERATION, Optional.empty(), Optional.empty());
+        TextGenerationResponse response = response("No usage");
+        modelCallJobRepository.tryRecordTextGenerationSuccess(
+                runningJob.id(), userId, runningJob.rowVersion(), response).orElseThrow();
+
+        assertThat(modelCallJobRepository.findTextGenerationResultByJobIdAndUserId(
+                runningJob.id(), userId)).contains(response);
+    }
+
+    @Test
+    void doesNotExposeStoredTextGenerationResultToAnotherOwner() {
+        UUID ownerUserId = userRepository.create();
+        UUID otherUserId = userRepository.create();
+        ModelCallJob runningJob = createAndStartJob(
+                ownerUserId, ModelOperation.TEXT_GENERATION, Optional.empty(), Optional.empty());
+        modelCallJobRepository.tryRecordTextGenerationSuccess(
+                runningJob.id(), ownerUserId, runningJob.rowVersion(), response("Private result")).orElseThrow();
+
+        assertThat(modelCallJobRepository.findTextGenerationResultByJobIdAndUserId(
+                runningJob.id(), otherUserId)).isEmpty();
+    }
+
+    @Test
+    void doesNotReturnResultBeforeSuccessfulCompletion() {
+        UUID userId = userRepository.create();
+        ModelCallJob runningJob = createAndStartJob(
+                userId, ModelOperation.TEXT_GENERATION, Optional.empty(), Optional.empty());
+
+        assertThat(modelCallJobRepository.findTextGenerationResultByJobIdAndUserId(
+                runningJob.id(), userId)).isEmpty();
+    }
+
+    @Test
     void staleVersionCannotOverwriteStoredResult() {
         UUID userId = userRepository.create();
         ModelCallJob runningJob = createAndStartJob(

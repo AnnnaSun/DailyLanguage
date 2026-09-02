@@ -15,6 +15,10 @@ interface ModelCallJobMapper {
             @Param("jobId") UUID jobId,
             @Param("userId") UUID userId);
 
+    Optional<StoredTextGenerationResult> findTextGenerationResultByJobIdAndUserId(
+            @Param("jobId") UUID jobId,
+            @Param("userId") UUID userId);
+
     Optional<StoredModelCallJob> tryStartExecution(
             @Param("jobId") UUID jobId,
             @Param("userId") UUID userId,

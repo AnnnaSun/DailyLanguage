@@ -31,6 +31,18 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="storedTextGenerationResult"
+               type="com.dailylanguage.modelcalljob.infrastructure.StoredTextGenerationResult">
+        <constructor>
+            <arg column="provider_id" javaType="java.lang.String"/>
+            <arg column="model_id" javaType="java.lang.String"/>
+            <arg column="generated_text" javaType="java.lang.String"/>
+            <arg column="finish_reason" javaType="java.lang.String"/>
+            <arg column="input_tokens" javaType="java.lang.Long"/>
+            <arg column="output_tokens" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
     <sql id="jobColumns">
         id, user_id, language_profile_id, model_purpose, model_operation, provider_id, model_id,
         workflow_id, workflow_step_id, workflow_version, execution_status, consumption_status,
@@ -58,6 +70,17 @@
         FROM model_call_job
         WHERE id = #{jobId, jdbcType=OTHER}
           AND user_id = #{userId, jdbcType=OTHER}
+    </select>
+
+    <select id="findTextGenerationResultByJobIdAndUserId" resultMap="storedTextGenerationResult">
+        SELECT job.provider_id, job.model_id,
+               result.generated_text, result.finish_reason, result.input_tokens, result.output_tokens
+        FROM model_call_job job
+        JOIN model_call_text_generation_result result ON result.job_id = job.id
+        WHERE job.id = #{jobId, jdbcType=OTHER}
+          AND job.user_id = #{userId, jdbcType=OTHER}
+          AND job.model_operation = 'TEXT_GENERATION'
+          AND job.execution_status = 'SUCCEEDED'
     </select>
 
     <select id="tryStartExecution" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
