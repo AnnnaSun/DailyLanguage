@@ -5,6 +5,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.dailylanguage.modelgateway.result.ModelFailure;
+import com.dailylanguage.modelgateway.result.ModelFailureKind;
 import com.dailylanguage.modelgateway.routing.ModelId;
 import com.dailylanguage.modelgateway.routing.ModelOperation;
 import com.dailylanguage.modelgateway.routing.ModelPurpose;
@@ -23,6 +25,7 @@ public record ModelCallJob(
         long workflowVersion,
         ExecutionStatus executionStatus,
         ConsumptionStatus consumptionStatus,
+        Optional<ModelFailure> failure,
         long rowVersion,
         OffsetDateTime createdAt,
         Optional<OffsetDateTime> completedAt,
@@ -39,6 +42,7 @@ public record ModelCallJob(
         validateWorkflow(workflowStepId, workflowVersion);
         Objects.requireNonNull(executionStatus, "executionStatus must not be null");
         Objects.requireNonNull(consumptionStatus, "consumptionStatus must not be null");
+        validateFailure(executionStatus, failure);
         if (rowVersion < 0) {
             throw new IllegalArgumentException("rowVersion must not be negative");
         }
@@ -71,6 +75,23 @@ public record ModelCallJob(
         }
         if (workflowVersion < 0) {
             throw new IllegalArgumentException("workflowVersion must not be negative");
+        }
+    }
+
+    private static void validateFailure(ExecutionStatus executionStatus, Optional<ModelFailure> failure) {
+        Objects.requireNonNull(failure, "failure must not be null");
+        boolean requiresFailure = executionStatus == ExecutionStatus.FAILED
+                || executionStatus == ExecutionStatus.TIMED_OUT;
+        if (requiresFailure != failure.isPresent()) {
+            throw new IllegalArgumentException("failure must match FAILED or TIMED_OUT executionStatus");
+        }
+        if (executionStatus == ExecutionStatus.TIMED_OUT
+                && failure.orElseThrow().kind() != ModelFailureKind.TIMEOUT) {
+            throw new IllegalArgumentException("TIMED_OUT executionStatus requires TIMEOUT failure");
+        }
+        if (executionStatus == ExecutionStatus.FAILED
+                && failure.orElseThrow().kind() == ModelFailureKind.TIMEOUT) {
+            throw new IllegalArgumentException("TIMEOUT failure requires TIMED_OUT executionStatus");
         }
     }
 

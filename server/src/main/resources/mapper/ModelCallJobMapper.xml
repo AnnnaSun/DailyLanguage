@@ -22,6 +22,8 @@
             <arg column="workflow_version" javaType="_long"/>
             <arg column="execution_status" javaType="java.lang.String"/>
             <arg column="consumption_status" javaType="java.lang.String"/>
+            <arg column="failure_kind" javaType="java.lang.String"/>
+            <arg column="failure_retry_after_seconds" javaType="java.lang.Long"/>
             <arg column="row_version" javaType="_long"/>
             <arg column="created_at" javaType="java.time.OffsetDateTime"/>
             <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
@@ -32,6 +34,7 @@
     <sql id="jobColumns">
         id, user_id, language_profile_id, model_purpose, model_operation, provider_id, model_id,
         workflow_id, workflow_step_id, workflow_version, execution_status, consumption_status,
+        failure_kind, failure_retry_after_seconds,
         row_version, created_at, completed_at, expires_at
     </sql>
 
@@ -97,4 +100,25 @@
             #{outputTokens, jdbcType=BIGINT}
         )
     </insert>
+
+    <select id="tryCompleteFailure" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET provider_id = COALESCE(provider_id, #{providerId, jdbcType=VARCHAR}),
+            model_id = COALESCE(model_id, #{modelId, jdbcType=VARCHAR}),
+            execution_status = #{terminalExecutionStatus, jdbcType=VARCHAR},
+            failure_kind = #{failureKind, jdbcType=VARCHAR},
+            failure_retry_after_seconds = #{retryAfterSeconds, jdbcType=BIGINT},
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'RUNNING'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND (
+              (provider_id IS NULL AND model_id IS NULL)
+              OR (provider_id = #{providerId, jdbcType=VARCHAR}
+                  AND model_id = #{modelId, jdbcType=VARCHAR})
+          )
+        RETURNING <include refid="jobColumns"/>
+    </select>
 </mapper>

@@ -93,25 +93,23 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
     }
 
     @Test
-    void storesSafeFailureWithExactRetryAfter() {
+    void storesSafeFailureWithWholeSecondRetryAfter() {
         UUID userId = userRepository.create();
         UUID jobId = insertRunningJob(userId, "TEXT_GENERATION", "deepseek", "deepseek-chat");
 
-        int updated = updateFailure(jobId, "FAILED", "RATE_LIMITED", 12L, 345_678_901);
+        int updated = updateFailure(jobId, "FAILED", "RATE_LIMITED", 12L);
 
         assertThat(updated).isEqualTo(1);
         assertThat(jdbcTemplate.queryForMap("""
                 SELECT execution_status,
                        failure_kind,
-                       failure_retry_after_seconds,
-                       failure_retry_after_nanos
+                       failure_retry_after_seconds
                 FROM model_call_job
                 WHERE id = ?
                 """, jobId))
                 .containsEntry("execution_status", "FAILED")
                 .containsEntry("failure_kind", "RATE_LIMITED")
-                .containsEntry("failure_retry_after_seconds", 12L)
-                .containsEntry("failure_retry_after_nanos", 345_678_901);
+                .containsEntry("failure_retry_after_seconds", 12L);
     }
 
     @ParameterizedTest
@@ -127,7 +125,7 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
         UUID userId = userRepository.create();
         UUID jobId = insertRunningJob(userId, "TEXT_GENERATION", "deepseek", "deepseek-chat");
 
-        assertThatThrownBy(() -> updateFailure(jobId, executionStatus, failureKind, null, null))
+        assertThatThrownBy(() -> updateFailure(jobId, executionStatus, failureKind, null))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -137,13 +135,12 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
             String providerId,
             String modelId,
             String failureKind,
-            Long retryAfterSeconds,
-            Integer retryAfterNanos) {
+            Long retryAfterSeconds) {
         UUID userId = userRepository.create();
         UUID jobId = insertRunningJob(userId, "TEXT_GENERATION", providerId, modelId);
 
         assertThatThrownBy(() -> updateFailure(
-                        jobId, "FAILED", failureKind, retryAfterSeconds, retryAfterNanos))
+                        jobId, "FAILED", failureKind, retryAfterSeconds))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -153,12 +150,25 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
         UUID jobId = insertRunningJob(userId, "TEXT_GENERATION", "deepseek", "deepseek-chat");
 
         assertThatThrownBy(() -> jdbcTemplate.update("""
-                        UPDATE model_call_job
-                        SET failure_retry_after_seconds = 1,
-                            failure_retry_after_nanos = 0
-                        WHERE id = ?
-                        """, jobId))
+                UPDATE model_call_job
+                SET failure_retry_after_seconds = 1
+                WHERE id = ?
+                """, jobId))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void exposesOnlyWholeSecondFailureRetryAfterColumn() {
+        List<String> columnNames = jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'model_call_job'
+                  AND column_name LIKE 'failure_retry_after_%'
+                ORDER BY ordinal_position
+                """, String.class);
+
+        assertThat(columnNames).containsExactly("failure_retry_after_seconds");
     }
 
     @Test
@@ -232,21 +242,18 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
             UUID jobId,
             String executionStatus,
             String failureKind,
-            Long retryAfterSeconds,
-            Integer retryAfterNanos) {
+            Long retryAfterSeconds) {
         return jdbcTemplate.update("""
                 UPDATE model_call_job
                 SET execution_status = ?,
                     failure_kind = ?,
                     failure_retry_after_seconds = ?,
-                    failure_retry_after_nanos = ?,
                     completed_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 executionStatus,
                 failureKind,
                 retryAfterSeconds,
-                retryAfterNanos,
                 jobId);
     }
 
@@ -259,9 +266,9 @@ class ModelCallJobOutcomeSchemaIntegrationTests {
 
     private static Stream<Arguments> invalidRetryAfterFailures() {
         return Stream.of(
-                Arguments.of(null, null, "RATE_LIMITED", 1L, 0),
-                Arguments.of("deepseek", "deepseek-chat", "PROVIDER_FAILURE", 1L, 0),
-                Arguments.of("deepseek", "deepseek-chat", "RATE_LIMITED", 0L, 0),
-                Arguments.of("deepseek", "deepseek-chat", "RATE_LIMITED", 1L, null));
+                Arguments.of(null, null, "RATE_LIMITED", 1L),
+                Arguments.of("deepseek", "deepseek-chat", "PROVIDER_FAILURE", 1L),
+                Arguments.of("deepseek", "deepseek-chat", "RATE_LIMITED", 0L),
+                Arguments.of("deepseek", "deepseek-chat", "RATE_LIMITED", -1L));
     }
 }

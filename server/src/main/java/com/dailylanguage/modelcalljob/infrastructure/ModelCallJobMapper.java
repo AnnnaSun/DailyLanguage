@@ -23,4 +23,6 @@ interface ModelCallJobMapper {
     Optional<StoredModelCallJob> tryCompleteTextGeneration(TextGenerationSuccessRow success);
 
     int insertTextGenerationResult(TextGenerationSuccessRow success);
+
+    Optional<StoredModelCallJob> tryCompleteFailure(ModelCallJobFailureRow failure);
 }

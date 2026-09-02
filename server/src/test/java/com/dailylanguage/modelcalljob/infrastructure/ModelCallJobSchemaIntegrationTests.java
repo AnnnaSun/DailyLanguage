@@ -320,8 +320,7 @@ class ModelCallJobSchemaIntegrationTests {
                 "completed_at",
                 "expires_at",
                 "failure_kind",
-                "failure_retry_after_seconds",
-                "failure_retry_after_nanos");
+                "failure_retry_after_seconds");
     }
 
     private UUID insertJob(

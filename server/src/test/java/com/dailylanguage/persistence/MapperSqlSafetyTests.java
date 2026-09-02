@@ -58,6 +58,9 @@ class MapperSqlSafetyTests {
                 .contains("#{finishReason, jdbcType=VARCHAR}")
                 .contains("#{inputTokens, jdbcType=BIGINT}")
                 .contains("#{outputTokens, jdbcType=BIGINT}")
+                .contains("#{terminalExecutionStatus, jdbcType=VARCHAR}")
+                .contains("#{failureKind, jdbcType=VARCHAR}")
+                .contains("#{retryAfterSeconds, jdbcType=BIGINT}")
                 .contains("#{expiresAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}")
                 .doesNotContain("${");
     }
