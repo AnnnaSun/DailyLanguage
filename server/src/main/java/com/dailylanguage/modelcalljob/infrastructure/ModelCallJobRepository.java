@@ -132,6 +132,30 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    public Optional<ModelCallJob> tryConsumeSucceededResult(
+            UUID jobId,
+            UUID userId,
+            long currentWorkflowVersion,
+            long expectedRowVersion) {
+        validateConsumptionTransitionArguments(
+                jobId, userId, currentWorkflowVersion, expectedRowVersion);
+        return modelCallJobMapper.tryConsumeSucceededResult(
+                        jobId, userId, currentWorkflowVersion, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
+    public Optional<ModelCallJob> tryMarkSucceededResultStale(
+            UUID jobId,
+            UUID userId,
+            long currentWorkflowVersion,
+            long expectedRowVersion) {
+        validateConsumptionTransitionArguments(
+                jobId, userId, currentWorkflowVersion, expectedRowVersion);
+        return modelCallJobMapper.tryMarkSucceededResultStale(
+                        jobId, userId, currentWorkflowVersion, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
     private static ModelCallJob toDomain(StoredModelCallJob job) {
         ModelCallJob.ExecutionStatus executionStatus = ModelCallJob.ExecutionStatus.valueOf(job.executionStatus());
         return new ModelCallJob(
@@ -170,6 +194,21 @@ public class ModelCallJobRepository {
                 result.generatedText(),
                 TextGenerationResponse.FinishReason.valueOf(result.finishReason()),
                 usage);
+    }
+
+    private static void validateConsumptionTransitionArguments(
+            UUID jobId,
+            UUID userId,
+            long currentWorkflowVersion,
+            long expectedRowVersion) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (currentWorkflowVersion < 0) {
+            throw new IllegalArgumentException("currentWorkflowVersion must not be negative");
+        }
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
     }
 
     private static long toWholeRetryAfterSeconds(Duration retryAfter) {

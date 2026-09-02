@@ -1,10 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.5
+> Version: 1.6
 > Approved: 2026-08-21
-> Last updated: 2026-08-30 — Model Call Job and late-result recovery
-> Last updated: 2026-08-29 — Provider-free Learning Baseline
+> Last updated: 2026-09-02 — Public Language Reference Source Boundary
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -46,6 +45,12 @@ V1 已批准 `Provider-free Learning Baseline`：用户未提供 Model Provider 
 Built-in Content 完成最小 Practice，并产生与 deterministic source 相符的 Assessment / Evidence。
 首个 Content Pack 使用 `targetLanguage=en`、`supportLanguage=zh-CN`；起始能力范围和内容数量留到
 M1 Scope Decision。详细 Contract 见 `docs/features/PROVIDER_FREE_LEARNING.md`。
+
+V1 同时批准 `Public Language Reference Source Boundary`：词典、语料、发音参考和语言 / 考试规范以
+read-only、versioned、带 provenance / license 的公共 Reference 进入 Built-in Content preparation 或
+M3 retrieval。Provider-free runtime 必须解析到本地已验证 artifact，不依赖 live public source；公共
+connector 不接收个人学习数据，Public / RAG Result 不直接修改长期学习状态。详细 Contract 见
+`docs/features/PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`。
 
 ### 3.2 Product North Star and Success Model
 
@@ -240,6 +245,7 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - BYOK transient credential handling；
 - PostgreSQL-backed Model Call Job、late-result capture 与 versioned consume；
 - Provider-free Built-in Text Practice baseline；
+- 首个 `en + zh-CN` Built-in Text Pack 的 immutable Public Source lineage / provenance；
 - Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
 - Text Practice / Conversation 的最小闭环；
 - deterministic assessment + validated semantic candidate 的 Session-level Evaluation；
@@ -256,6 +262,9 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - lightweight Practice Feedback；
 - Reading / imported content 的最小训练路径；
 - 基础 Content retrieval / RAG，且 Retrieval Result 只作为 Context；
+- Public Source Catalog、typed read-only text reference operation，以及公共 / 个人 retrieval isolation；
+- 至少一个经批准的 dictionary / lexical reference source 与一个 curated corpus source；
+- 有限、官方、带版本的 language / exam descriptor reference；
 - Tool Gateway 与 Controlled Multi-role Agent Workflow，用于 grounded material preparation / review；
 - Milestone Check；
 - Listening 与 turn-based Voice 的受控最小能力；
@@ -270,7 +279,9 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - advanced assessment mechanisms；
 - advanced feedback dispute / appeal；
 - realtime full-duplex voice；
-- 完整零基础课程、全语言 Built-in Content 与大规模通用词库；
+- 完整零基础课程、全语言 Built-in / Public Source Bundle 与大规模通用词库或完整公共语料镜像；
+- 完整 exam curriculum、考试题库、未经官方依据的 score equivalence 与 pronunciation scoring；
+- live public source 作为 Provider-free runtime 硬依赖，或公共 connector 接收个人学习数据；
 - System-managed Provider 与 bundled local Model；
 - 由 LLM 直接修改长期 Level、Weakness 或 Mastery；
 - 业务模块直接依赖具体 Model Provider SDK；
@@ -284,9 +295,9 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 | Phase | Name | Primary outcome |
 | --- | --- | --- |
 | M0 | Engineering Foundation & Language Workspace | 建立可运行工程、状态 authority、语言隔离与 Model/BYOK 边界 |
-| M1 | Minimum Text Practice Loop | 跑通一次 text practice 与 session-level evaluation |
+| M1 | Minimum Text Practice Loop | 跑通一次 text practice、source-lineage Built-in artifact 与 session-level evaluation |
 | M2 | Persistent Adaptation Loop | Evidence 进入长期状态并影响下一次 Planner 决策 |
-| M3 | Content / RAG / Multi-role Agent Workflow | grounded retrieval、Tool Gateway 和受控 Multi-role Agent Workflow 进入统一 Evidence 链路 |
+| M3 | Content / RAG / Multi-role Agent Workflow | Public Reference、grounded retrieval、Tool Gateway 和受控 Multi-role Agent Workflow 进入统一 Evidence 链路 |
 | M4 | Learning Completeness | 补齐 Milestone Check、Review 与 V1 学习完整性 |
 | M5 | Listening / Turn-based Voice | 增加非实时的听说训练闭环 |
 | M6 | V1 Hardening & Evidence Delivery | 完成 security、reliability、Eval、capacity、CI、部署与 interview evidence 验收 |

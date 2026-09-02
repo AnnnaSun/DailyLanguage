@@ -144,4 +144,34 @@
           )
         RETURNING <include refid="jobColumns"/>
     </select>
+
+    <select id="tryConsumeSucceededResult"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET consumption_status = 'CONSUMED',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'SUCCEEDED'
+          AND consumption_status = 'NOT_READY'
+          AND workflow_version = #{currentWorkflowVersion, jdbcType=BIGINT}
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND expires_at > CURRENT_TIMESTAMP
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryMarkSucceededResultStale"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET consumption_status = 'STALE',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'SUCCEEDED'
+          AND consumption_status = 'NOT_READY'
+          AND workflow_version &lt; #{currentWorkflowVersion, jdbcType=BIGINT}
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND expires_at > CURRENT_TIMESTAMP
+        RETURNING <include refid="jobColumns"/>
+    </select>
 </mapper>

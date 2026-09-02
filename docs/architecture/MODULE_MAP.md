@@ -1040,6 +1040,7 @@ Responsibility:
 - SYSTEM_CONTENT；
 - AI_GENERATED；
 - USER_IMPORT；
+- PUBLIC_REFERENCE；
 - 后续 OPEN_CONTENT。
 
 Provides:
@@ -1050,7 +1051,8 @@ Provides:
 - difficulty；
 - duration；
 - content type；
-- source。
+- source；
+- source version / provenance / license。
 
 Consumers:
 
@@ -1062,7 +1064,8 @@ Consumers:
 Must Not:
 
 - 根据用户等级硬锁全部内容；
-- 自动删除疑似重复用户内容。
+- 自动删除疑似重复用户内容；
+- 把公共 Reference 与 User Import 混成没有来源和权限语义的 Content。
 
 Architecture Importance:
 
@@ -1143,6 +1146,85 @@ Architecture Importance:
 
 ---
 
+## 7.3 Public Language Reference Sources
+
+Source Module:
+
+`22 / 23 — Content Library / Content Pipeline sub-boundary`
+
+V1:
+
+`P0 source lineage / P1-M3 read-only text reference / P1-M5 verified audio`
+
+Responsibility:
+
+为词典、语料、发音参考和语言 / 考试规范提供：
+
+- read-only Public Source Catalog；
+- versioned source manifest、provenance、license 与 attribution；
+- Dictionary Lookup、Corpus Search、Pronunciation Reference Lookup 与 Language / Exam Specification Lookup；
+- M1 / M5 Built-in artifact 的 immutable source lineage；
+- M3 Content preparation / retrieval 所需的 typed Public Reference Result。
+
+Provider-free Flow:
+
+    Approved Public Source
+      ↓ Controlled Import / Curation
+    License + Quality + Provenance Validation
+      ↓
+    Immutable Versioned Source Bundle
+      ↓
+    Built-in Content / Audio Artifact
+      ↓
+    Provider-free Practice
+
+M3 Read-only Flow:
+
+    Minimal Typed Query
+      ↓
+    Read-only Source Adapter
+      ↓
+    Schema + Provenance Validation
+      ↓
+    Public Reference Result
+      ↓
+    Content / RAG / Tool Gateway
+
+Data Boundary:
+
+- Public Reference 可以跨用户共享，并按 `sourceId + sourceVersion + targetLanguage` 等公共 identity 管理；
+- Language Profile、PracticeSession、用户回答、Evidence、Learning Memory 与 User Import 属于个人学习 /
+  私有内容边界；
+- public connector query 不携带 `userId`、`languageProfileId`、完整 Conversation、用户原始回答、长期状态
+  或 User Import 私密原文；
+- Public Reference Result 只作为 Reference / Context，不产生用户成功 / 失败 Evidence，也不修改长期状态。
+
+Initial V1 Delivery:
+
+- `en + zh-CN` Built-in Text artifact source lineage；
+- M3 至少一个经批准的 dictionary / lexical reference source 与一个 curated corpus source；
+- M3 有限、官方、带版本的 language / exam descriptor reference；
+- M5 带 source、license、version、locale / accent 与 quality provenance 的固定音频。
+
+Must Not:
+
+- 把 live public source 作为 Provider-free runtime 硬依赖；
+- 因 source 暂时不可用而改变已发布 Practice 语义；
+- 使用万能 Source DTO、arbitrary metadata Map 或自由 Prompt 绕过 query minimization；
+- 把公开可访问等同于允许抓取、修改、缓存或再分发；
+- 将 corpus frequency、exam descriptor、dictionary entry 或 pronunciation reference 直接视为 Learner Model truth；
+- 提前实现全语言 bundle、大规模通用词库 / 语料镜像、完整 exam curriculum 或 pronunciation scoring。
+
+Architecture Importance:
+
+`A — Critical for data / permission / learning-state authority boundary`
+
+Detailed Contract:
+
+`docs/features/PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`
+
+---
+
 # 8. Retrieval & Context / 检索与上下文
 
 ## 8.1 RAG / Retrieval
@@ -1169,6 +1251,7 @@ Advanced Hybrid Retrieval:
 
 Logical retrieval domains:
 
+- Public Reference；
 - Personal Memory；
 - Content Library；
 - User Import。
@@ -1189,7 +1272,9 @@ Do Not Use RAG For:
 Must Not:
 
 - 把 Retrieval Result 直接视为长期状态事实；
-- 跨 user / languageProfile 检索。
+- 跨 user / languageProfile 检索；
+- 混淆 Public Reference、Personal Memory 与 User Import 的 result domain / provenance；
+- 将个人学习数据或 User Import 私密原文发送给 public connector。
 
 Architecture Importance:
 
@@ -1427,7 +1512,8 @@ Logical components:
 
 - SpeechToText Provider；
 - TextToSpeech Provider；
-- Pronunciation Provider interface。
+- Pronunciation Provider interface；
+- verified Pronunciation Reference Audio source bundle。
 
 Voice Conversation:
 
@@ -1444,7 +1530,9 @@ Voice Conversation:
 Must Not:
 
 - STT success = pronunciation accuracy；
-- STT failure = pronunciation weakness。
+- STT failure = pronunciation weakness；
+- 单一 reference audio / accent = 唯一标准发音；
+- 缺少 source、license、version、locale / accent 或 quality provenance 的音频成为 Built-in Evidence authority。
 
 Architecture Importance:
 
@@ -2162,6 +2250,7 @@ RAG Result 返回 Context。
 | Weakness / Skill | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Review | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Content Pipeline | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Public Language Reference Sources | TBD | TBD | TBD | TBD | NOT_STARTED — APPROVED DESIGN；M1 source lineage、M3 read-only text reference / public-personal isolation、M5 verified audio |
 | RAG | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Context Manager | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Tool Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |

@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.3
+> Version: 1.4
 > Approved: 2026-08-20  
-> Last updated: 2026-08-30
+> Last updated: 2026-09-02
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -52,6 +52,11 @@ supportLanguage = zh-CN
 Scope Decision。详细 Product / Architecture Contract 见
 `docs/features/PROVIDER_FREE_LEARNING.md`。
 
+Built-in Content 的词典、语料、发音参考和语言 / 考试规范 source lineage 使用 V1 已批准的
+read-only Public Language Reference Source Boundary。Provider-free runtime 只读取本地已验证、不可变的
+artifact，不把 live public source 或外部网络作为硬依赖；详细 Contract 见
+`docs/features/PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`。
+
 跨 Phase 交付：
 
 ```text
@@ -98,6 +103,8 @@ M1 Built-in Text Practice walking skeleton
 - 无 Provider 时至少一条 `en + zh-CN` Built-in Text Practice 可以完成 LearningTask、PracticeSession
   与 deterministic assessment，且不调用 Model Gateway；
 - Built-in task 引用稳定 `materialId + version`，语言不匹配、内容损坏或无可用材料时 fail closed；
+- Built-in material provenance 可以解析到本地 immutable source bundle / manifest version；执行已发布
+  Practice 时不调用 live public connector；
 - Provider-free baseline 只产生 exact / rule-verifiable 结果及可信 assistance event 支持的
   deterministic assessment，不伪造 semantic、naturalness 或 pronunciation Evidence；
 - Evaluator 不直接改变 Weakness、Level 或 Mastery；
@@ -139,6 +146,12 @@ M1 Built-in Text Practice walking skeleton
 
 - Reading / imported content 可以生成 LearningTask 与 Evidence；
 - Retrieval 具备 language isolation、provenance 与基础 relevance metadata；
+- 建立最小 Public Source Catalog、typed read-only text reference operation 和 query minimization；
+- 至少接入一个经过批准的 dictionary / lexical reference source 与一个 curated corpus source；
+- Public Reference、Personal Memory 与 User Import 保留可审计的 namespace / filter / result-domain isolation；
+- 公共 connector 不接收 `userId`、`languageProfileId`、完整 Conversation、用户原始回答、Learning Memory
+  或 User Import 私密原文；
+- 有限、官方、带版本的 language / exam descriptor 只能作为 optional goal、difficulty 或 rubric Context；
 - RAG Result 只作为 Context，不直接成为长期状态事实；
 - `Content Retrieval Role → Lesson Design Role → Quality Review Role → bounded revision` 由 Java
   workflow state、turn/tool limit、validation 与 publish authority 控制；
@@ -174,6 +187,8 @@ M1 Built-in Text Practice walking skeleton
 - Listening / turn-based Voice 复用 Language Profile、Planner、Evaluator 与 Memory 边界；
 - 经过验证的固定音频可以作为 Built-in Listening material；浏览器或设备 TTS 仅作为可选 UX，
   不成为 audio authenticity、评分或 Evidence authority；
+- Built-in audio 保留 source、license、version、locale / accent 与 quality provenance；Pronunciation Reference
+  不等于 pronunciation scoring 或唯一标准口音；
 - 音频失败、超时与重试不污染长期状态；
 - Voice 不绕过 Tool / Model Gateway；
 - realtime full-duplex voice 不进入 V1。
