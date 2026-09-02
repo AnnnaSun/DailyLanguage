@@ -27,6 +27,10 @@ public class ModelCallJobExecutionConfiguration {
         taskExecutor.setQueueCapacity(executor.queueCapacity());
         taskExecutor.setThreadNamePrefix("model-call-job-");
         taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        // 优雅关闭给 in-flight worker 完整窗口写入终态；等待上限 ≥ 最大 route timeout（30s）+ 落库余量。
+        // 硬杀进程仍可能留下 RUNNING Job，其 reconciliation 属于未批准的后续可靠性 scope。
+        taskExecutor.setWaitForTasksToCompleteOnShutdown(true);
+        taskExecutor.setAwaitTerminationMillis(35_000L);
         return taskExecutor;
     }
 }

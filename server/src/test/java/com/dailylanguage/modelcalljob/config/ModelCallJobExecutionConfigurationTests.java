@@ -61,6 +61,31 @@ class ModelCallJobExecutionConfigurationTests {
     }
 
     @Test
+    void gracefulShutdownLetsInFlightTaskFinishBeforeCloseReturns() {
+        CountDownLatch taskFinished = new CountDownLatch(1);
+
+        contextRunner.run(context -> {
+            ThreadPoolTaskExecutor executor = context.getBean(
+                    ModelCallJobExecutionConfiguration.MODEL_CALL_JOB_TASK_EXECUTOR,
+                    ThreadPoolTaskExecutor.class);
+            executor.execute(() -> {
+                try {
+                    Thread.sleep(200L);
+                }
+                catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                taskFinished.countDown();
+            });
+        });
+
+        // Spring 6.2 未暴露 waitForTasksToCompleteOnShutdown getter；
+        // 若未开启优雅关闭，close 会中断 in-flight 任务且 latch 永不触发。
+        assertThat(taskFinished.getCount()).isZero();
+    }
+
+    @Test
     void runsTasksOnDedicatedPlatformJobThreads() {
         CountDownLatch taskFinished = new CountDownLatch(1);
         AtomicReference<Thread> workerThread = new AtomicReference<>();

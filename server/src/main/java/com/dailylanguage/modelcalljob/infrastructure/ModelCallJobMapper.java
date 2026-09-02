@@ -30,6 +30,11 @@ interface ModelCallJobMapper {
 
     Optional<StoredModelCallJob> tryCompleteFailure(ModelCallJobFailureRow failure);
 
+    Optional<StoredModelCallJob> tryRecordOutcomeUnknown(
+            @Param("jobId") UUID jobId,
+            @Param("userId") UUID userId,
+            @Param("expectedRowVersion") long expectedRowVersion);
+
     Optional<StoredModelCallJob> tryConsumeSucceededResult(
             @Param("jobId") UUID jobId,
             @Param("userId") UUID userId,

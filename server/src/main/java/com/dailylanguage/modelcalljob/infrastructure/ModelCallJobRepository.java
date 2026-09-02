@@ -132,6 +132,16 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    public Optional<ModelCallJob> tryRecordOutcomeUnknown(UUID jobId, UUID userId, long expectedRowVersion) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        return modelCallJobMapper.tryRecordOutcomeUnknown(jobId, userId, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
     public Optional<ModelCallJob> tryConsumeSucceededResult(
             UUID jobId,
             UUID userId,
