@@ -1,9 +1,9 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-01
-> Current Phase: M0 — Engineering Foundation & Language Workspace
-> Current Gate: M0-S9 / DESIGN_SCOPE_PENDING
-> Production baseline: M0-S8D COMPLETE (`c9314dd`)
+> Last updated: 2026-09-03
+> Current Phase: M1 — Minimum Text Practice Loop
+> Current Gate: M1 / DESIGN_SCOPE_PENDING
+> Production baseline: M0-S9 COMPLETE (`b88606c`)
 
 ## Approved Decisions
 
@@ -59,8 +59,11 @@
   workflow version 自动消费、等待用户确认或标记 stale。
 - Model Call Job 使用稳定 UUIDv7 `jobId`、独立 `workflowVersion` 与 optimistic-lock `rowVersion`；V1
   runtime 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ，不持久化 BYOK Credential。
-- Model Call Job backend foundation 排入 M0-S9，依赖 S7 transient Credential 与 S8 Structured Output /
-  Trace；详细 Contract 见 `docs/features/MODEL_CALL_JOB.md`，当前 M0-S6E 不实现 Job。
+- M0-S9 已完成 Model Call Job backend foundation：PostgreSQL execution / consumption state、typed
+  result / failure、rowVersion conditional transition、TaskExecutor Worker、typed submission boundary 与
+  operation-specific start component 已串联；详细 Contract 见 `docs/features/MODEL_CALL_JOB.md`。
+- M0-S9 不实现 Planner / Conversation / Evaluator Workflow、HTTP polling / confirmation、durable backlog、
+  automatic retry 或 Credential persistence；这些能力继续由后续 Phase 和独立 Architecture Decision 控制。
 - M0-S6F non-blocking L2 Ownership gap 已由用户接受；该决定不把 Ownership 提升为 L3，也不改变
   S6F `PARTIAL` 的历史结论。
 - M0-S7A Design / Scope 已批准：`TransientProviderCredential` 与 provider-neutral request 分离，
@@ -142,37 +145,48 @@
     已提交为 `3f8838d`。
 35. M0-S8D same-Trace-ID Provider diagnostics：safe allowlist / redaction、concurrent per-route rate limit、Review、
     Ownership 与 default-model verification reconciliation 完成；已提交为 `c9314dd`。
+36. M0-S9 Model Call Job foundation：S9A–S9K3 schema、domain、repository、execution / consumption transition、
+    dedicated TaskExecutor、Worker、typed submission 与 Application start wiring 均完成 Review 和 Ownership；
+    integrated baseline 已提交为 `b88606c`。
+37. M0-S9 fresh closeout verification：PostgreSQL 18 + Flyway V1–V7 PASS；fresh server suite 335 PASS、
+    3 个 Redis-unavailable conditional skip 后单独启用并 3/3 PASS；338 个 unique tests 均实际通过；
+    client production build PASS；Compose PostgreSQL / Redis healthy。
+38. M0 primary local database remediation：重建 `daily_language` database 后由真实 backend startup 从 empty
+    schema 执行 Flyway V1–V7，7 个 migration 全部成功；backend startup / graceful shutdown PASS，未保留
+    repository test fixtures；重建前 custom-format backup 已单独保留。
 
 ## Current Gate
 
 ```text
-Selected phase: M0-S9 — Model Call Job foundation
+Selected phase: M1 — Minimum Text Practice Loop
 Gate: DESIGN_SCOPE_PENDING
-M0-S8A: COMPLETE (`8d11ddd`)
-M0-S8B: COMPLETE (`16635d0`)
-M0-S8C: COMPLETE (`3f8838d`)
-M0-S8D: COMPLETE (`c9314dd`)
-Verification: PASS for Model Gateway scope (95/95; default runtime composition 6/6; server compile)
-Wider server regression: NOT_RUN for S8; latest S7D evidence is 217 total, 0 failures/errors, 33 environment-skipped
-Behavior Flow: CURRENT
-Code Review: PASS (S8A-S8D no blocking findings)
-M0-S8 integrated closeout: PARTIAL / ACCEPTED for progression to S9 Design / Scope
-Ownership: Structured Output L2 module-local; Trace / Observability L3 module-local; Model Gateway remains L2
-Completion level: S8 foundations complete; no Application Workflow integration or Trace persistence
-Production baseline: M0-S8D COMPLETE (`c9314dd`)
-Current target: define and approve only the first M0-S9 implementation slice
-Dependency: approved `docs/features/MODEL_CALL_JOB.md` Detailed Design
+M0-S9 implementation: COMPLETE (`b88606c`)
+M0-S9 Review: COMPLETE (no blocking Production finding)
+M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
+Behavior Flow: CURRENT (`docs/flow/text-generation-job-start.md`)
+Fresh server verification: PASS (338 unique tests all executed; 0 failures; 0 errors)
+Fresh migration verification: PASS (PostgreSQL 18; Flyway V1-V7)
+Fresh client production build: PASS
+Compose infrastructure: PostgreSQL / Redis healthy
+Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and ownership
+Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
+M0 integrated closeout: PASS
+Production baseline: M0-S9 COMPLETE (`b88606c`)
+M1 implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-基于已批准 `MODEL_CALL_JOB.md` 提出 M0-S9 第一个 implementation slice 的 Design / Scope，明确 schema、
-execution / consumption state boundary、TaskExecutor 与 Gateway Executor 分离、transient Credential lifecycle、
-验证范围和 stop point。等待批准前不修改 schema、Production code 或 API。
+基于 M1 approved Phase boundary 提出第一个 Architecture-sensitive Design / Scope，明确 Minimum Text Practice
+walking skeleton 的最小 Domain、Application Workflow、Provider-free fallback、ModelCallJob integration、Evidence
+boundary、Production / test files 与 stop point。M1 implementation scope 尚未批准；批准前不修改 Production、
+schema 或 API。
 
 ## Blockers
 
-None for M0-S9 Design / Scope. M0-S9 implementation scope、schema、API 与 file boundary 尚未批准。
+没有已发现的 M0 closeout blocker。Primary local database 已从 empty schema 重建并由真实 backend startup
+成功执行 / validate Flyway V1–V7；原 V4 checksum mismatch 已通过重建解决，没有执行 `Flyway repair` 或直接修改
+`flyway_schema_history`。
 Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output 只有 module-local validation，
 Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent
 Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured

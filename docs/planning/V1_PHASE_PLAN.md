@@ -212,7 +212,7 @@ M1 Built-in Text Practice walking skeleton
 - 核心调用链完成人工 Ownership Check；
 - 可重复 demo 展示 adaptation、grounding、fallback、trace、replay 与 language isolation。
 
-## 3. Current Phase: M0 Implementation Slices
+## 3. Completed M0 Implementation Slices and Closeout
 
 M0 先拆为以下认知边界。每个 slice 开始前仍需确认具体 file scope 和 architecture-sensitive decision。
 
@@ -1052,8 +1052,16 @@ M0-S8 Ownership: PARTIAL (Structured Output L2 module-local；Trace / Observabil
 Model Gateway remains L2)
 M0-S8 Integrated Closeout: PARTIAL / ACCEPTED for progression to M0-S9 Design / Scope
 M0-S9 Detailed Design: APPROVED
-M0-S9 Implementation: IN_PROGRESS / SLICE-GATED（S9A–S9J 已提交；S9K1 REVIEW_PENDING；完整状态
-reconciliation 留在 M0-S9 closeout）
+M0-S9 Implementation: COMPLETE（S9A–S9K3；integrated baseline `b88606c`）
+M0-S9 Review: COMPLETE（no blocking Production finding；Behavior Flow CURRENT）
+M0-S9 Ownership: COMPLETE（Model Call Job L3 — Explainable）
+M0-S9 Verification: PASS（fresh PostgreSQL 18 + Flyway V1–V7；fresh server suite 335 PASS +
+3 Redis-unavailable conditional skip，专项启用后 3/3 PASS；338 unique tests 全部实际通过；client build PASS）
+M0-S9: COMPLETE (`b88606c`)
+M0 Primary Local Database Remediation: COMPLETE（重建 `daily_language` database；真实 backend 从 empty schema
+执行 Flyway V1–V7；7 migrations PASS；startup / graceful shutdown PASS；未保留 repository test fixtures）
+M0 Integrated Closeout: PASS（Production implementation、fresh server/client verification、formal documentation、
+Ownership 与 primary local infrastructure verification 完成）
 ```
 
 `M0-S6A` 已按批准 Scope 完成 5 个 portable route domain types、focused tests、server compile 与

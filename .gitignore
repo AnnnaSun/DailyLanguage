@@ -35,6 +35,9 @@ docs/**/*.pdf
 .env.local
 .idea
 
+# Local coding-agent workspace
+.zcode/
+
 # macOS
 .DS_Store
 
