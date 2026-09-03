@@ -193,6 +193,10 @@ published content；source manifest 必须能解析 Target Core、selected Suppo
 修改 target content、support scaffold、rubric 或 source lineage 必须产生新 published version，不能覆盖旧
 artifact 并改变历史 PracticeSession 的解释依据。
 
+Built-in manifest 使用显式 `planningAvailability` 区分版本用途：`PLANNABLE` 版本可以进入新的 Planner
+candidate list，`HISTORICAL_ONLY` 版本只供已有 `LearningTask` 按 `materialId + publishedVersion` 精确解析。
+同一 `materialId` 最多只能有一个 `PLANNABLE` 版本；历史版本仍需完成完整 hash 与 artifact validation。
+
 ### 6.3 Availability and isolation
 
 Built-in Practice 只有在以下条件同时满足时才 available：

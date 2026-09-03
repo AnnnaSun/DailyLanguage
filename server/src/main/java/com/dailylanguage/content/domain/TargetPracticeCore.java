@@ -17,4 +17,8 @@ public record TargetPracticeCore(
         List<TextPracticeStep> steps,
         /** versioned semantic rubric 引用，供后续 Grounded Evaluator 消费。 */
         String semanticRubricReference) {
+
+    public TargetPracticeCore {
+        steps = steps == null ? null : List.copyOf(steps);
+    }
 }

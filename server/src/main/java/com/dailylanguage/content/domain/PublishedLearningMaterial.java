@@ -11,4 +11,8 @@ public record PublishedLearningMaterial(
         TargetPracticeCore targetCore,
         List<SupportScaffold> supportScaffolds,
         MaterialSourceLineage sourceLineage) {
+
+    public PublishedLearningMaterial {
+        supportScaffolds = supportScaffolds == null ? null : List.copyOf(supportScaffolds);
+    }
 }

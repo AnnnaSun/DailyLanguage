@@ -18,6 +18,13 @@ public record BuiltInMaterialManifest(int manifestVersion, String packId, List<E
             String sourceVersion,
             String license,
             String resource,
-            String contentHash) {
+            String contentHash,
+            PlanningAvailability planningAvailability) {
+    }
+
+    /** 区分新规划可见版本与仅供历史 LearningTask 精确解析的保留版本。 */
+    public enum PlanningAvailability {
+        PLANNABLE,
+        HISTORICAL_ONLY
     }
 }

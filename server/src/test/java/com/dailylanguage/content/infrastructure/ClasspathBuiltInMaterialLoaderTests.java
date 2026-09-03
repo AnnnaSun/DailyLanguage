@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.dailylanguage.content.domain.MaterialDifficulty;
 import com.dailylanguage.content.domain.MaterialIdentity;
@@ -55,10 +57,14 @@ class ClasspathBuiltInMaterialLoaderTests {
 
     @Test
     void loadsBuiltInEnglishPackFromClasspath() {
-        List<PublishedLearningMaterial> materials = new ClasspathBuiltInMaterialLoader().load();
+        BuiltInMaterialPack pack = new ClasspathBuiltInMaterialLoader().load();
 
-        assertThat(materials)
+        assertThat(pack.materials())
                 .extracting(PublishedLearningMaterial::identity)
+                .containsExactlyInAnyOrder(
+                        new MaterialIdentity("en-builtin-greeting-intro", "v1"),
+                        new MaterialIdentity("en-builtin-cafe-request", "v1"));
+        assertThat(pack.plannableMaterialIdentities())
                 .containsExactlyInAnyOrder(
                         new MaterialIdentity("en-builtin-greeting-intro", "v1"),
                         new MaterialIdentity("en-builtin-cafe-request", "v1"));
@@ -66,7 +72,7 @@ class ClasspathBuiltInMaterialLoaderTests {
 
     @Test
     void loadsPublishedMaterialWithLineageScaffoldAndTypedSteps() {
-        PublishedLearningMaterial material = new ClasspathBuiltInMaterialLoader().load().stream()
+        PublishedLearningMaterial material = new ClasspathBuiltInMaterialLoader().load().materials().stream()
                 .filter(loaded -> loaded.identity()
                         .equals(new MaterialIdentity("en-builtin-greeting-intro", "v1")))
                 .findFirst()
@@ -90,11 +96,27 @@ class ClasspathBuiltInMaterialLoaderTests {
 
     @Test
     void acceptsValidInMemoryPack() {
-        List<PublishedLearningMaterial> materials = new ClasspathBuiltInMaterialLoader(
+        BuiltInMaterialPack pack = new ClasspathBuiltInMaterialLoader(
                 validPack()::get).load();
 
-        assertThat(materials).hasSize(1);
-        assertThat(materials.getFirst().identity()).isEqualTo(new MaterialIdentity("mat-1", "v1"));
+        assertThat(pack.materials()).hasSize(1);
+        assertThat(pack.materials().getFirst().identity()).isEqualTo(new MaterialIdentity("mat-1", "v1"));
+        assertThat(pack.plannableMaterialIdentities())
+                .containsExactly(new MaterialIdentity("mat-1", "v1"));
+    }
+
+    @Test
+    void retainsHistoricalVersionWhileMarkingOnlyCurrentVersionPlannable() {
+        BuiltInMaterialPack pack = new ClasspathBuiltInMaterialLoader(
+                twoVersionPack("HISTORICAL_ONLY", "PLANNABLE")::get).load();
+
+        assertThat(pack.materials())
+                .extracting(PublishedLearningMaterial::identity)
+                .containsExactly(
+                        new MaterialIdentity("mat-1", "v1"),
+                        new MaterialIdentity("mat-1", "v2"));
+        assertThat(pack.plannableMaterialIdentities())
+                .containsExactly(new MaterialIdentity("mat-1", "v2"));
     }
 
     @Test
@@ -136,33 +158,37 @@ class ClasspathBuiltInMaterialLoaderTests {
                 "invalid JSON structure in manifest.json");
     }
 
-    @Test
-    void rejectsUnsupportedManifestVersion() {
+    @ParameterizedTest
+    @ValueSource(ints = {1, 3})
+    void rejectsUnsupportedManifestVersion(int unsupportedVersion) {
         Map<String, byte[]> pack = validPack();
-        pack.put("manifest.json", manifest(materialHash(), "\"manifestVersion\": 1", "\"manifestVersion\": 2")
+        pack.put("manifest.json", manifest(
+                materialHash(),
+                "\"manifestVersion\": 2",
+                "\"manifestVersion\": " + unsupportedVersion)
                 .getBytes(StandardCharsets.UTF_8));
 
-        assertRejected(pack, "unsupported built-in material manifestVersion: 2");
+        assertRejected(pack, "unsupported built-in material manifestVersion: " + unsupportedVersion);
     }
 
     @Test
     void rejectsEmptyMaterialsList() {
         Map<String, byte[]> pack = validPack();
         pack.put("manifest.json", """
-                {"manifestVersion": 1, "packId": "pack", "materials": []}
+                {"manifestVersion": 2, "packId": "pack", "materials": []}
                 """.getBytes(StandardCharsets.UTF_8));
 
         assertRejected(pack, "must declare a non-empty materials list");
     }
 
     @Test
-    void rejectsDuplicateMaterialIdInPack() {
+    void rejectsDuplicateMaterialIdentityInPack() {
         String materialHash = materialHash();
         Map<String, byte[]> pack = new HashMap<>();
         pack.put("materials/mat-1/v1.json", VALID_MATERIAL.getBytes(StandardCharsets.UTF_8));
         pack.put("manifest.json", ("""
                 {
-                  "manifestVersion": 1,
+                  "manifestVersion": 2,
                   "packId": "pack",
                   "materials": [
                     %s,
@@ -172,7 +198,21 @@ class ClasspathBuiltInMaterialLoaderTests {
                 """.formatted(manifestEntry(materialHash), manifestEntry(materialHash)))
                 .getBytes(StandardCharsets.UTF_8));
 
-        assertRejected(pack, "duplicate materialId in built-in pack: mat-1");
+        assertRejected(pack, "duplicate material identity in built-in pack");
+    }
+
+    @Test
+    void rejectsMultiplePlannableVersionsForSameMaterialId() {
+        assertRejected(
+                twoVersionPack("PLANNABLE", "PLANNABLE"),
+                "multiple plannable versions for materialId: mat-1");
+    }
+
+    @Test
+    void rejectsNullPlanningAvailability() {
+        assertRejectedWithManifest(
+                "\"planningAvailability\": \"PLANNABLE\"", "\"planningAvailability\": null",
+                "planningAvailability must not be null");
     }
 
     @Test
@@ -344,6 +384,30 @@ class ClasspathBuiltInMaterialLoaderTests {
         return pack;
     }
 
+    private static Map<String, byte[]> twoVersionPack(String v1Availability, String v2Availability) {
+        byte[] v1Material = materialBytes();
+        byte[] v2Material = VALID_MATERIAL
+                .replace("\"publishedVersion\": \"v1\"", "\"publishedVersion\": \"v2\"")
+                .getBytes(StandardCharsets.UTF_8);
+        Map<String, byte[]> pack = new HashMap<>();
+        pack.put("materials/mat-1/v1.json", v1Material);
+        pack.put("materials/mat-1/v2.json", v2Material);
+        pack.put("manifest.json", ("""
+                {
+                  "manifestVersion": 2,
+                  "packId": "pack",
+                  "materials": [
+                    %s,
+                    %s
+                  ]
+                }
+                """.formatted(
+                        manifestEntry("v1", "materials/mat-1/v1.json", sha256(v1Material), v1Availability),
+                        manifestEntry("v2", "materials/mat-1/v2.json", sha256(v2Material), v2Availability)))
+                .getBytes(StandardCharsets.UTF_8));
+        return pack;
+    }
+
     private static String materialHash() {
         return sha256(materialBytes());
     }
@@ -355,7 +419,7 @@ class ClasspathBuiltInMaterialLoaderTests {
     private static String manifest(String contentHash, String replaceTarget, String replacement) {
         String manifest = """
                 {
-                  "manifestVersion": 1,
+                  "manifestVersion": 2,
                   "packId": "pack",
                   "materials": [
                     %s
@@ -366,18 +430,28 @@ class ClasspathBuiltInMaterialLoaderTests {
     }
 
     private static String manifestEntry(String contentHash) {
+        return manifestEntry("v1", "materials/mat-1/v1.json", contentHash, "PLANNABLE");
+    }
+
+    private static String manifestEntry(
+            String publishedVersion,
+            String resource,
+            String contentHash,
+            String planningAvailability
+    ) {
         return """
                 {
                   "materialId": "mat-1",
-                  "publishedVersion": "v1",
+                  "publishedVersion": "%s",
                   "targetLanguage": "en",
                   "supportLanguages": ["zh-cn"],
                   "source": "PROJECT_ORIGINAL",
                   "sourceVersion": "1",
                   "license": "AGPL-3.0",
-                  "resource": "materials/mat-1/v1.json",
-                  "contentHash": "sha256:%s"
-                }""".formatted(contentHash);
+                  "resource": "%s",
+                  "contentHash": "sha256:%s",
+                  "planningAvailability": "%s"
+                }""".formatted(publishedVersion, resource, contentHash, planningAvailability);
     }
 
     private static void assertRejectedWithManifest(

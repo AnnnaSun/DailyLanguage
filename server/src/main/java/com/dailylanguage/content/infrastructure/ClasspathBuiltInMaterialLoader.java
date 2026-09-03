@@ -39,7 +39,7 @@ public final class ClasspathBuiltInMaterialLoader {
 
     public static final String DEFAULT_ROOT = "content/builtin";
     private static final String MANIFEST_LOCATION = "manifest.json";
-    private static final int SUPPORTED_MANIFEST_VERSION = 1;
+    private static final int SUPPORTED_MANIFEST_VERSION = 2;
     private static final int MAX_LANGUAGE_CODE_LENGTH = 35;
     private static final Pattern CONTENT_HASH_PATTERN = Pattern.compile("sha256:[0-9a-f]{64}");
 
@@ -62,16 +62,21 @@ public final class ClasspathBuiltInMaterialLoader {
                 .build();
     }
 
-    public List<PublishedLearningMaterial> load() {
+    public BuiltInMaterialPack load() {
         BuiltInMaterialManifest manifest = bindJson(
                 readResource(MANIFEST_LOCATION), BuiltInMaterialManifest.class, MANIFEST_LOCATION);
         validateManifest(manifest);
 
         List<PublishedLearningMaterial> materials = new ArrayList<>(manifest.materials().size());
+        Set<MaterialIdentity> plannableMaterialIdentities = new LinkedHashSet<>();
         for (BuiltInMaterialManifest.Entry entry : manifest.materials()) {
-            materials.add(loadMaterial(entry));
+            PublishedLearningMaterial material = loadMaterial(entry);
+            materials.add(material);
+            if (entry.planningAvailability() == BuiltInMaterialManifest.PlanningAvailability.PLANNABLE) {
+                plannableMaterialIdentities.add(material.identity());
+            }
         }
-        return List.copyOf(materials);
+        return new BuiltInMaterialPack(materials, plannableMaterialIdentities);
     }
 
     private PublishedLearningMaterial loadMaterial(BuiltInMaterialManifest.Entry entry) {
@@ -106,7 +111,8 @@ public final class ClasspathBuiltInMaterialLoader {
         }
         requireNonBlank(manifest.packId(), "manifest.packId", "manifest");
 
-        Set<String> materialIds = new LinkedHashSet<>();
+        Set<MaterialIdentity> materialIdentities = new LinkedHashSet<>();
+        Set<String> plannableMaterialIds = new LinkedHashSet<>();
         for (BuiltInMaterialManifest.Entry entry : manifest.materials()) {
             if (entry == null) {
                 throw new BuiltInMaterialValidationException("manifest entry must not be null");
@@ -119,6 +125,9 @@ public final class ClasspathBuiltInMaterialLoader {
             requireNonBlank(entry.license(), "license", context);
             requireResourceLocation(entry.resource(), context);
             requireContentHash(entry.contentHash(), context);
+            if (entry.planningAvailability() == null) {
+                throw new BuiltInMaterialValidationException(context + ": planningAvailability must not be null");
+            }
 
             if (entry.supportLanguages() == null || entry.supportLanguages().isEmpty()) {
                 throw new BuiltInMaterialValidationException(context + ": supportLanguages must not be empty");
@@ -132,9 +141,15 @@ public final class ClasspathBuiltInMaterialLoader {
                 }
             }
 
-            if (!materialIds.add(entry.materialId())) {
+            MaterialIdentity identity = new MaterialIdentity(entry.materialId(), entry.publishedVersion());
+            if (!materialIdentities.add(identity)) {
                 throw new BuiltInMaterialValidationException(
-                        "duplicate materialId in built-in pack: " + entry.materialId());
+                        "duplicate material identity in built-in pack: " + identity);
+            }
+            if (entry.planningAvailability() == BuiltInMaterialManifest.PlanningAvailability.PLANNABLE
+                    && !plannableMaterialIds.add(entry.materialId())) {
+                throw new BuiltInMaterialValidationException(
+                        "multiple plannable versions for materialId: " + entry.materialId());
             }
         }
     }

@@ -1,5 +1,5 @@
 {
-  "manifestVersion": 1,
+  "manifestVersion": 2,
   "packId": "builtin-m1-english",
   "materials": [
     {
@@ -11,7 +11,8 @@
       "sourceVersion": "1",
       "license": "AGPL-3.0",
       "resource": "materials/en-builtin-greeting-intro/v1.json",
-      "contentHash": "sha256:e218c89152a4b93b3ee5238b6dcb301837b7dcef0549774eb122fefa1a264dfe"
+      "contentHash": "sha256:e218c89152a4b93b3ee5238b6dcb301837b7dcef0549774eb122fefa1a264dfe",
+      "planningAvailability": "PLANNABLE"
     },
     {
       "materialId": "en-builtin-cafe-request",
@@ -22,7 +23,8 @@
       "sourceVersion": "1",
       "license": "AGPL-3.0",
       "resource": "materials/en-builtin-cafe-request/v1.json",
-      "contentHash": "sha256:166d8910d57be32c029396350858d12fefef7e53a2f883f19fa502fd4bfb2a4e"
+      "contentHash": "sha256:166d8910d57be32c029396350858d12fefef7e53a2f883f19fa502fd4bfb2a4e",
+      "planningAvailability": "PLANNABLE"
     }
   ]
 }

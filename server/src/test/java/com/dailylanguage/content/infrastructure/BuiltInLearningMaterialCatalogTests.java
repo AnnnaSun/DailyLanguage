@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +62,45 @@ class BuiltInLearningMaterialCatalogTests {
     }
 
     @Test
+    void listsOnlyPlannableVersionButStillResolvesHistoricalVersionByIdentity() {
+        BuiltInMaterialPack loadedPack = new ClasspathBuiltInMaterialLoader().load();
+        PublishedLearningMaterial v1 = loadedPack.materials().stream()
+                .filter(material -> material.identity().materialId().equals("en-builtin-greeting-intro"))
+                .findFirst()
+                .orElseThrow();
+        PublishedLearningMaterial v2 = new PublishedLearningMaterial(
+                new MaterialIdentity(v1.identity().materialId(), "v2"),
+                v1.targetCore(),
+                v1.supportScaffolds(),
+                v1.sourceLineage());
+        LearningMaterialCatalog versionedCatalog = new BuiltInLearningMaterialCatalog(
+                new BuiltInMaterialPack(List.of(v1, v2), Set.of(v2.identity())));
+
+        assertThat(versionedCatalog.listAvailable("en", "zh-cn"))
+                .extracting(AvailableMaterialSummary::identity)
+                .containsExactly(v2.identity());
+        assertThat(versionedCatalog.findByIdentity(v1.identity(), "zh-cn"))
+                .isInstanceOfSatisfying(MaterialQueryResult.Available.class,
+                        available -> assertThat(available.material().identity()).isEqualTo(v1.identity()));
+    }
+
+    @Test
+    void rejectsPackWithMultiplePlannableVersionsForSameMaterialId() {
+        BuiltInMaterialPack loadedPack = new ClasspathBuiltInMaterialLoader().load();
+        PublishedLearningMaterial v1 = loadedPack.materials().getFirst();
+        PublishedLearningMaterial v2 = new PublishedLearningMaterial(
+                new MaterialIdentity(v1.identity().materialId(), "v2"),
+                v1.targetCore(),
+                v1.supportScaffolds(),
+                v1.sourceLineage());
+
+        assertThatThrownBy(() -> new BuiltInMaterialPack(
+                List.of(v1, v2), Set.of(v1.identity(), v2.identity())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only one version per materialId may be plannable");
+    }
+
+    @Test
     void reportsMaterialNotPublishedForUnknownIdentity() {
         MaterialQueryResult result = catalog.findByIdentity(
                 new MaterialIdentity("ja-builtin-clarify-repeat", "v1"), "zh-cn");
@@ -93,10 +133,12 @@ class BuiltInLearningMaterialCatalogTests {
 
     @Test
     void rejectsDuplicateIdentityAtConstruction() {
-        List<PublishedLearningMaterial> loaded = new ClasspathBuiltInMaterialLoader().load();
+        BuiltInMaterialPack loadedPack = new ClasspathBuiltInMaterialLoader().load();
+        List<PublishedLearningMaterial> loaded = loadedPack.materials();
         List<PublishedLearningMaterial> duplicated = List.of(loaded.getFirst(), loaded.getFirst());
 
-        assertThatThrownBy(() -> new BuiltInLearningMaterialCatalog(duplicated))
+        assertThatThrownBy(() -> new BuiltInLearningMaterialCatalog(
+                new BuiltInMaterialPack(duplicated, Set.of(loaded.getFirst().identity()))))
                 .isInstanceOf(BuiltInMaterialValidationException.class)
                 .hasMessageContaining("duplicate material identity");
     }

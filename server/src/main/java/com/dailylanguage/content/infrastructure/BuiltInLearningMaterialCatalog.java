@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -24,13 +25,15 @@ public class BuiltInLearningMaterialCatalog implements LearningMaterialCatalog {
 
     private final List<PublishedLearningMaterial> materialsInPackOrder;
     private final Map<MaterialIdentity, PublishedLearningMaterial> materialsByIdentity;
+    private final Set<MaterialIdentity> plannableMaterialIdentities;
 
     public BuiltInLearningMaterialCatalog() {
         this(new ClasspathBuiltInMaterialLoader().load());
     }
 
-    BuiltInLearningMaterialCatalog(List<PublishedLearningMaterial> loadedMaterials) {
-        Objects.requireNonNull(loadedMaterials, "loadedMaterials must not be null");
+    BuiltInLearningMaterialCatalog(BuiltInMaterialPack loadedPack) {
+        Objects.requireNonNull(loadedPack, "loadedPack must not be null");
+        List<PublishedLearningMaterial> loadedMaterials = loadedPack.materials();
         Map<MaterialIdentity, PublishedLearningMaterial> byIdentity = new LinkedHashMap<>();
         for (PublishedLearningMaterial material : loadedMaterials) {
             PublishedLearningMaterial existing = byIdentity.putIfAbsent(material.identity(), material);
@@ -41,6 +44,7 @@ public class BuiltInLearningMaterialCatalog implements LearningMaterialCatalog {
         }
         this.materialsInPackOrder = List.copyOf(loadedMaterials);
         this.materialsByIdentity = Map.copyOf(byIdentity);
+        this.plannableMaterialIdentities = loadedPack.plannableMaterialIdentities();
     }
 
     @Override
@@ -66,6 +70,7 @@ public class BuiltInLearningMaterialCatalog implements LearningMaterialCatalog {
         Objects.requireNonNull(supportLanguage, "supportLanguage must not be null");
         // 按 materialId 排序：列表顺序与 manifest 编辑顺序无关，Planner 的候选 / fallback 顺序可重放。
         return materialsInPackOrder.stream()
+                .filter(material -> plannableMaterialIdentities.contains(material.identity()))
                 .filter(material -> material.targetCore().targetLanguage().equals(targetLanguage))
                 .filter(material -> material.supportScaffolds().stream()
                         .anyMatch(scaffold -> scaffold.supportLanguage().equals(supportLanguage)))

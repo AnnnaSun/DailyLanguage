@@ -11,4 +11,8 @@ public record AvailableMaterialSummary(
         MaterialDifficulty difficulty,
         String scenario,
         List<String> supportLanguages) {
+
+    public AvailableMaterialSummary {
+        supportLanguages = supportLanguages == null ? null : List.copyOf(supportLanguages);
+    }
 }
