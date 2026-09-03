@@ -2,8 +2,8 @@
 
 > Last updated: 2026-09-03
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S1 / REVIEW_PENDING
-> Production baseline: M0-S9 COMPLETE (`b88606c`)
+> Current Gate: M1-S1 COMPLETE / M1-S2 SCOPE_NOT_APPROVED
+> Production baseline: M1-S1 COMPLETE (`d3eeadc`)
 
 ## Approved Decisions
 
@@ -29,6 +29,8 @@
   `(targetLanguage, supportLanguage)` 查询、无 cross-language fallback），当前只发布 `en + zh-CN` pack
   （2 个 `FOUNDATION` text communication scenarios，`ja + zh-CN` 查询返回 unavailable）；Content 为项目内
   原创（manifest 记录 `PROJECT_ORIGINAL` source、AGPL-3.0）；无 PostgreSQL migration、无 API endpoint。
+- M1-S1 已完成 implementation、verification、Code Review 与 Ownership Review，并由用户提交为 `d3eeadc`；
+  content module 40/40、full server suite 378 run / 0 failures / 0 errors、manifest hash `--check` PASS。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -167,12 +169,14 @@
 38. M0 primary local database remediation：重建 `daily_language` database 后由真实 backend startup 从 empty
     schema 执行 Flyway V1–V7，7 个 migration 全部成功；backend startup / graceful shutdown PASS，未保留
     repository test fixtures；重建前 custom-format backup 已单独保留。
+39. M1-S1 Built-in Content boundary + English artifact：Scope MATCH；Code Review 无 blocking finding；
+    Ownership Review `UNDERSTOOD`；实现与文档由用户提交为 `d3eeadc`。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S1 REVIEW_PENDING
+Gate: M1-S1 COMPLETE / M1-S2 SCOPE_NOT_APPROVED
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -184,23 +188,24 @@ Compose infrastructure: PostgreSQL / Redis healthy
 Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and ownership
 Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
 M0 integrated closeout: PASS
-Production baseline: M0-S9 COMPLETE (`b88606c`)
+Production baseline: M1-S1 COMPLETE (`d3eeadc`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
 M1-S1 Current Slice Contract: APPROVED (2026-09-03)
-M1-S1 implementation: COMPLETE / REVIEW_PENDING
+M1-S1 implementation: COMPLETE (`d3eeadc`)
 M1-S1 verification: PASS — content module 40/40；full server suite 378 run / 0 failures / 0 errors
   / 11 既有 conditional skip（RUN_DATABASE_TESTS=true + DATABASE_PORT=15432，PostgreSQL 18 + Flyway V1-V7）；
   manifest hash `--check` PASS；全部 @SpringBootTest context 含 Built-in catalog 并启动成功
+M1-S1 Code Review: PASS (no blocking finding)
+M1-S1 Ownership Review: UNDERSTOOD
 M1-S2+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-对 M1-S1 Diff 运行 Code Ownership Review（`docs` 三份 gate 文档 + `MODULE_MAP` 物理 mapping + content
-module / Built-in artifact / tests / hash 工具）。Review 通过后由用户决定 commit；未 Review 前不进入 M1-S2
-（Deterministic Planner core）的 Current Slice Contract。
+提出 `M1-S2 — Deterministic Planner core` Current Slice Contract，明确 observable behavior、Expected Files、
+failure path、Architecture / data impact、verification 与 stop point；等待用户批准后才可实现。
 
 ## Blockers
 

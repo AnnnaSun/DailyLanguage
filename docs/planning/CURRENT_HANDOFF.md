@@ -6,19 +6,19 @@
 ## Snapshot
 
 ```text
-Updated At: 2026-09-03 16:10 CST
-Updated By: Zcode
+Updated At: 2026-09-03 16:19 CST
+Updated By: Codex
 Handoff State: CURRENT
-Handoff Reason: 用户明确要求刷新 handoff snapshot（AGENTS §34.2 第二条件；非额度触发）
+Handoff Reason: 用户明确要求完成 M1-S1 post-commit documentation closeout
 ```
 
 ## Branch / HEAD / Worktree
 
 ```text
-Branch: codex/M1-S1（会话开始时在 main，会话中途由用户切换；HEAD 未变）
-HEAD: 15e0ec8（= main 当前 HEAD，尚无新 commit）
-Worktree Summary: 9 个 status 条目 = M1-S1 未提交改动（见 Uncommitted Changes，8 条）
-  + 本 handoff 文件自身；无他人遗留修改；无 stash
+Branch: codex/M1-S1
+HEAD: d3eeadc（feat(content): 实现 M1-S1 Built-in 内容边界与 en+zh-cn 内置材料包）
+Worktree Summary: DIRTY — 仅 M1-S1 post-commit closeout 的 4 个 documentation files；
+  Production / tests / resources clean，无接手前遗留修改
 ```
 
 ## Current Product Gate
@@ -26,8 +26,8 @@ Worktree Summary: 9 个 status 条目 = M1-S1 未提交改动（见 Uncommitted 
 ```text
 Current Phase: M1 — Minimum Text Practice Loop
 Current Slice: M1-S1 — Built-in Content boundary + English artifact
-Slice Gate: READY_TO_COMMIT（Code Review PASS；Ownership Review UNDERSTOOD）
-Stop Point: 等待用户 commit 决定；可选 Human Touch 小任务未做
+Slice Gate: COMPLETE（Code Review PASS；Ownership Review UNDERSTOOD；committed as d3eeadc）
+Stop Point: M1-S2 SCOPE_NOT_APPROVED；只可提出 Current Slice Contract，不得直接实现
 ```
 
 ## Approved Scope / Explicit Non-scope
@@ -40,7 +40,7 @@ Stop Point: 等待用户 commit 决定；可选 Human Touch 小任务未做
   PracticeSession（S5）、deterministic matcher（S6）、semantic rubric 资源（S7+）、日语 pack（S10）、
   Vue UI（S11）、Content publish pipeline（M3）。
 
-## Completed Work（本 slice，全部未提交）
+## Completed Work（M1-S1，已提交为 `d3eeadc`）
 
 1. M1-D1 Documentation Review 标记通过；`PROJECT_STATUS` / `V1_PHASE_PLAN` /
    `M1_MINIMUM_TEXT_PRACTICE` gate 同步至 M1-S1；
@@ -56,22 +56,24 @@ Stop Point: 等待用户 commit 决定；可选 Human Touch 小任务未做
 
 ## Verification Evidence
 
-- fresh（本会话实际运行）：
-  - content 模块 `mvnw test -Dtest='com.dailylanguage.content.**'`：40/40 PASS（注释修改后复跑仍 40/40）；
+- fresh（本次 post-commit documentation closeout）：
+  - branch / HEAD / clean starting worktree 核对：`codex/M1-S1@d3eeadc`；
+  - closeout scope：仅 4 个 documentation files；Production / tests / resources 无修改；
+  - `git diff --check`：PASS；M1-S1 stale gate / commit wording targeted search：PASS。
+- prior（M1-S1 implementation / Review handoff evidence；本次 closeout 未复跑）：
+  - content 模块 `mvnw test -Dtest='com.dailylanguage.content.**'`：40/40 PASS；
   - 全量 `RUN_DATABASE_TESTS=true DATABASE_PORT=15432 ./mvnw test`：378 run / 0 failures /
-    0 errors / 11 既有 conditional skip（= M0 基线 338 + 本 slice 40，完全对账）；
-  - `GenerateBuiltInMaterialHash --check`：PASS。
-- prior（引用 `PROJECT_STATUS.md`，本会话未复跑）：M0-S9 closeout、client build、migration 验证。
-- not run：client build（本 slice 未触及 client）；compose 全栈启动（未改基础设施）。
+    0 errors / 11 既有 conditional skip（= M0 基线 338 + M1-S1 40）；
+  - `GenerateBuiltInMaterialHash --check`：PASS；Code Review PASS；Ownership Review UNDERSTOOD。
+- prior（引用 `PROJECT_STATUS.md`；本次未复跑）：M0-S9 closeout、client build、migration 验证。
+- not run：backend tests、client build、compose 全栈启动、M1-S2 behavior（docs-only closeout）。
 
 ## Uncommitted Changes
 
-- 本 slice 修改（全部）：`server/src/main/java/com/dailylanguage/content/`（19 文件）、
-  `server/src/main/resources/content/builtin/`（3 文件）、
-  `server/src/test/java/com/dailylanguage/content/`（3 文件）、
-  `server/tools/GenerateBuiltInMaterialHash.java`、docs 4 文件
-  （PROJECT_STATUS / V1_PHASE_PLAN / M1_MINIMUM_TEXT_PRACTICE / MODULE_MAP）。
-- 接手前已有修改：无（会话开始时 worktree clean）。
+- M1-S1 Production / tests / resources：none；已提交为 `d3eeadc`。
+- Post-commit closeout docs：`CURRENT_HANDOFF.md`、`PROJECT_STATUS.md`、`V1_PHASE_PLAN.md`、
+  `M1_MINIMUM_TEXT_PRACTICE.md`。
+- 接手前已有修改：无；开始本次 closeout 时 worktree clean。
 
 ## Decisions / Blockers / Risks / UNKNOWN
 
@@ -81,18 +83,18 @@ Stop Point: 等待用户 commit 决定；可选 Human Touch 小任务未做
   不跨模块依赖；hash 先于结构校验；`listAvailable` 按 materialId 排序保证可重放。
 - Decisions（用户会话中决定）：补类注释（已做）；命名约定文档化、content 按 modality 分包、
   相应 Backlog 条目——均「暂时先不修改」，未记录。
-- Blockers：无。
+- Blockers：无；M1-S2 仍需独立 Scope approval。
 - Risks：本机 5432 端口是另一个 PostgreSQL 实例（凭据不符）；本项目 DB 在 **15432**
   （`.env` 已配），跑 DB 测试需 `DATABASE_PORT=15432` + `RUN_DATABASE_TESTS=true`。
-- UNKNOWN：无。
+- UNKNOWN：M1-S2 的 Current Slice Contract 尚未形成，Expected Files、data / API impact 与具体 verification
+  commands 尚未批准。
 
 ## Next Action（单一）
 
-由用户执行 M1-S1 commit 决定（可直接 commit 当前 Diff；commit 前可先完成可选 Human Touch
-小任务：给 greeting-intro 的 EXACT 步骤加一个回答变体并用 hash 工具更新 manifest）。
+提出 `M1-S2 — Deterministic Planner core` Current Slice Contract；完成 Design / Scope 后停止并等待用户批准，
+不自动修改 Planner Production Code、schema 或 API。
 
 ## 需要用户完成的 Decision
 
-1. Commit Decision：是否按当前 Diff 提交 M1-S1（commit message / 是否拆分由用户定）；
-2. 可选：Human Touch 小任务做不做；
-3. Commit 后：何时提出 M1-S2（Deterministic Planner core）Current Slice Contract。
+1. 当前 4 份 post-commit closeout documentation 的 Review / Commit Decision；
+2. M1-S2 Current Slice Contract 形成后的 Scope Decision。
