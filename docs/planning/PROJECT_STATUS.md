@@ -2,7 +2,7 @@
 
 > Last updated: 2026-09-03
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1 / DESIGN_SCOPE_PENDING
+> Current Gate: M1-D1 / DOCUMENTATION_REVIEW_PENDING
 > Production baseline: M0-S9 COMPLETE (`b88606c`)
 
 ## Approved Decisions
@@ -10,12 +10,17 @@
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
-- V1 Scope v1.5 已纳入 Engineering Evidence Track 与 Model Call Job，正式范围记录在
+- V1 Scope v1.7 已纳入 Engineering Evidence Track、Model Call Job 与 M1 Minimum Text Practice Design，正式范围记录在
   `docs/product/V1_SCOPE.md`；
 - Phase Gate 与 M0 slices 记录在 `docs/planning/V1_PHASE_PLAN.md`。
 - Engineering Evidence Track 已批准：M1 Grounded Evaluator、M2 versioned Memory / replay、M3 RAG +
   Tool Gateway + Controlled Multi-role Agent Workflow、M6 Eval / capacity / CI / interview evidence；详细验收
   记录在 `docs/planning/ENGINEERING_EVIDENCE_PLAN.md`。
+- M1 Minimum Text Practice Architecture 已批准：一套共用 Learning Workflow；Built-in Content 使用
+  `TargetPracticeCore + SupportScaffold` composition；`en + zh-CN` 先交付两个 `FOUNDATION` scenarios，
+  `ja + zh-CN` 随后交付一个 clarification / repetition validation scenario；`supportLanguage` 不自动等于母语。
+- M1 Grounded Evaluator 使用 `sourceTurnId + exactQuote + occurrenceIndex` 声明引用，由 Java 验证 learner
+  text 并计算 numeric span；M1 只保存 Session-level assessment / candidate，长期 Evidence aggregation 从 M2 开始。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -159,7 +164,7 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: DESIGN_SCOPE_PENDING
+Gate: M1-D1 DOCUMENTATION_REVIEW_PENDING
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -172,15 +177,18 @@ Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and o
 Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
 M0 integrated closeout: PASS
 Production baseline: M0-S9 COMPLETE (`b88606c`)
+M1 Architecture Decision: APPROVED
+M1 Phase Slice Plan: APPROVED
+M1-D1 Documentation: IMPLEMENTED / REVIEW_PENDING
 M1 implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-基于 M1 approved Phase boundary 提出第一个 Architecture-sensitive Design / Scope，明确 Minimum Text Practice
-walking skeleton 的最小 Domain、Application Workflow、Provider-free fallback、ModelCallJob integration、Evidence
-boundary、Production / test files 与 stop point。M1 implementation scope 尚未批准；批准前不修改 Production、
-schema 或 API。
+对 M1-D1 documentation diff 运行 Review，确认 Scope、Provider-free、Content composition、Grounded Evaluator、
+Phase slices 与 Project Status 一致。Review 通过后单独提出 `M1-S1` Current Slice Contract，明确 Production /
+test files、Content source / license、verification 与 stop point。M1-S1 implementation scope 尚未批准；批准前
+不修改 Production、schema、API 或 Built-in Production artifact。
 
 ## Blockers
 

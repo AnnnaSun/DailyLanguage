@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.4
+> Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-02
+> Last updated: 2026-09-03 — M1 Minimum Text Practice Architecture
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -41,16 +41,25 @@ Eval、Trace、measurement 与 interview demo evidence。Design 或正常路径�
 V1 已批准用户未提供 Model Provider 时仍可执行的最小学习路径。它复用同一 Planner、Practice、
 Evaluator、Evidence、Learning Memory 与 `languageProfileId` isolation，不建立第二套 offline Tutor。
 
-首个 Built-in Content Pack 使用：
+M1 批准的 Built-in delivery matrix 使用：
 
 ```text
 targetLanguage = en
 supportLanguage = zh-CN
+
+targetLanguage = ja
+supportLanguage = zh-CN
 ```
 
-`supportLanguage` 只提供翻译、解释与提示，不产生独立学习状态。起始能力范围和内容数量留到 M1
-Scope Decision。详细 Product / Architecture Contract 见
-`docs/features/PROVIDER_FREE_LEARNING.md`。
+`en + zh-CN` 先交付两个 `FOUNDATION` text communication scenarios，形成第一条 walking skeleton；
+`ja + zh-CN` 随后交付一个 `FOUNDATION` clarification / repetition scenario，验证真实第二语言 isolation 与
+Content extensibility。`supportLanguage` 只提供翻译、解释与提示，不自动等于母语，也不产生独立学习状态。
+详细 Product / Architecture Contract 见 `docs/features/PROVIDER_FREE_LEARNING.md` 与
+`docs/features/M1_MINIMUM_TEXT_PRACTICE.md`。
+
+Built-in Content 在概念上使用 `TargetPracticeCore + SupportScaffold` 组合，不为每个 target / support pair
+复制完整课程。M1 可以把 typed components 保存于同一个 immutable classpath artifact；M3 再根据真实
+Content production evidence 决定物理拆分与 publish lifecycle。
 
 Built-in Content 的词典、语料、发音参考和语言 / 考试规范 source lineage 使用 V1 已批准的
 read-only Public Language Reference Source Boundary。Provider-free runtime 只读取本地已验证、不可变的
@@ -98,10 +107,14 @@ M1 Built-in Text Practice walking skeleton
 - Practice 产生 trusted event 可确定的 deterministic assessment；
 - Model 可用时 Evaluator 生成经过 validation 的 semantic diagnosis；
 - semantic issue 可以定位到具体 Practice turn / span；缺少 grounding 的 claim 不得进入 Evidence；
+- semantic claim 使用 `sourceTurnId + exactQuote + occurrenceIndex` 定位，numeric span 由 Java 根据已保存的
+  learner text 验证和计算；support text、其他 Session 或不存在 quote 不得成为 grounded claim；
 - Model failure 只隔离 model-derived result，Practice 与 deterministic assessment 被正确保存；
 - Planner 在 Model unavailable / invalid output 时仍能生成合法的 deterministic fallback task；
 - 无 Provider 时至少一条 `en + zh-CN` Built-in Text Practice 可以完成 LearningTask、PracticeSession
   与 deterministic assessment，且不调用 Model Gateway；
+- `ja + zh-CN` validation pack 使用同一 Planner、Practice、Evaluator 与 persistence path，且 cross-language
+  fallback、support-text evaluation 与跨 `languageProfileId` 状态污染被拒绝；
 - Built-in task 引用稳定 `materialId + version`，语言不匹配、内容损坏或无可用材料时 fail closed；
 - Built-in material provenance 可以解析到本地 immutable source bundle / manifest version；执行已发布
   Practice 时不调用 live public connector；
@@ -112,6 +125,32 @@ M1 Built-in Text Practice walking skeleton
 - Planner / Evaluator Trace 记录 model、version、token、latency 与 result status，不记录 Secret。
 - Text Model Call 在 interactive wait budget 耗尽后可以继续后台执行；迟到结果根据 owning Workflow
   version 自动消费、等待用户确认或标记 stale。
+
+M1 只持久化 Session-level deterministic assessment 与 validated semantic candidate；Raw Evidence
+persistence、qualification、aggregation、Weakness / Skill lifecycle、Review 与 re-planning 从 M2 开始。
+
+#### M1 Approved Architecture and Slice Plan
+
+M1 使用 explicit Application Services 串联 Learning Workflow，不引入 generic workflow engine、Agent graph、
+dynamic handler registry 或第二套 Provider-free runtime。Content、Planner、Practice、Evaluator、ModelCallJob
+integration、failure invariant 与完整 slices 见
+[`M1_MINIMUM_TEXT_PRACTICE.md`](../features/M1_MINIMUM_TEXT_PRACTICE.md)。
+
+| Slice | Goal | Status |
+| --- | --- | --- |
+| M1-D1 | 同步 approved M1 Scope / Architecture / slice plan | REVIEW_PENDING |
+| M1-S1 | Built-in Content boundary + English artifact | SCOPE_NOT_APPROVED |
+| M1-S2 | Deterministic Planner core | SCOPE_NOT_APPROVED |
+| M1-S3 | LearningTask persistence | SCOPE_NOT_APPROVED |
+| M1-S4 | Owner-scoped planning API | SCOPE_NOT_APPROVED |
+| M1-S5 | PracticeSession lifecycle | SCOPE_NOT_APPROVED |
+| M1-S6 | Deterministic completion / assessment | SCOPE_NOT_APPROVED |
+| M1-S7 | Grounded Evaluator contract | SCOPE_NOT_APPROVED |
+| M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
+| M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
+| M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
+| M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
+| M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
 
 ### M2 — Persistent Adaptation Loop
 
@@ -871,7 +910,9 @@ Verification:
 
 ## 4. Later-phase Planning Rule
 
-M1–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细 implementation tasks。
+M1 已在 Phase 开始时根据 M0 真实 baseline 完成 Architecture 与 slice decomposition；各 Production slice
+仍需单独批准 Current Slice Contract。M2–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细
+implementation tasks。
 
 当某个 Phase 即将开始时，只根据已经存在的真实代码和前一 Phase 结果拆分 slices，避免 speculative abstraction 与过早计划漂移。
 

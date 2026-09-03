@@ -2,7 +2,7 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
-> Updated: 2026-09-02 — Public Language Reference Source Boundary
+> Updated: 2026-09-03 — M1 Multi-language Content Composition
 > Implementation scope: NOT_APPROVED  
 > V1 phases: M1 / M2 / M3 / M5
 
@@ -14,17 +14,22 @@ Built-in Content 使用的词典、语料、发音参考和语言 / 考试规范
 [`PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`](PUBLIC_LANGUAGE_REFERENCE_SOURCES.md)。公共 source 是
 Reference / Context，不是个人学习状态 truth，也不是 Provider-free runtime 的 live dependency。
 
-首个 Built-in Content Pack 已批准使用：
+M1 Built-in delivery 已批准使用：
 
 ```text
 targetLanguage = en
+supportLanguage = zh-CN
+
+targetLanguage = ja
 supportLanguage = zh-CN
 ```
 
 `targetLanguage` 是用户正在学习、并由 `languageProfileId` 隔离学习状态的语言；
 `supportLanguage` 只用于翻译、解释、提示和其他学习支架，不产生独立学习状态，也不改变
-`Language Profile` 的归属。首个 Content Pack 的起始能力范围和内容数量留到 M1 Scope Decision，
-不得把建议值提前写成已批准范围。
+`Language Profile` 的归属，也不自动等于用户母语。`en + zh-CN` 先交付两个 `FOUNDATION` text
+communication scenarios；`ja + zh-CN` 随后交付一个 `FOUNDATION` clarification / repetition scenario，
+用于验证真实第二语言 isolation 与 Content extensibility。详细 M1 Contract 见
+[`M1_MINIMUM_TEXT_PRACTICE.md`](M1_MINIMUM_TEXT_PRACTICE.md)。
 
 ## 1. Product goal
 
@@ -153,7 +158,7 @@ answer 或长期学习状态的唯一 authority。
 - stable `materialId`；
 - `version`；
 - `targetLanguage`；
-- `supportLanguage`；
+- 一个或多个 typed `SupportScaffold` 及其 `supportLanguage`；
 - difficulty / level band；
 - Practice type；
 - scenario；
@@ -162,6 +167,24 @@ answer 或长期学习状态的唯一 authority。
 - deterministic answer / rubric；
 - available assistance；
 - provenance / license。
+
+M1 不为每个 `targetLanguage × supportLanguage` pair 复制完整课程。Published material 在概念上使用：
+
+```text
+TargetPracticeCore
+        +
+SupportScaffold
+        ↓
+PublishedLearningMaterial
+```
+
+Target Core 保存目标语言内容、writing-system reading information、interaction、accepted answers 与 rubric；
+Support Scaffold 保存对应辅助语言的 instruction、translation、explanation、hint 与少量有依据的 contrastive
+note。Pair-specific note 只是学习支架，不能用于推断个人 Weakness 或长期状态。
+
+M1 可以在同一个 immutable classpath artifact 内保存 Target Core 与 typed `List<SupportScaffold>`；对外仍由
+稳定 `materialId + publishedVersion` 标识用户实际看到的完整内容。source manifest 必须能解析 target、selected
+scaffold、source version、license 与 content hash。M3 再根据真实 production evidence 决定是否物理拆分。
 
 M1 Built-in artifact 的 provenance 必须能够解析到本地已验证、不可变的 source bundle / manifest version。
 公共 source 的 controlled import / curation 可以发生在发布前，但 Provider-free runtime 不得为了执行已发布
@@ -232,11 +255,19 @@ boundary，使 Planner / Practice 不依赖 classpath 或未来 database storage
 ## 8. Multi-language and support-language rules
 
 - Built-in candidate selection 必须按 `targetLanguage` 过滤；
+- requested `supportLanguage` 必须解析到同一 published material 的 verified `SupportScaffold`；缺少 scaffold
+  时 M1 明确 unavailable，不调用 live Model 临时翻译；
 - PracticeSession、Assessment、Evidence 与长期状态继续按 `languageProfileId` 隔离；
 - `supportLanguage` 不建立另一份 Language Profile 或 mastery truth；
+- `supportLanguage` 不自动等于母语，也不能预先决定用户会出现哪些跨语言错误；
 - support text 不得被 Evaluator 误判为 target-language learner output；
-- 首个 `en + zh-CN` Content Pack 不代表系统只支持这一语言组合；
+- `en + zh-CN` 与 `ja + zh-CN` 共用同一 Workflow、state、API、assessment envelope 与 grounding validation；
 - 其他语言组合只有存在经过验证的 Content Pack 时才可声明 Built-in Practice available。
+
+M1 deterministic text matching 使用保守的 outer-whitespace handling、Unicode NFC normalization 与
+material-owned `acceptedAnswers`。Japanese 合法变体必须显式列出；M1 不自动把所有 kanji / kana、hiragana /
+katakana 或不同语序认定为等价。Japanese material 可以提供 optional kana reading，但不建立完整 kana curriculum、
+复杂 furigana UI、romaji mastery 或 pronunciation Evidence。
 
 ## 9. Explicit non-goals
 
@@ -265,10 +296,11 @@ Code、schema、API、Security 或当前 Phase implementation status。
 
 ### M1-PF1 — Built-in Text Material Boundary
 
-加载并验证最小 versioned Built-in Text Material，使 Java candidate generation 可以按目标语言、
-Practice type 与 hard constraint 读取合法材料。明确不进入 Practice API、Evidence、database、audio
-或 AI 调用。material provenance 必须解析到不可变 source bundle / manifest version；runtime 不调用 live
-public connector。
+加载并验证最小 versioned Built-in Text Material，使 Java candidate generation 可以按目标语言、requested
+support language、Practice type 与 hard constraint 读取合法材料。Content contract 使用 typed Target Core /
+Support Scaffold composition；第一条 Production walking skeleton 先发布 `en + zh-CN` artifact。明确不进入
+Practice API、Evidence、database、audio 或 AI 调用。material provenance 必须解析到不可变 source bundle /
+manifest version；runtime 不调用 live public connector。
 
 ### M1-PF2 — Provider-free Practice Walking Skeleton
 
@@ -283,6 +315,13 @@ Language Profile
 ```
 
 验证 Model Gateway 未被调用、损坏或不匹配内容 fail closed、Session 与 deterministic result 被保留。
+
+### M1-PF2J — Japanese Validation Pack
+
+在 English walking skeleton 的同一 Planner、Practice、Evaluator 与 persistence path 上增加一个
+`ja + zh-CN` `FOUNDATION` clarification / repetition scenario。允许 Japanese text、optional kana reading、
+Chinese scaffold 与 material-owned accepted variants；验证 cross-language fallback、support-text evaluation
+与跨 `languageProfileId` 污染被拒绝。不新增第二套 workflow、schema 或长期状态模型。
 
 ### M2-PF3 — Persistent Adaptation
 

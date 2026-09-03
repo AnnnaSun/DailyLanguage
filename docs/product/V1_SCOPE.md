@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.6
+> Version: 1.7
 > Approved: 2026-08-21
-> Last updated: 2026-09-02 — Public Language Reference Source Boundary
+> Last updated: 2026-09-03 — M1 Minimum Text Practice Architecture
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -43,8 +43,11 @@
 
 V1 已批准 `Provider-free Learning Baseline`：用户未提供 Model Provider 时，仍可通过经过验证的
 Built-in Content 完成最小 Practice，并产生与 deterministic source 相符的 Assessment / Evidence。
-首个 Content Pack 使用 `targetLanguage=en`、`supportLanguage=zh-CN`；起始能力范围和内容数量留到
-M1 Scope Decision。详细 Contract 见 `docs/features/PROVIDER_FREE_LEARNING.md`。
+M1 使用一套共用 Learning Workflow 交付 `targetLanguage=en` / `supportLanguage=zh-CN` 的第一条 walking
+skeleton，并以 `targetLanguage=ja` / `supportLanguage=zh-CN` 作为第二语言 validation pack。Built-in
+Content 按 `TargetPracticeCore + SupportScaffold` 组合，避免为每个 target / support pair 复制完整课程；
+`supportLanguage` 只决定解释与提示，不自动等于母语，也不产生长期 learner truth。详细 Contract 见
+`docs/features/PROVIDER_FREE_LEARNING.md` 与 `docs/features/M1_MINIMUM_TEXT_PRACTICE.md`。
 
 V1 同时批准 `Public Language Reference Source Boundary`：词典、语料、发音参考和语言 / 考试规范以
 read-only、versioned、带 provenance / license 的公共 Reference 进入 Built-in Content preparation 或
@@ -245,7 +248,9 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - BYOK transient credential handling；
 - PostgreSQL-backed Model Call Job、late-result capture 与 versioned consume；
 - Provider-free Built-in Text Practice baseline；
-- 首个 `en + zh-CN` Built-in Text Pack 的 immutable Public Source lineage / provenance；
+- `en + zh-CN` 第一条 walking skeleton 与 `ja + zh-CN` 第二语言 validation pack 的 immutable source
+  lineage / provenance；
+- `TargetPracticeCore + SupportScaffold` 的 versioned Built-in Content composition；
 - Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
 - Text Practice / Conversation 的最小闭环；
 - deterministic assessment + validated semantic candidate 的 Session-level Evaluation；

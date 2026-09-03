@@ -2,6 +2,7 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-02
+> Updated: 2026-09-03 — M1 English / Japanese Built-in lineage
 > Implementation scope: NOT_APPROVED
 > V1 phases: M1 / M3 / M5
 
@@ -22,14 +23,19 @@ M3 可以通过 typed read-only operation 接入经过批准的公共 source，�
 preparation 或 retrieval。公共结果只作为 Reference / Context；它不能直接修改 Learning Memory、Weakness、
 Mastery、Level 或其他长期学习状态。
 
-初始交付限定为已批准的：
+M1 初始交付限定为已批准的：
 
 ```text
 targetLanguage = en
 supportLanguage = zh-CN
+
+targetLanguage = ja
+supportLanguage = zh-CN
 ```
 
-该组合不代表完整语言覆盖，也不自动批准具体 source、内容数量或起始能力范围。
+两种 target language 使用同一 Public Reference boundary，并分别通过 immutable source lineage 支撑
+Target Practice Core 与 Chinese Support Scaffold。该 delivery matrix 不代表完整语言覆盖，也不自动批准
+具体 external source、connector 或更大内容数量。
 
 ## 2. Problem and product value
 
@@ -255,8 +261,10 @@ Trace 优先记录 source、operation、version、result status、latency、cach
 
 ### M1-PLR1 — Built-in Source Lineage
 
-为首个 `en + zh-CN` Built-in Text Material 建立最小 source manifest / lineage，并验证 material provenance
-可以解析到不可变 bundle version。M1 不接 live public connector，不新增 RAG、Content database 或通用 registry。
+为 `en + zh-CN` 第一条 walking skeleton 与 `ja + zh-CN` validation pack 建立最小 source manifest /
+lineage，并验证 published material provenance 可以解析 Target Practice Core、selected Support Scaffold 与
+不可变 bundle version。M1 不接 live public connector，不新增 RAG、Content database 或通用 registry；具体
+external source 与 license conclusion 仍需在对应 Content slice 中批准。
 
 ### M3-PLR2 — Public Source Catalog and Read-only Text Operations
 

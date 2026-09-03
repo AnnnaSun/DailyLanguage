@@ -1201,7 +1201,8 @@ Data Boundary:
 
 Initial V1 Delivery:
 
-- `en + zh-CN` Built-in Text artifact source lineage；
+- `en + zh-CN` 第一条 walking skeleton 与 `ja + zh-CN` validation pack 的 Built-in Text artifact source lineage；
+- Target Practice Core 与 Chinese Support Scaffold 的 versioned provenance；
 - M3 至少一个经批准的 dictionary / lexical reference source 与一个 curated corpus source；
 - M3 有限、官方、带版本的 language / exam descriptor reference；
 - M5 带 source、license、version、locale / accent 与 quality provenance 的固定音频。
