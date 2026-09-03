@@ -1,0 +1,55 @@
+{
+  "materialId": "en-builtin-cafe-request",
+  "publishedVersion": "v1",
+  "targetCore": {
+    "targetLanguage": "en",
+    "difficulty": "FOUNDATION",
+    "scenario": "CAFE_SIMPLE_REQUEST",
+    "communicationObjective": "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.",
+    "targetLanguageText": "You are at a coffee shop. The barista looks up and asks: \"Hi there! What can I get for you?\"",
+    "readingInfo": null,
+    "steps": [
+      {
+        "stepId": "order-drink",
+        "kind": "EXACT",
+        "prompt": "Order a medium coffee politely.",
+        "acceptedAnswers": [
+          "Could I have a medium coffee, please?",
+          "Could I get a medium coffee, please?",
+          "Can I have a medium coffee, please?",
+          "I'd like a medium coffee, please.",
+          "I would like a medium coffee, please.",
+          "A medium coffee, please."
+        ]
+      },
+      {
+        "stepId": "ask-price",
+        "kind": "EXACT",
+        "prompt": "Ask how much the coffee costs.",
+        "acceptedAnswers": [
+          "How much is it?",
+          "How much is the coffee?",
+          "How much is a medium coffee?",
+          "How much does it cost?",
+          "How much does the coffee cost?"
+        ]
+      },
+      {
+        "stepId": "answer-to-go",
+        "kind": "SEMANTIC_ONLY",
+        "prompt": "The barista asks: \"For here or to go?\" Answer that you want it to go, and thank the barista.",
+        "acceptedAnswers": []
+      }
+    ],
+    "semanticRubricReference": "builtin-text-communication-rubric/v1"
+  },
+  "supportScaffolds": [
+    {
+      "supportLanguage": "zh-cn",
+      "instruction": "阅读下面的场景，按每个步骤的提示用英语完成点单。前两步有标准答案，第三步请自由作答。",
+      "explanation": "场景：你在一家咖啡店。咖啡师抬头问你：\"你好！请问需要点什么？\"",
+      "hint": "点单常用 Could I have ... / Can I have ... / I'd like ...，句尾加 please 更礼貌。问价格用 How much is it? 或 How much does it cost?。\"带走\"用 to go。",
+      "contrastiveNote": "英语的 please 通常放在句尾；点单和问价格都可以直接说，不需要中文里常见的客气铺垫（如\"不好意思，麻烦一下\"），需要引起注意时用一句 Excuse me 即可。"
+    }
+  ]
+}

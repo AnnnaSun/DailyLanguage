@@ -2,7 +2,7 @@
 
 > Last updated: 2026-09-03
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-D1 / DOCUMENTATION_REVIEW_PENDING
+> Current Gate: M1-S1 / REVIEW_PENDING
 > Production baseline: M0-S9 COMPLETE (`b88606c`)
 
 ## Approved Decisions
@@ -21,6 +21,14 @@
   `ja + zh-CN` 随后交付一个 clarification / repetition validation scenario；`supportLanguage` 不自动等于母语。
 - M1 Grounded Evaluator 使用 `sourceTurnId + exactQuote + occurrenceIndex` 声明引用，由 Java 验证 learner
   text 并计算 numeric span；M1 只保存 Session-level assessment / candidate，长期 Evidence aggregation 从 M2 开始。
+- M1-D1 Documentation Review 已通过（2026-09-03）：Scope、Provider-free、Content composition、Grounded
+  Evaluator、Phase slices 与 Project Status 一致。
+- M1-S1 Current Slice Contract 已批准（2026-09-03）：`LearningMaterialCatalog` read boundary + classpath
+  Built-in JSON adapter（strict record binding + manifest SHA-256 lineage + fail-closed eager startup
+  validation）；catalog/schema 是 language-pair generic（validated language code string、按
+  `(targetLanguage, supportLanguage)` 查询、无 cross-language fallback），当前只发布 `en + zh-CN` pack
+  （2 个 `FOUNDATION` text communication scenarios，`ja + zh-CN` 查询返回 unavailable）；Content 为项目内
+  原创（manifest 记录 `PROJECT_ORIGINAL` source、AGPL-3.0）；无 PostgreSQL migration、无 API endpoint。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -164,7 +172,7 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-D1 DOCUMENTATION_REVIEW_PENDING
+Gate: M1-S1 REVIEW_PENDING
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -179,16 +187,20 @@ M0 integrated closeout: PASS
 Production baseline: M0-S9 COMPLETE (`b88606c`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
-M1-D1 Documentation: IMPLEMENTED / REVIEW_PENDING
-M1 implementation scope: NOT_APPROVED
+M1-D1 Documentation Review: PASS (2026-09-03)
+M1-S1 Current Slice Contract: APPROVED (2026-09-03)
+M1-S1 implementation: COMPLETE / REVIEW_PENDING
+M1-S1 verification: PASS — content module 40/40；full server suite 378 run / 0 failures / 0 errors
+  / 11 既有 conditional skip（RUN_DATABASE_TESTS=true + DATABASE_PORT=15432，PostgreSQL 18 + Flyway V1-V7）；
+  manifest hash `--check` PASS；全部 @SpringBootTest context 含 Built-in catalog 并启动成功
+M1-S2+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-对 M1-D1 documentation diff 运行 Review，确认 Scope、Provider-free、Content composition、Grounded Evaluator、
-Phase slices 与 Project Status 一致。Review 通过后单独提出 `M1-S1` Current Slice Contract，明确 Production /
-test files、Content source / license、verification 与 stop point。M1-S1 implementation scope 尚未批准；批准前
-不修改 Production、schema、API 或 Built-in Production artifact。
+对 M1-S1 Diff 运行 Code Ownership Review（`docs` 三份 gate 文档 + `MODULE_MAP` 物理 mapping + content
+module / Built-in artifact / tests / hash 工具）。Review 通过后由用户决定 commit；未 Review 前不进入 M1-S2
+（Deterministic Planner core）的 Current Slice Contract。
 
 ## Blockers
 

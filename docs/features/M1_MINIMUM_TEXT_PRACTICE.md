@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: NOT_APPROVED
-> Current gate: M1-D1 DOCUMENTATION_REVIEW_PENDING
+> Production implementation scope: M1-S1 APPROVED (2026-09-03)
+> Current gate: M1-S1 REVIEW_PENDING
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob

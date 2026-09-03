@@ -1,0 +1,43 @@
+{
+  "materialId": "en-builtin-greeting-intro",
+  "publishedVersion": "v1",
+  "targetCore": {
+    "targetLanguage": "en",
+    "difficulty": "FOUNDATION",
+    "scenario": "GREETING_INTRODUCTION",
+    "communicationObjective": "Exchange a greeting and introduce yourself with your name and where you are from.",
+    "targetLanguageText": "You are at a small language exchange event. Another learner, Maya, walks up to you, smiles, and says: \"Good morning! I'm Maya. How are you?\"",
+    "readingInfo": null,
+    "steps": [
+      {
+        "stepId": "greet-return",
+        "kind": "EXACT",
+        "prompt": "Reply to Maya's greeting and say that you are fine.",
+        "acceptedAnswers": [
+          "Good morning! I'm fine, thank you.",
+          "Good morning! I'm fine, thanks.",
+          "Good morning, Maya! I'm fine, thank you.",
+          "Good morning, Maya! I'm fine, thanks.",
+          "Hi Maya! I'm fine, thank you.",
+          "Hi Maya! I'm fine, thanks."
+        ]
+      },
+      {
+        "stepId": "introduce-yourself",
+        "kind": "SEMANTIC_ONLY",
+        "prompt": "Introduce yourself: tell Maya your name and where you are from.",
+        "acceptedAnswers": []
+      }
+    ],
+    "semanticRubricReference": "builtin-text-communication-rubric/v1"
+  },
+  "supportScaffolds": [
+    {
+      "supportLanguage": "zh-cn",
+      "instruction": "阅读下面的场景，按每个步骤的提示用英语回答。第一步有标准答案，第二步请自由作答。",
+      "explanation": "场景：你在一个小型语言交换活动上。另一位学习者 Maya 走过来，微笑着对你说：\"早上好！我是 Maya。你好吗？\"",
+      "hint": "回应问候时先说 Good morning 或 Hi，再回答 I'm fine。介绍自己用 My name is ... 或 I'm ...，然后用 I'm from ... 说明你来自哪里。",
+      "contrastiveNote": "英语中 How are you? 是问候语而不是真实提问，简短回答 I'm fine 即可，不需要详细描述近况；这一点和中文寒暄习惯不同。"
+    }
+  ]
+}

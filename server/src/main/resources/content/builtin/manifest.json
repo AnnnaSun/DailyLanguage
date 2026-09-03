@@ -1,0 +1,28 @@
+{
+  "manifestVersion": 1,
+  "packId": "builtin-m1-english",
+  "materials": [
+    {
+      "materialId": "en-builtin-greeting-intro",
+      "publishedVersion": "v1",
+      "targetLanguage": "en",
+      "supportLanguages": ["zh-cn"],
+      "source": "PROJECT_ORIGINAL",
+      "sourceVersion": "1",
+      "license": "AGPL-3.0",
+      "resource": "materials/en-builtin-greeting-intro/v1.json",
+      "contentHash": "sha256:e218c89152a4b93b3ee5238b6dcb301837b7dcef0549774eb122fefa1a264dfe"
+    },
+    {
+      "materialId": "en-builtin-cafe-request",
+      "publishedVersion": "v1",
+      "targetLanguage": "en",
+      "supportLanguages": ["zh-cn"],
+      "source": "PROJECT_ORIGINAL",
+      "sourceVersion": "1",
+      "license": "AGPL-3.0",
+      "resource": "materials/en-builtin-cafe-request/v1.json",
+      "contentHash": "sha256:166d8910d57be32c029396350858d12fefef7e53a2f883f19fa502fd4bfb2a4e"
+    }
+  ]
+}
