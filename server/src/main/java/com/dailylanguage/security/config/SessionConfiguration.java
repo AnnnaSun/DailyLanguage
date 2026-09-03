@@ -1,4 +1,4 @@
-package com.dailylanguage.security.infrastructure;
+package com.dailylanguage.security.config;
 
 import java.util.Objects;
 

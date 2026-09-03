@@ -1040,6 +1040,7 @@ Responsibility:
 - SYSTEM_CONTENT；
 - AI_GENERATED；
 - USER_IMPORT；
+- PUBLIC_REFERENCE；
 - 后续 OPEN_CONTENT。
 
 Provides:
@@ -1050,7 +1051,8 @@ Provides:
 - difficulty；
 - duration；
 - content type；
-- source。
+- source；
+- source version / provenance / license。
 
 Consumers:
 
@@ -1062,7 +1064,8 @@ Consumers:
 Must Not:
 
 - 根据用户等级硬锁全部内容；
-- 自动删除疑似重复用户内容。
+- 自动删除疑似重复用户内容；
+- 把公共 Reference 与 User Import 混成没有来源和权限语义的 Content。
 
 Architecture Importance:
 
@@ -1143,6 +1146,85 @@ Architecture Importance:
 
 ---
 
+## 7.3 Public Language Reference Sources
+
+Source Module:
+
+`22 / 23 — Content Library / Content Pipeline sub-boundary`
+
+V1:
+
+`P0 source lineage / P1-M3 read-only text reference / P1-M5 verified audio`
+
+Responsibility:
+
+为词典、语料、发音参考和语言 / 考试规范提供：
+
+- read-only Public Source Catalog；
+- versioned source manifest、provenance、license 与 attribution；
+- Dictionary Lookup、Corpus Search、Pronunciation Reference Lookup 与 Language / Exam Specification Lookup；
+- M1 / M5 Built-in artifact 的 immutable source lineage；
+- M3 Content preparation / retrieval 所需的 typed Public Reference Result。
+
+Provider-free Flow:
+
+    Approved Public Source
+      ↓ Controlled Import / Curation
+    License + Quality + Provenance Validation
+      ↓
+    Immutable Versioned Source Bundle
+      ↓
+    Built-in Content / Audio Artifact
+      ↓
+    Provider-free Practice
+
+M3 Read-only Flow:
+
+    Minimal Typed Query
+      ↓
+    Read-only Source Adapter
+      ↓
+    Schema + Provenance Validation
+      ↓
+    Public Reference Result
+      ↓
+    Content / RAG / Tool Gateway
+
+Data Boundary:
+
+- Public Reference 可以跨用户共享，并按 `sourceId + sourceVersion + targetLanguage` 等公共 identity 管理；
+- Language Profile、PracticeSession、用户回答、Evidence、Learning Memory 与 User Import 属于个人学习 /
+  私有内容边界；
+- public connector query 不携带 `userId`、`languageProfileId`、完整 Conversation、用户原始回答、长期状态
+  或 User Import 私密原文；
+- Public Reference Result 只作为 Reference / Context，不产生用户成功 / 失败 Evidence，也不修改长期状态。
+
+Initial V1 Delivery:
+
+- `en + zh-CN` Built-in Text artifact source lineage；
+- M3 至少一个经批准的 dictionary / lexical reference source 与一个 curated corpus source；
+- M3 有限、官方、带版本的 language / exam descriptor reference；
+- M5 带 source、license、version、locale / accent 与 quality provenance 的固定音频。
+
+Must Not:
+
+- 把 live public source 作为 Provider-free runtime 硬依赖；
+- 因 source 暂时不可用而改变已发布 Practice 语义；
+- 使用万能 Source DTO、arbitrary metadata Map 或自由 Prompt 绕过 query minimization；
+- 把公开可访问等同于允许抓取、修改、缓存或再分发；
+- 将 corpus frequency、exam descriptor、dictionary entry 或 pronunciation reference 直接视为 Learner Model truth；
+- 提前实现全语言 bundle、大规模通用词库 / 语料镜像、完整 exam curriculum 或 pronunciation scoring。
+
+Architecture Importance:
+
+`A — Critical for data / permission / learning-state authority boundary`
+
+Detailed Contract:
+
+`docs/features/PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`
+
+---
+
 # 8. Retrieval & Context / 检索与上下文
 
 ## 8.1 RAG / Retrieval
@@ -1169,6 +1251,7 @@ Advanced Hybrid Retrieval:
 
 Logical retrieval domains:
 
+- Public Reference；
 - Personal Memory；
 - Content Library；
 - User Import。
@@ -1189,7 +1272,9 @@ Do Not Use RAG For:
 Must Not:
 
 - 把 Retrieval Result 直接视为长期状态事实；
-- 跨 user / languageProfile 检索。
+- 跨 user / languageProfile 检索；
+- 混淆 Public Reference、Personal Memory 与 User Import 的 result domain / provenance；
+- 将个人学习数据或 User Import 私密原文发送给 public connector。
 
 Architecture Importance:
 
@@ -1427,7 +1512,8 @@ Logical components:
 
 - SpeechToText Provider；
 - TextToSpeech Provider；
-- Pronunciation Provider interface。
+- Pronunciation Provider interface；
+- verified Pronunciation Reference Audio source bundle。
 
 Voice Conversation:
 
@@ -1444,7 +1530,9 @@ Voice Conversation:
 Must Not:
 
 - STT success = pronunciation accuracy；
-- STT failure = pronunciation weakness。
+- STT failure = pronunciation weakness；
+- 单一 reference audio / accent = 唯一标准发音；
+- 缺少 source、license、version、locale / accent 或 quality provenance 的音频成为 Built-in Evidence authority。
 
 Architecture Importance:
 
@@ -1855,9 +1943,13 @@ Basic.
 
 Architecture:
 
-    Spring TaskExecutor
-    +
-    DB Job State
+    Application Workflow
+        ↓
+    Typed Job Submission Boundary
+        ↓
+    Spring TaskExecutor adapter
+        +
+    PostgreSQL Job State
 
 Targets:
 
@@ -1873,12 +1965,15 @@ Model Call Job owns:
 - PostgreSQL execution / consumption status；
 - stable `jobId`、workflow reference/version、optimistic-lock `rowVersion` 与 expiry；
 - interactive pending、late-result persistence 与 consume-once；
-- TaskExecutor execution using transient in-memory Credential。
+- operation-specific typed submission contract 与显式 capacity rejection；
+- TaskExecutor execution using transient in-memory Credential；
+- transport-agnostic Worker，使未来 execution mechanism 的替换优先收敛在 submission / dispatch boundary。
 
 Model Call Job must not:
 
 - persist Credential；
 - decide Provider routing、Gateway failure taxonomy 或 Learning State mutation；
+- expose `TaskExecutor`、`Executor`、`Runnable` 或 broker API to Application Workflow；
 - treat Kafka as queryable Job state；
 - automatically retry an outcome-unknown Provider call。
 
@@ -1887,6 +1982,10 @@ Kafka:
 `BACKLOG — scale driven`
 
 Do not introduce Kafka only for engineering display.
+
+`ADR-0004` 只批准 typed submission boundary 与未来 durable backlog evolution seam；V1 当前 adapter 仍是
+bounded in-process `TaskExecutor`。Kafka、RabbitMQ、database-backed dispatcher 与 durable Credential
+distribution 均未获批准。
 
 ---
 
@@ -2162,15 +2261,17 @@ RAG Result 返回 Context。
 | Weakness / Skill | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Review | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Content Pipeline | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Public Language Reference Sources | TBD | TBD | TBD | TBD | NOT_STARTED — APPROVED DESIGN；M1 source lineage、M3 read-only text reference / public-personal isolation、M5 verified audio |
 | RAG | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Context Manager | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Tool Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Model Gateway | `server/src/main/java/com/dailylanguage/modelgateway` | `TextGenerationPort`, `RoutedTextGenerationPort`, `TextGenerationGatewayConfiguration`, `ProviderConnectionVerificationService`, `ModelProviderPresetController`, `StructuredOutputValidator` | `ModelPurpose`, `ModelOperation`, `ModelRouteKey`, `ProviderId`, `ModelId`, `TransientProviderCredential`, `ModelResult`, `ModelFailure`, `ModelFailureKind`, `ModelUsage`, `ModelProviderCallException`, `TextGenerationRequest`, `TextMessage`, `TextOutputSpecification`, `TextGenerationResponse`, `TextGenerationRoute`, `FixedTextGenerationRoutes`, `TextGenerationProviderAdapter`, `OpenAiCompatibleProviderConfig`, `OpenAiCompatibleTextGenerationAdapter`, `StructuredOutputValidation`, `StructuredOutputFailure`, `TextGenerationGatewayProperties`, `ProviderPreset` | Existing Model Gateway tests plus `ProviderConnectionVerificationServiceTests`, `ModelProviderPresetControllerTests`, `OpenAiCompatibleProviderConfigTests`, `OpenAiCompatibleTextPayloadMapperTests`, `OpenAiCompatibleTextGenerationAdapterTests`, `StructuredOutputValidatorTests`, `TextGenerationGatewayConfigurationTests` | PARTIAL — M0-S8D COMPLETE (`c9314dd`)；DeepSeek-first OpenAI-compatible runtime、authenticated Backend Credential verification、JsonObject transport 与 module-local Structured Output validation 已实现；Model Gateway Ownership 保持 L2；无 Hosted TLS / Browser / live Provider evidence、Application Workflow integration、retry / fallback 或 ModelCallJob |
+| Model Call Job | `server/src/main/java/com/dailylanguage/modelcalljob`, `server/src/main/resources/mapper/ModelCallJobMapper.xml`, `server/src/main/resources/db/migration/V4__add_model_call_job.sql`–`V7__allow_model_call_job_submission_rejected.sql` | `TextGenerationJobStart`, `TextGenerationJobSubmission`, `TextGenerationJobWorker`, `ModelCallJobRepository` | `ModelCallJob`, `NewModelCallJob`, `TextGenerationJobWorkItem`, `ModelCallJobMapper`, `ModelCallJobExecutionConfiguration`, `ModelCallJobExecutionProperties` | `TextGenerationJobStartTests`, `TextGenerationJobStartTransactionTests`, `TextGenerationJobSubmissionTests`, `TextGenerationJobWorkerTests`, `ModelCallJobExecutionConfigurationTests`, ModelCallJob repository / schema integration tests | COMPLETE — M0-S9 backend foundation (`b88606c`)；PostgreSQL 是 execution / consumption status 与 typed outcome authority，rowVersion 保护 conditional transition / consume-once，workflowVersion 支持 stale 判断；dedicated TaskExecutor、typed submission、transient Credential WorkItem 与 Text Generation Worker 已串联；不包含 M1 Workflow polling / confirmation、durable backlog、retry 或 Credential persistence |
+| Model Gateway | `server/src/main/java/com/dailylanguage/modelgateway` | `TextGenerationPort`, `RoutedTextGenerationPort`, `TextGenerationGatewayConfiguration`, `ProviderConnectionVerificationService`, `ModelProviderPresetController`, `StructuredOutputValidator` | `ModelPurpose`, `ModelOperation`, `ModelRouteKey`, `ProviderId`, `ModelId`, `TransientProviderCredential`, `ModelResult`, `ModelFailure`, `ModelFailureKind`, `ModelUsage`, `ModelProviderCallException`, `TextGenerationRequest`, `TextMessage`, `TextOutputSpecification`, `TextGenerationResponse`, `TextGenerationRoute`, `FixedTextGenerationRoutes`, `TextGenerationProviderAdapter`, `OpenAiCompatibleProviderConfig`, `OpenAiCompatibleTextGenerationAdapter`, `StructuredOutputValidation`, `StructuredOutputFailure`, `TextGenerationGatewayProperties`, `ProviderPreset` | Existing Model Gateway tests plus `ProviderConnectionVerificationServiceTests`, `ModelProviderPresetControllerTests`, `OpenAiCompatibleProviderConfigTests`, `OpenAiCompatibleTextPayloadMapperTests`, `OpenAiCompatibleTextGenerationAdapterTests`, `StructuredOutputValidatorTests`, `TextGenerationGatewayConfigurationTests` | PARTIAL — M0-S8D Model Gateway foundation complete，M0-S9 Text Generation Job Worker 已通过 `RoutedTextGenerationPort` 复用该边界；DeepSeek-first OpenAI-compatible runtime、authenticated Backend Credential verification、JsonObject transport 与 module-local Structured Output validation 已实现；Model Gateway Ownership 保持 L2；无 Hosted TLS / Browser / live Provider evidence、M1 Learning Workflow integration、retry 或 fallback |
 | Trace | `server/src/main/java/com/dailylanguage/modelgateway/trace` | `ModelCallTraceRecorder` | `ModelCallTrace`, `LoggingModelCallTraceRecorder` | `ModelCallTraceRuntimeTests`, `LoggingModelCallTraceRecorderTests`, `OpenAiCompatibleFinishReasonDiagnosticsTests` | PARTIAL — M0-S8C/S8D module-local safe terminal Trace 与 unknown finish-reason diagnostics 已实现；Trace / Observability Ownership L3；无 persistence、OpenTelemetry、metric storage 或 cross-Workflow correlation |
 | Eval | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Security | `server/src/main/java/com/dailylanguage/security`, `server/src/main/java/com/dailylanguage/authentication` | `SecurityConfiguration`, `LocalRegistrationController`, `LocalAuthenticationRepository`, `LocalPasswordHasher`, `RedisAuthenticationAttemptRateLimiter`, `PersistentSingleUser` | trusted `UserContext`, ownership access boundary, local registration/login/logout/me, password policy and Argon2id, Redis Session, SPA CSRF, authentication throttling, hash concurrency gate and singleton bootstrap | `AuthenticationHttpContractTests`, `LocalRegistrationLoginIntegrationTests`, `RedisAuthenticationSessionIntegrationTests`, `PasswordHashConcurrencyGateTests`, `RedisAuthenticationAttemptRateLimiterIntegrationTests`, `SingleUserPersistenceIntegrationTests` | COMPLETE — M0-S4 authentication / UserContext foundation; Hosted capacity remains provisional until M6 |
-| Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements, auth identity and credential schema | `PersistenceIdentityIntegrationTests`, `LocalAuthenticationPersistenceIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity and local credential foundation |
-| Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL |
+| Persistence Infrastructure | `server/src/main/resources/db`, `server/src/main/resources/mapper`, `server/src/main/java/com/dailylanguage/persistence` | Flyway, MyBatis Mapper XML | PostgreSQL UUID TypeHandler, parameterized Mapper statements, auth identity / credential schema, Model Call Job schema / typed outcome tables | `PersistenceIdentityIntegrationTests`, `LocalAuthenticationPersistenceIntegrationTests`, `MapperSqlSafetyTests`, ModelCallJob schema / repository integration tests | PARTIAL — identity、local credential 与 Model Call Job persistence foundation；fresh test database 和 rebuilt primary local database 均已验证 PostgreSQL 18 + Flyway V1–V7 |
+| Infrastructure | `compose.yaml`, `server/src/main` | `compose.yaml`, `DailyLanguageApplication` | PostgreSQL + pgvector, Redis, externalized connection and health configuration | `DailyLanguageApplicationTests`, Compose/runtime health verification | PARTIAL — M0 local infrastructure verified；PostgreSQL / Redis healthy，backend 使用 primary local database startup / graceful shutdown PASS |
 
 `NOT_STARTED` 只是当前文档初始化默认值。
 

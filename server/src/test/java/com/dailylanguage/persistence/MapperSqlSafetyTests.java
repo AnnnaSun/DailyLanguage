@@ -33,6 +33,8 @@ class MapperSqlSafetyTests {
                 .getResource("classpath:/mapper/LanguageProfileMapper.xml");
         Resource localAuthenticationMapper = new PathMatchingResourcePatternResolver()
                 .getResource("classpath:/mapper/LocalAuthenticationMapper.xml");
+        Resource modelCallJobMapper = new PathMatchingResourcePatternResolver()
+                .getResource("classpath:/mapper/ModelCallJobMapper.xml");
 
         assertThat(readResource(languageProfileMapper))
                 .contains("#{userId, jdbcType=OTHER}")
@@ -45,6 +47,22 @@ class MapperSqlSafetyTests {
                 .contains("#{providerSubject, jdbcType=VARCHAR}")
                 .contains("#{authenticationIdentityId, jdbcType=OTHER}")
                 .contains("#{encodedPasswordHash, jdbcType=VARCHAR}");
+        assertThat(readResource(modelCallJobMapper))
+                .contains("#{userId, jdbcType=OTHER}")
+                .contains("#{languageProfileId, jdbcType=OTHER}")
+                .contains("#{providerId, jdbcType=VARCHAR}")
+                .contains("#{modelId, jdbcType=VARCHAR}")
+                .contains("#{workflowId, jdbcType=OTHER}")
+                .contains("#{expectedRowVersion, jdbcType=BIGINT}")
+                .contains("#{generatedText, jdbcType=VARCHAR}")
+                .contains("#{finishReason, jdbcType=VARCHAR}")
+                .contains("#{inputTokens, jdbcType=BIGINT}")
+                .contains("#{outputTokens, jdbcType=BIGINT}")
+                .contains("#{terminalExecutionStatus, jdbcType=VARCHAR}")
+                .contains("#{failureKind, jdbcType=VARCHAR}")
+                .contains("#{retryAfterSeconds, jdbcType=BIGINT}")
+                .contains("#{expiresAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}")
+                .doesNotContain("${");
     }
 
     private static String readResource(Resource resource) throws IOException {

@@ -1,4 +1,4 @@
-package com.dailylanguage.modelgateway.infrastructure;
+package com.dailylanguage.modelgateway.config;
 
 import java.net.URI;
 import java.time.Duration;

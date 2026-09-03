@@ -1,4 +1,4 @@
-package com.dailylanguage.security.infrastructure;
+package com.dailylanguage.security.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +11,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+
+import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
+import com.dailylanguage.security.infrastructure.LoginRateLimitFilter;
+import com.dailylanguage.security.infrastructure.PersistentSingleUser;
+import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
+import com.dailylanguage.security.infrastructure.SingleUserAuthenticationFilter;
 
 /**
  * Authentication / authorization 的组合入口。Filter 顺序本身属于安全语义，

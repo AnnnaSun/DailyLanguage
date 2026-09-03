@@ -1,0 +1,6 @@
+app:
+  model-call-job:
+    execution:
+      executor:
+        workers: ${MODEL_CALL_JOB_EXECUTOR_WORKERS:4}
+        queue-capacity: ${MODEL_CALL_JOB_EXECUTOR_QUEUE_CAPACITY:16}

@@ -393,6 +393,7 @@ I understand Planner.
 
 | Module                            | Engineering Class | Current Ownership | V1 Target | Interview Target | Evidence |
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
+| Model Call Job                    | A                 | L3                | L4        | L5               | M0-S9 Ownership 已能解释 create / submit / claim / Provider call 的阶段边界、Job TaskExecutor 与 Gateway ExecutorService 分离、execution / consumption state、workflowVersion stale、rowVersion conditional update / consume-once、capacity rejection、outcome unknown 与 transient Credential lifecycle；尚无 M1 Learning Workflow polling / confirmation、restart recovery 或 production capacity evidence |
 | Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7D–S8D Ownership 确认 authenticated verification、fixed route、transient Credential、bounded executor、OpenAI-compatible call、Structured Output seam、terminal Trace 与 safe diagnostics 可追踪；无 Hosted TLS、Browser UI、live Provider、Application Workflow 或 BYOK End-to-End evidence |
 | Structured Output                 | A                 | L2                | L4        | L5               | M0-S8A/S8B 已能追踪 JsonObject transport、strict parse / record shape / enum / semantic validation 与 Valid / Invalid envelope；尚无 Planner / Evaluator / Content Workflow 集成或真实状态保护操作证据 |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |

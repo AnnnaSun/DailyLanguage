@@ -2,12 +2,17 @@
 
 > Status: APPROVED DESIGN  
 > Approved: 2026-08-29  
+> Updated: 2026-09-02 — Public Language Reference Source Boundary
 > Implementation scope: NOT_APPROVED  
 > V1 phases: M1 / M2 / M3 / M5
 
 本文定义用户未提供 Model Provider 时仍可执行的最小学习路径。它补充
 `ADR-0003` 已批准的 deterministic fallback 与 bounded AI dependency，但不建立第二套 offline
 Tutor、Planner、Evaluator、Learning Memory 或长期状态 authority。
+
+Built-in Content 使用的词典、语料、发音参考和语言 / 考试规范 source lineage 继续遵守
+[`PUBLIC_LANGUAGE_REFERENCE_SOURCES.md`](PUBLIC_LANGUAGE_REFERENCE_SOURCES.md)。公共 source 是
+Reference / Context，不是个人学习状态 truth，也不是 Provider-free runtime 的 live dependency。
 
 首个 Built-in Content Pack 已批准使用：
 
@@ -158,6 +163,14 @@ answer 或长期学习状态的唯一 authority。
 - available assistance；
 - provenance / license。
 
+M1 Built-in artifact 的 provenance 必须能够解析到本地已验证、不可变的 source bundle / manifest version。
+公共 source 的 controlled import / curation 可以发生在发布前，但 Provider-free runtime 不得为了执行已发布
+Practice 实时调用公共 connector。source 更新必须形成新的 bundle / material version。
+
+公共 source bundle 是共享 reference；Language Profile、用户回答、PracticeSession、Evidence、Learning Memory
+和 User Import 仍属于个人学习 / 私有内容边界。不得向公共 connector 发送 `userId`、`languageProfileId`、
+完整 Conversation、用户原始回答、Weakness、Mastery、Level 或 User Import 私密原文。
+
 `PracticeSession` 与后续 Evidence 引用 `materialId + version`。Content update 必须形成可追踪的新版本，
 不得通过覆盖旧内容改变历史 Session / Evidence 的解释依据。
 
@@ -238,6 +251,9 @@ boundary，使 Planner / Practice 不依赖 classpath 或未来 database storage
 - full offline sync；
 - 第二套 Planner、Evaluator、Learning Memory 或 mastery truth；
 - M1 RAG、Tool Gateway 或 Content Agent；
+- live public source 作为 Provider-free Practice 的硬依赖；
+- 公共 connector 接收个人学习数据或 User Import 私密原文；
+- 完整 Public Language Reference Source 覆盖；
 - AI Session failure 后的静默模式切换。
 
 ## 10. Phase delivery
@@ -251,7 +267,8 @@ Code、schema、API、Security 或当前 Phase implementation status。
 
 加载并验证最小 versioned Built-in Text Material，使 Java candidate generation 可以按目标语言、
 Practice type 与 hard constraint 读取合法材料。明确不进入 Practice API、Evidence、database、audio
-或 AI 调用。
+或 AI 调用。material provenance 必须解析到不可变 source bundle / manifest version；runtime 不调用 live
+public connector。
 
 ### M1-PF2 — Provider-free Practice Walking Skeleton
 
@@ -275,12 +292,13 @@ re-planning，覆盖 replay、duplicate event、assisted / independent 语义与
 ### M3-PF4 — Content Productionization
 
 在真实 dogfooding evidence 下确定有限场景包的数量与覆盖，接入正式 Content Library、provenance、
-publish lifecycle 和 imported / curated content boundary。不得把 Content 直接写成长期学习状态。
+publish lifecycle、Public Language Reference 与 imported / curated content boundary。公共 lookup 通过 typed
+read-only operation 与最小化 query 执行，不得把 Content / Reference Result 直接写成长期学习状态。
 
 ### M5-PF5 — Built-in Audio
 
-将经过验证的固定音频接入 Listening；音频缺失、损坏或播放失败不得产生虚假 comprehension、
-speech recognition 或 pronunciation Evidence。
+将经过验证且携带 source、license、locale / accent 与版本信息的固定音频接入 Listening；音频缺失、损坏、
+variant 不匹配或播放失败不得产生虚假 comprehension、speech recognition 或 pronunciation Evidence。
 
 ## 11. Architecture impact
 

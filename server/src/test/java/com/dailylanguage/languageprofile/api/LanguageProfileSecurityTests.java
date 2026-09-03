@@ -34,7 +34,7 @@ import com.dailylanguage.security.domain.UserContext;
 import com.dailylanguage.security.infrastructure.AuthenticationHttpResponseWriter;
 import com.dailylanguage.security.infrastructure.PersistentSingleUser;
 import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateLimiter;
-import com.dailylanguage.security.infrastructure.SecurityConfiguration;
+import com.dailylanguage.security.config.SecurityConfiguration;
 
 @WebMvcTest(LanguageProfileController.class)
 @Import({

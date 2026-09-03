@@ -1,4 +1,4 @@
-package com.dailylanguage.security.infrastructure;
+package com.dailylanguage.security.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

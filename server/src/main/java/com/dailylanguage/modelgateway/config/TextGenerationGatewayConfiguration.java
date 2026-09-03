@@ -1,4 +1,4 @@
-package com.dailylanguage.modelgateway.infrastructure;
+package com.dailylanguage.modelgateway.config;
 
 import java.net.http.HttpClient;
 import java.util.HashMap;

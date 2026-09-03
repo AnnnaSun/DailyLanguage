@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.modelcalljob.infrastructure.ModelCallJobMapper">
+
+    <resultMap id="storedModelCallJobResult"
+               type="com.dailylanguage.modelcalljob.infrastructure.StoredModelCallJob">
+        <constructor>
+            <idArg column="id" javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="user_id" javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="language_profile_id" javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="model_purpose" javaType="java.lang.String"/>
+            <arg column="model_operation" javaType="java.lang.String"/>
+            <arg column="provider_id" javaType="java.lang.String"/>
+            <arg column="model_id" javaType="java.lang.String"/>
+            <arg column="workflow_id" javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="workflow_step_id" javaType="java.lang.String"/>
+            <arg column="workflow_version" javaType="_long"/>
+            <arg column="execution_status" javaType="java.lang.String"/>
+            <arg column="consumption_status" javaType="java.lang.String"/>
+            <arg column="failure_kind" javaType="java.lang.String"/>
+            <arg column="failure_retry_after_seconds" javaType="java.lang.Long"/>
+            <arg column="row_version" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="expires_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedTextGenerationResult"
+               type="com.dailylanguage.modelcalljob.infrastructure.StoredTextGenerationResult">
+        <constructor>
+            <arg column="provider_id" javaType="java.lang.String"/>
+            <arg column="model_id" javaType="java.lang.String"/>
+            <arg column="generated_text" javaType="java.lang.String"/>
+            <arg column="finish_reason" javaType="java.lang.String"/>
+            <arg column="input_tokens" javaType="java.lang.Long"/>
+            <arg column="output_tokens" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="jobColumns">
+        id, user_id, language_profile_id, model_purpose, model_operation, provider_id, model_id,
+        workflow_id, workflow_step_id, workflow_version, execution_status, consumption_status,
+        failure_kind, failure_retry_after_seconds,
+        row_version, created_at, completed_at, expires_at
+    </sql>
+
+    <select id="insertAndReturn" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        INSERT INTO model_call_job (
+            user_id, language_profile_id, model_purpose, model_operation, provider_id, model_id,
+            workflow_id, workflow_step_id, workflow_version, expires_at
+        )
+        VALUES (
+            #{userId, jdbcType=OTHER}, #{languageProfileId, jdbcType=OTHER},
+            #{modelPurpose, jdbcType=VARCHAR}, #{modelOperation, jdbcType=VARCHAR},
+            #{providerId, jdbcType=VARCHAR}, #{modelId, jdbcType=VARCHAR},
+            #{workflowId, jdbcType=OTHER}, #{workflowStepId, jdbcType=VARCHAR},
+            #{workflowVersion, jdbcType=BIGINT}, #{expiresAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}
+        )
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="findByIdAndUserId" resultMap="storedModelCallJobResult">
+        SELECT <include refid="jobColumns"/>
+        FROM model_call_job
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+    </select>
+
+    <select id="findTextGenerationResultByJobIdAndUserId" resultMap="storedTextGenerationResult">
+        SELECT job.provider_id, job.model_id,
+               result.generated_text, result.finish_reason, result.input_tokens, result.output_tokens
+        FROM model_call_job job
+        JOIN model_call_text_generation_result result ON result.job_id = job.id
+        WHERE job.id = #{jobId, jdbcType=OTHER}
+          AND job.user_id = #{userId, jdbcType=OTHER}
+          AND job.model_operation = 'TEXT_GENERATION'
+          AND job.execution_status = 'SUCCEEDED'
+    </select>
+
+    <select id="tryStartExecution" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET execution_status = 'RUNNING',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'CREATED'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryRecordSubmissionRejection"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET execution_status = 'SUBMISSION_REJECTED',
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'CREATED'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryCompleteTextGeneration" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET provider_id = #{providerId, jdbcType=VARCHAR},
+            model_id = #{modelId, jdbcType=VARCHAR},
+            execution_status = 'SUCCEEDED',
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND model_operation = 'TEXT_GENERATION'
+          AND execution_status = 'RUNNING'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND (
+              (provider_id IS NULL AND model_id IS NULL)
+              OR (provider_id = #{providerId, jdbcType=VARCHAR} AND model_id = #{modelId, jdbcType=VARCHAR})
+          )
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <insert id="insertTextGenerationResult">
+        INSERT INTO model_call_text_generation_result (
+            job_id, generated_text, finish_reason, input_tokens, output_tokens
+        )
+        VALUES (
+            #{jobId, jdbcType=OTHER}, #{generatedText, jdbcType=VARCHAR},
+            #{finishReason, jdbcType=VARCHAR}, #{inputTokens, jdbcType=BIGINT},
+            #{outputTokens, jdbcType=BIGINT}
+        )
+    </insert>
+
+    <select id="tryCompleteFailure" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET provider_id = COALESCE(provider_id, #{providerId, jdbcType=VARCHAR}),
+            model_id = COALESCE(model_id, #{modelId, jdbcType=VARCHAR}),
+            execution_status = #{terminalExecutionStatus, jdbcType=VARCHAR},
+            failure_kind = #{failureKind, jdbcType=VARCHAR},
+            failure_retry_after_seconds = #{retryAfterSeconds, jdbcType=BIGINT},
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'RUNNING'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND (
+              (provider_id IS NULL AND model_id IS NULL)
+              OR (provider_id = #{providerId, jdbcType=VARCHAR}
+                  AND model_id = #{modelId, jdbcType=VARCHAR})
+          )
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryRecordOutcomeUnknown" resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET execution_status = 'OUTCOME_UNKNOWN',
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'RUNNING'
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryConsumeSucceededResult"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET consumption_status = 'CONSUMED',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'SUCCEEDED'
+          AND consumption_status = 'NOT_READY'
+          AND workflow_version = #{currentWorkflowVersion, jdbcType=BIGINT}
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND expires_at > CURRENT_TIMESTAMP
+        RETURNING <include refid="jobColumns"/>
+    </select>
+
+    <select id="tryMarkSucceededResultStale"
+            resultMap="storedModelCallJobResult" affectData="true" flushCache="true">
+        UPDATE model_call_job
+        SET consumption_status = 'STALE',
+            row_version = row_version + 1
+        WHERE id = #{jobId, jdbcType=OTHER}
+          AND user_id = #{userId, jdbcType=OTHER}
+          AND execution_status = 'SUCCEEDED'
+          AND consumption_status = 'NOT_READY'
+          AND workflow_version &lt; #{currentWorkflowVersion, jdbcType=BIGINT}
+          AND row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND expires_at > CURRENT_TIMESTAMP
+        RETURNING <include refid="jobColumns"/>
+    </select>
+</mapper>

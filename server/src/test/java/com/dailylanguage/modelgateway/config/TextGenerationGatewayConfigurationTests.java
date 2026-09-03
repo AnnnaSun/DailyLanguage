@@ -1,4 +1,4 @@
-package com.dailylanguage.modelgateway.infrastructure;
+package com.dailylanguage.modelgateway.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
