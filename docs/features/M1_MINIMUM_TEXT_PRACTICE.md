@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: M1-S1 COMPLETE (`d3eeadc`); M1-S2 NOT_APPROVED
-> Current gate: M1-S1 COMPLETE / M1-S2 SCOPE_NOT_APPROVED
+> Production implementation scope: M1-S2 COMPLETE (`fcefedb` + review fixes `4322499`); M1-S3 NOT_APPROVED
+> Current gate: M1-S2 COMPLETE / M1-S3 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -257,6 +257,14 @@ LLM 只能在 Java 给出的 candidate set 中选择，不能创造 material、�
 Model unavailable、Credential missing、capacity rejection、timeout、invalid structure、invalid candidate 或
 interactive wait budget 耗尽时，Planner 使用同一 candidate set 生成合法 deterministic task。
 
+### 7.1 Implemented M1-S2 boundary
+
+M1-S2 已实现 `LearningTaskPlanner` / `DeterministicLearningTaskPlanner` module-local flow：从
+`LearningMaterialCatalog` 获取候选，经 target/support/difficulty/duration/exclusion hard filtering 与稳定 identity
+排序后重新按完整 `materialId + publishedVersion` 解析；list/resolve 不一致时 fail closed。成功只返回尚未持久化的
+`LearningTaskPlan`，失败返回 typed `Unavailable`。本 slice 不写 PostgreSQL、不调用 Model、不创建 Session，也不修改
+Profile、Evidence、Weakness、Level 或 Memory。Durable task identity 与 lifecycle 仍由 M1-S3 负责。
+
 ## 8. Practice lifecycle and deterministic assessment
 
 M1 conceptual lifecycle：
@@ -449,11 +457,12 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: M1-S1 COMPLETE (`d3eeadc`); M1-S2 NOT_APPROVED
+Production Current Slice Scope: M1-S2 COMPLETE (`fcefedb` + review fixes `4322499`); M1-S3 NOT_APPROVED
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S1 已完成并提交。下一步只提出 `M1-S2 — Deterministic Planner core` Current Slice Contract；
-未获批准前不修改 Planner Production Code、schema 或 API。
+当前 Stop Point：M1-S2 implementation、Review、verification 与 Ownership 已完成。`M1-S3 — LearningTask
+persistence` Current Slice Contract 尚待用户批准；未获批准前不修改 PostgreSQL schema、Planner persistence
+Production Code 或 API。

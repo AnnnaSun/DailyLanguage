@@ -371,7 +371,7 @@ I understand Planner.
 | ----------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
 | Language Management           | A                 | UNASSESSED        | L3        | L3               |          |
 | Language Profile              | A                 | UNASSESSED        | L3        | L4               |          |
-| Planner                       | A                 | UNASSESSED        | L3        | L5               |          |
+| Planner                       | A                 | L3                | L3        | L5               | M1-S2 Ownership `UNDERSTOOD`：可追踪 prevalidated `LanguageProfileIdentity` / hard constraints → Catalog candidate list → Java filtering / stable fallback → exact material re-resolution → `LearningTaskPlan` 或 typed `Unavailable`，并能说明 S2 input 不是 authorization proof、Planner 不拥有 persistence、Model、Session 或 learner-state mutation authority；尚无 S3 persistence、S4 owner-scoped API、S9 Model enrichment 或 integrated workflow evidence |
 | Practice Runtime              | A                 | UNASSESSED        | L3        | L4               |          |
 | Conversation                  | A                 | UNASSESSED        | L3        | L5               |          |
 | Reading                       | A                 | UNASSESSED        | L3        | L4               |          |
@@ -706,6 +706,7 @@ Human Touch 的目的：
 | M0-S7B OpenAI-compatible Provider Boundary | 3 | UNDERSTOOD | None for current Provider-boundary slice；无 runtime wiring / live Provider evidence | 2026-08-31 |
 | M0-S7C Text Runtime Composition | 1 | UNDERSTOOD | None for current runtime-composition slice；无 live Provider / BYOK End-to-End evidence | 2026-08-31 |
 | M0-S7D BYOK Connection Verification | 3 | UNDERSTOOD | None for current Backend API slice；无 Hosted TLS / Browser UI / live Provider evidence | 2026-08-31 |
+| M1-S2 Deterministic Planner Core | UNKNOWN（旧记录未保留） | UNDERSTOOD | None for current module-local deterministic slice；无 persistence / API / Model enrichment evidence | 2026-09-03 |
 
 Result：
 
@@ -1015,7 +1016,7 @@ L5
 
 | Module                   | Ownership  | Interview Readiness | Main Gap |
 | ------------------------ | ---------- | ------------------- | -------- |
-| Planner                  | UNASSESSED | I0                  |          |
+| Planner                  | L3        | I2                  | 可解释 deterministic filtering、stable fallback、list/resolve fail-closed 与 Java authority；尚无 durable task、owner-scoped API、optional Model ranking 或完整 Learning Workflow evidence |
 | Conversation             | UNASSESSED | I0                  |          |
 | Evaluator                | UNASSESSED | I0                  |          |
 | Learning Memory          | UNASSESSED | I0                  |          |

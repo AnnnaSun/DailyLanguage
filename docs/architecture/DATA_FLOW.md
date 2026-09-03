@@ -2081,7 +2081,7 @@ Progress 不应该重新计算另一套学习状态。
 
 | Logical Flow | Entry | Application Service | Domain Service | Repository | Storage | Main Test |
 |---|---|---|---|---|---|---|
-| Planner Flow | TBD | TBD | TBD | TBD | TBD | TBD |
+| Planner Flow | `LearningTaskPlanner.plan` | `DeterministicLearningTaskPlanner` | `PlanningRequest` → `LearningTaskPlan` / typed `PlanningResult` | N/A — M1-S2 不持久化 | N/A — M1-S3 未批准 | `DeterministicLearningTaskPlannerTests` |
 | Practice Flow | TBD | TBD | TBD | TBD | TBD | TBD |
 | Evaluator Flow | TBD | TBD | TBD | TBD | TBD | TBD |
 | Memory Flow | TBD | TBD | TBD | TBD | TBD | TBD |

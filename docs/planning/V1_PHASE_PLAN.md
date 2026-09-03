@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-03 — M1-S1 post-commit closeout
+> Last updated: 2026-09-03 — M1-S2 documentation reconciliation
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -140,7 +140,7 @@ integration、failure invariant 与完整 slices 见
 | --- | --- | --- |
 | M1-D1 | 同步 approved M1 Scope / Architecture / slice plan | COMPLETE |
 | M1-S1 | Built-in Content boundary + English artifact | COMPLETE (`d3eeadc`) |
-| M1-S2 | Deterministic Planner core | SCOPE_NOT_APPROVED |
+| M1-S2 | Deterministic Planner core | COMPLETE (`fcefedb` + review fixes `4322499`) |
 | M1-S3 | LearningTask persistence | SCOPE_NOT_APPROVED |
 | M1-S4 | Owner-scoped planning API | SCOPE_NOT_APPROVED |
 | M1-S5 | PracticeSession lifecycle | SCOPE_NOT_APPROVED |
@@ -151,6 +151,12 @@ integration、failure invariant 与完整 slices 见
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
+
+M1-S2 已完成 provider-free deterministic candidate filtering、stable fallback、final material re-resolution
+validation 与 typed `Planned / Unavailable` result；Planner 不拥有 persistence、Model invocation、Session 或
+learner-state mutation authority。Review fixes 同步补齐 immutable published material 与历史版本解析边界。
+2026-09-03 fresh evidence：Planner + affected Content 64/64 PASS；non-database server regression 389 tests /
+0 failures / 0 errors / 85 environment-gated skips；Code Review PASS；Ownership `UNDERSTOOD`（Planner L3）。
 
 ### M2 — Persistent Adaptation Loop
 

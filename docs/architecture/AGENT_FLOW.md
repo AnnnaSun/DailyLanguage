@@ -2047,7 +2047,7 @@ Optimization / Self-improvement 当前保持受控：
 
 | Agent / Runtime | Source Path | Main Entry | Prompt | Context Policy | Tools | Output Schema | Tests |
 |---|---|---|---|---|---|---|---|
-| Planner | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Planner | `server/src/main/java/com/dailylanguage/planner` | `LearningTaskPlanner`, `DeterministicLearningTaskPlanner` | N/A — M1-S2 deterministic only | Prevalidated `LanguageProfileIdentity` + task hard constraints；不读取完整历史或长期 Memory | `LearningMaterialCatalog` read boundary | `PlanningResult.Planned` / `PlanningResult.Unavailable` | `DeterministicLearningTaskPlannerTests` |
 | Conversation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Evaluator | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Context Manager | TBD | TBD | N/A | TBD | N/A | TBD | TBD |
