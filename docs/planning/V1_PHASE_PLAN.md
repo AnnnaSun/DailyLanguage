@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-04 — M1-S4 documentation reconciliation
+> Last updated: 2026-09-04 — M1-S5 documentation reconciliation
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -143,7 +143,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S2 | Deterministic Planner core | COMPLETE (`fcefedb` + review fixes `4322499`) |
 | M1-S3 | LearningTask persistence | COMPLETE (`45143af`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S4 | Owner-scoped planning API | COMPLETE (`dd9559d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
-| M1-S5 | PracticeSession lifecycle | SCOPE_NOT_APPROVED |
+| M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | SCOPE_NOT_APPROVED |
 | M1-S7 | Grounded Evaluator contract | SCOPE_NOT_APPROVED |
 | M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
@@ -161,8 +161,15 @@ learner-state mutation authority。Review fixes 同步补齐 immutable published
 M1-S4 已完成 owner-scoped planning HTTP flow：authenticated `UserContext` → owned Profile → deterministic
 Planner → Profile identity guard → `INSERT ... SELECT` durable create。Code Review / Architecture PASS；unit 18/18、
 HTTP 12/12、Application integration 7/7、S3 regression 10/10、empty-database Flyway V1–V8 8/8、wider server
-regression 456/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `dd9559d`。M1-S5 仍需独立
-Current Slice Contract 与 Scope Decision。
+regression 456/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `dd9559d`。
+
+M1-S5 已完成 owner-scoped PracticeSession start 与 learner response flow：Task `PLANNED → STARTED` 与唯一
+`IN_PROGRESS` Session 在同一 transaction 原子提交；repeated/concurrent start 返回同一 durable Session；response
+先锁 Session row，再以 owner/profile/`IN_PROGRESS` SQL gate 和 `(sessionId, stepId)` identity 裁决首次接受、
+exact replay 或 different-payload conflict。Code Review / Architecture PASS；unit/application/HTTP/Mapper 43/43、
+PostgreSQL 18.6 S5 integration/concurrency 19/19、S3 regression 10/10、S4 regression 7/7、empty-database Flyway
+V1–V9 9/9、wider server regression 501/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为
+`b6cde9d`。M1-S6 仍需独立 Current Slice Contract 与 Scope Decision。
 
 ### M2 — Persistent Adaptation Loop
 

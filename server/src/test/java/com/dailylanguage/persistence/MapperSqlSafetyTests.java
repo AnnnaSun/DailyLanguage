@@ -35,6 +35,10 @@ class MapperSqlSafetyTests {
                 .getResource("classpath:/mapper/LocalAuthenticationMapper.xml");
         Resource modelCallJobMapper = new PathMatchingResourcePatternResolver()
                 .getResource("classpath:/mapper/ModelCallJobMapper.xml");
+        Resource learningTaskMapper = new PathMatchingResourcePatternResolver()
+                .getResource("classpath:/mapper/LearningTaskMapper.xml");
+        Resource practiceSessionMapper = new PathMatchingResourcePatternResolver()
+                .getResource("classpath:/mapper/PracticeSessionMapper.xml");
 
         assertThat(readResource(languageProfileMapper))
                 .contains("#{userId, jdbcType=OTHER}")
@@ -62,6 +66,24 @@ class MapperSqlSafetyTests {
                 .contains("#{failureKind, jdbcType=VARCHAR}")
                 .contains("#{retryAfterSeconds, jdbcType=BIGINT}")
                 .contains("#{expiresAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}")
+                .doesNotContain("${");
+        assertThat(readResource(learningTaskMapper))
+                .contains("#{materialId, jdbcType=VARCHAR}")
+                .contains("#{publishedVersion, jdbcType=VARCHAR}")
+                .contains("#{targetLanguage, jdbcType=VARCHAR}")
+                .contains("#{taskId, jdbcType=OTHER}")
+                .contains("#{trustedUserId, jdbcType=OTHER}")
+                .contains("#{languageProfileId, jdbcType=OTHER}")
+                .doesNotContain("${");
+        assertThat(readResource(practiceSessionMapper))
+                .contains("#{taskId, jdbcType=OTHER}")
+                .contains("#{sessionId, jdbcType=OTHER}")
+                .contains("#{trustedUserId, jdbcType=OTHER}")
+                .contains("#{languageProfileId, jdbcType=OTHER}")
+                .contains("#{stepId, jdbcType=VARCHAR}")
+                .contains("#{learnerText, jdbcType=VARCHAR}")
+                .contains("ON CONFLICT DO NOTHING")
+                .contains("FOR UPDATE OF session")
                 .doesNotContain("${");
     }
 
