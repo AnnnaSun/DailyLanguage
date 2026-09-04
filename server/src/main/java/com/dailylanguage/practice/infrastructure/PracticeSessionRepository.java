@@ -1,6 +1,7 @@
 package com.dailylanguage.practice.infrastructure;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.PracticeSession;
 
 @Repository
@@ -100,6 +102,85 @@ public class PracticeSessionRepository {
                 .map(PracticeSessionRepository::toDomain);
     }
 
+    /** completion 计算读取该 Session 的全部已接受 response（owner-scoped，含 learner text）。 */
+    public List<PracticeSession.LearnerResponse> findOwnedResponses(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        validateOwnedArguments(sessionId, trustedUserId, languageProfileId);
+        return practiceSessionMapper
+                .findOwnedResponses(sessionId, trustedUserId, languageProfileId)
+                .stream()
+                .map(PracticeSessionRepository::toDomain)
+                .toList();
+    }
+
+    /**
+     * 前置条件：调用方已在同一事务内持有该 Session 的行锁。conditional IN_PROGRESS → COMPLETED
+     * transition，guard 由数据库原子裁决；返回数据库给出的 durable completedAt（PostgreSQL
+     * CURRENT_TIMESTAMP 是 lifecycle timestamp authority），empty 表示 gate 不匹配且零 mutation，
+     * 由调用方以异常 fail closed。
+     */
+    @Transactional
+    public Optional<OffsetDateTime> completeOwned(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        validateOwnedArguments(sessionId, trustedUserId, languageProfileId);
+        return Optional.ofNullable(practiceSessionMapper.completeOwnedAndReturnCompletedAt(
+                sessionId, trustedUserId, languageProfileId));
+    }
+
+    /**
+     * 前置条件：同一事务内 Session 已进入 COMPLETED。insert gate 在数据库内重校验 owner/profile
+     * 与 terminal state，返回 durable createdAt；empty 表示 gate 不匹配（零行），由调用方以异常
+     * fail closed。PRIMARY KEY(session_id) 冲突以异常表达并由外层事务回滚。
+     */
+    @Transactional
+    public Optional<OffsetDateTime> insertOwnedAssessment(
+            UUID sessionId,
+            String assessmentPolicyVersion,
+            long durationSeconds,
+            UUID trustedUserId,
+            UUID languageProfileId) {
+        validateOwnedArguments(sessionId, trustedUserId, languageProfileId);
+        Objects.requireNonNull(assessmentPolicyVersion, "assessmentPolicyVersion must not be null");
+        if (durationSeconds < 0) {
+            throw new IllegalArgumentException("durationSeconds must not be negative");
+        }
+        return Optional.ofNullable(practiceSessionMapper.insertOwnedAssessmentAndReturnCreatedAt(
+                sessionId, assessmentPolicyVersion, durationSeconds, trustedUserId, languageProfileId));
+    }
+
+    /**
+     * 前置条件：同一事务内该 Session 的 assessment header 已插入。insert gate 在数据库内重校验
+     * ownership 与 assessment 存在性；false 表示零行，由调用方以异常 fail closed。
+     */
+    @Transactional
+    public boolean insertOwnedStepAssessment(
+            UUID sessionId,
+            String stepId,
+            String stepKind,
+            String outcome,
+            UUID trustedUserId,
+            UUID languageProfileId) {
+        validateOwnedArguments(sessionId, trustedUserId, languageProfileId);
+        Objects.requireNonNull(stepId, "stepId must not be null");
+        Objects.requireNonNull(stepKind, "stepKind must not be null");
+        Objects.requireNonNull(outcome, "outcome must not be null");
+        return practiceSessionMapper.insertOwnedStepAssessmentAndReturnSessionId(
+                sessionId, stepId, stepKind, outcome, trustedUserId, languageProfileId) != null;
+    }
+
+    /** completed replay 读取完整 durable assessment（header + step 结果）；不重新依赖 catalog。 */
+    public Optional<DeterministicAssessment> findOwnedAssessment(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        validateOwnedArguments(sessionId, trustedUserId, languageProfileId);
+        return practiceSessionMapper
+                .findOwnedAssessment(sessionId, trustedUserId, languageProfileId)
+                .map(stored -> toDomain(stored, practiceSessionMapper
+                        .findOwnedStepAssessments(sessionId, trustedUserId, languageProfileId)
+                        .stream()
+                        .map(PracticeSessionRepository::toDomain)
+                        .toList()));
+    }
+
     private PracticeSession requireOwnedRead(
             UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
         return practiceSessionMapper
@@ -127,6 +208,23 @@ public class PracticeSessionRepository {
                 response.submittedAt());
     }
 
+    private static DeterministicAssessment toDomain(
+            StoredDeterministicAssessment assessment, List<DeterministicAssessment.StepResult> stepResults) {
+        return new DeterministicAssessment(
+                assessment.sessionId(),
+                assessment.assessmentPolicyVersion(),
+                assessment.durationSeconds(),
+                assessment.createdAt(),
+                stepResults);
+    }
+
+    private static DeterministicAssessment.StepResult toDomain(StoredStepAssessment step) {
+        return new DeterministicAssessment.StepResult(
+                step.stepId(),
+                DeterministicAssessment.StepKind.valueOf(step.stepKind()),
+                DeterministicAssessment.StepOutcome.valueOf(step.outcome()));
+    }
+
     private static void validateOwnedArguments(
             UUID sessionIdOrTaskId, UUID trustedUserId, UUID languageProfileId) {
         Objects.requireNonNull(sessionIdOrTaskId, "sessionId must not be null");
@@ -149,4 +247,17 @@ record StoredLearnerResponse(
         String stepId,
         String learnerText,
         OffsetDateTime submittedAt) {
+}
+
+record StoredDeterministicAssessment(
+        UUID sessionId,
+        String assessmentPolicyVersion,
+        long durationSeconds,
+        OffsetDateTime createdAt) {
+}
+
+record StoredStepAssessment(
+        String stepId,
+        String stepKind,
+        String outcome) {
 }

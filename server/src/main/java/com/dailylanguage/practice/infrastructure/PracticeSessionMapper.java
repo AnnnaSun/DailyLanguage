@@ -1,6 +1,7 @@
 package com.dailylanguage.practice.infrastructure;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,6 +41,41 @@ interface PracticeSessionMapper {
     Optional<StoredLearnerResponse> findOwnedResponse(
             @Param("sessionId") UUID sessionId,
             @Param("stepId") String stepId,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    List<StoredLearnerResponse> findOwnedResponses(
+            @Param("sessionId") UUID sessionId,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    OffsetDateTime completeOwnedAndReturnCompletedAt(
+            @Param("sessionId") UUID sessionId,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    OffsetDateTime insertOwnedAssessmentAndReturnCreatedAt(
+            @Param("sessionId") UUID sessionId,
+            @Param("assessmentPolicyVersion") String assessmentPolicyVersion,
+            @Param("durationSeconds") long durationSeconds,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    UUID insertOwnedStepAssessmentAndReturnSessionId(
+            @Param("sessionId") UUID sessionId,
+            @Param("stepId") String stepId,
+            @Param("stepKind") String stepKind,
+            @Param("outcome") String outcome,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    Optional<StoredDeterministicAssessment> findOwnedAssessment(
+            @Param("sessionId") UUID sessionId,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    List<StoredStepAssessment> findOwnedStepAssessments(
+            @Param("sessionId") UUID sessionId,
             @Param("trustedUserId") UUID trustedUserId,
             @Param("languageProfileId") UUID languageProfileId);
 }

@@ -1,9 +1,15 @@
 package com.dailylanguage.practice.application;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -16,8 +22,11 @@ import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextReadingInfo;
+import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.planner.domain.LearningTask;
 import com.dailylanguage.planner.infrastructure.LearningTaskRepository;
+import com.dailylanguage.practice.domain.DeterministicAssessment;
+import com.dailylanguage.practice.domain.DeterministicTextAssessmentPolicy;
 import com.dailylanguage.practice.domain.PracticeSession;
 import com.dailylanguage.practice.infrastructure.PracticeSessionRepository;
 import com.dailylanguage.security.domain.UserContext;
@@ -27,7 +36,10 @@ import com.dailylanguage.security.domain.UserContext;
  * 放在同一个 Spring 事务内：Session insert/read 的 unexpected failure 以异常结束事务，
  * Task 随之回滚到 PLANNED，不会留下孤立的 STARTED Task。response 提交先锁定 Session 行再
  * 写入，(sessionId, stepId) 的首次接受由数据库 identity 裁决，exact payload 重放返回首次
- * submittedAt，不同 payload 冲突不覆盖。userId 只信任 {@link UserContext}。
+ * submittedAt，不同 payload 冲突不覆盖。completion 与 response submission 使用相同的
+ * Session-row-first 锁序：锁定 → 校验 → 计算 deterministic assessment → Session/Task 双
+ * transition 与 assessment insert 原子提交；completed replay 只读 durable 结果，不重新依赖
+ * catalog。userId 只信任 {@link UserContext}。
  */
 @Service
 public class PracticeSessionApplicationService {
@@ -166,6 +178,196 @@ public class PracticeSessionApplicationService {
     }
 
     /**
+     * completion 的单一事务编排：owner-scoped SELECT … FOR UPDATE（与 response submission 相同的
+     * Session-row-first 锁序）→ 校验 Session/Task 状态 → resolve exact material → 读取全部已接受
+     * response → 验证 material step 集合与 response 集合一致 → Java 内计算 deterministic step
+     * results → conditional IN_PROGRESS → COMPLETED → insert assessment + step results →
+     * conditional STARTED → COMPLETED Task → durable reread → commit。任一 mutation 失败以异常
+     * 结束整个事务，不产生 completed Session + STARTED Task 或缺 assessment 的中间状态。
+     * completed Session 走 durable replay：只读取已持久化的 assessment，不重新依赖 catalog。
+     */
+    @Transactional
+    public CompletionResult complete(UUID languageProfileId, UUID sessionId, UserContext userContext) {
+        Objects.requireNonNull(languageProfileId, "languageProfileId must not be null");
+        Objects.requireNonNull(sessionId, "sessionId must not be null");
+        Objects.requireNonNull(userContext, "userContext must not be null");
+
+        Optional<PracticeSession> lockedSession = practiceSessionRepository.findOwnedForUpdate(
+                sessionId, userContext.userId(), languageProfileId);
+        if (lockedSession.isEmpty()) {
+            // unknown、wrong-owner 与 wrong-profile 对外不可区分。
+            return new CompletionResult.SessionNotFound();
+        }
+        PracticeSession session = lockedSession.orElseThrow();
+
+        if (session.status() == PracticeSession.Status.COMPLETED) {
+            return replayCompleted(session, userContext.userId(), languageProfileId);
+        }
+        if (session.status() == PracticeSession.Status.ABANDONED) {
+            return new CompletionResult.NotCompletable();
+        }
+
+        Optional<LearningTask> ownedTask = learningTaskRepository.findOwned(
+                session.taskId(), userContext.userId(), languageProfileId);
+        if (ownedTask.isEmpty() || ownedTask.orElseThrow().status() != LearningTask.Status.STARTED) {
+            // FK 与 owner-scoped lock read 使其在正常运行中不可达；durable invariant violation，
+            // 以异常回滚并交给容器输出 sanitized 5xx，不自动修复。
+            throw new IllegalStateException(
+                    "practice session completion requires a started learning task");
+        }
+
+        Optional<MaterialQueryResult.Available> resolvedMaterial =
+                resolveExactMaterial(ownedTask.orElseThrow());
+        if (resolvedMaterial.isEmpty()) {
+            return new CompletionResult.MaterialUnavailable();
+        }
+        List<TextPracticeStep> steps = resolvedMaterial.orElseThrow().material().targetCore().steps();
+        if (steps == null || steps.isEmpty()) {
+            throw new IllegalStateException(
+                    "practice session completion requires a material with at least one step");
+        }
+
+        Map<String, PracticeSession.LearnerResponse> responseByStepId =
+                acceptedResponsesByStepId(sessionId, userContext.userId(), languageProfileId);
+        Set<String> materialStepIds = materialStepIds(steps);
+        for (String responseStepId : responseByStepId.keySet()) {
+            if (!materialStepIds.contains(responseStepId)) {
+                // material 未定义的 response step 属于 durable invariant violation，不是可恢复 client state。
+                throw new IllegalStateException(
+                        "practice response step " + responseStepId
+                                + " is not defined by the resolved material");
+            }
+        }
+        if (!responseByStepId.keySet().containsAll(materialStepIds)) {
+            // 缺少任一 material step 的 response 是可恢复的 client state。
+            return new CompletionResult.Incomplete();
+        }
+
+        List<DeterministicAssessment.StepResult> stepResults = calculateStepResults(steps, responseByStepId);
+
+        OffsetDateTime completedAt = practiceSessionRepository
+                .completeOwned(sessionId, userContext.userId(), languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "practice session completion transition did not match an in-progress session"));
+        long durationSeconds = Duration.between(session.startedAt(), completedAt).toSeconds();
+
+        practiceSessionRepository
+                .insertOwnedAssessment(
+                        sessionId,
+                        DeterministicTextAssessmentPolicy.ASSESSMENT_POLICY_VERSION,
+                        durationSeconds,
+                        userContext.userId(),
+                        languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "deterministic assessment insert requires a completed owned practice session"));
+        for (DeterministicAssessment.StepResult stepResult : stepResults) {
+            if (!practiceSessionRepository.insertOwnedStepAssessment(
+                    sessionId,
+                    stepResult.stepId(),
+                    stepResult.stepKind().name(),
+                    stepResult.outcome().name(),
+                    userContext.userId(),
+                    languageProfileId)) {
+                throw new IllegalStateException(
+                        "deterministic step assessment insert requires the owned completed assessment");
+            }
+        }
+
+        learningTaskRepository
+                .tryComplete(session.taskId(), userContext.userId(), languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "practice session completion requires transitioning the started learning task"));
+
+        return new CompletionResult.Created(
+                requireOwnedSessionRead(sessionId, userContext.userId(), languageProfileId),
+                requireOwnedTaskRead(session.taskId(), userContext.userId(), languageProfileId),
+                requireOwnedAssessmentRead(sessionId, userContext.userId(), languageProfileId));
+    }
+
+    /** completed Session 的 idempotent replay：只读 durable Session/Task/assessment，不触碰 catalog。 */
+    private CompletionResult replayCompleted(
+            PracticeSession completedSession, UUID trustedUserId, UUID languageProfileId) {
+        LearningTask task = requireOwnedTaskRead(
+                completedSession.taskId(), trustedUserId, languageProfileId);
+        if (task.status() != LearningTask.Status.COMPLETED) {
+            // completed Session 搭配非 COMPLETED Task 属于 durable invariant violation。
+            throw new IllegalStateException(
+                    "completed practice session requires a completed learning task");
+        }
+        return new CompletionResult.Replayed(
+                completedSession,
+                task,
+                requireOwnedAssessmentRead(completedSession.id(), trustedUserId, languageProfileId));
+    }
+
+    private Map<String, PracticeSession.LearnerResponse> acceptedResponsesByStepId(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        Map<String, PracticeSession.LearnerResponse> responseByStepId = new HashMap<>();
+        for (PracticeSession.LearnerResponse response : practiceSessionRepository
+                .findOwnedResponses(sessionId, trustedUserId, languageProfileId)) {
+            // (session_id, step_id) 主键保证不会出现重复 stepId。
+            responseByStepId.put(response.stepId(), response);
+        }
+        return responseByStepId;
+    }
+
+    private static Set<String> materialStepIds(List<TextPracticeStep> steps) {
+        Set<String> stepIds = new HashSet<>();
+        for (TextPracticeStep step : steps) {
+            if (!stepIds.add(step.stepId())) {
+                // catalog 契约要求 material 内 stepId 唯一；重复属于 fail-closed 的内容异常。
+                throw new IllegalStateException(
+                        "practice material defines duplicate stepId " + step.stepId());
+            }
+        }
+        return stepIds;
+    }
+
+    private static List<DeterministicAssessment.StepResult> calculateStepResults(
+            List<TextPracticeStep> steps, Map<String, PracticeSession.LearnerResponse> responseByStepId) {
+        List<DeterministicAssessment.StepResult> stepResults = new ArrayList<>(steps.size());
+        for (TextPracticeStep step : steps) {
+            DeterministicAssessment.StepKind stepKind = assessmentStepKind(step.kind());
+            DeterministicAssessment.StepOutcome outcome = DeterministicTextAssessmentPolicy.outcomeFor(
+                    stepKind,
+                    responseByStepId.get(step.stepId()).learnerText(),
+                    step.acceptedAnswers());
+            stepResults.add(new DeterministicAssessment.StepResult(step.stepId(), stepKind, outcome));
+        }
+        return stepResults;
+    }
+
+    private static DeterministicAssessment.StepKind assessmentStepKind(TextStepKind stepKind) {
+        return switch (stepKind) {
+            case EXACT -> DeterministicAssessment.StepKind.EXACT;
+            case SEMANTIC_ONLY -> DeterministicAssessment.StepKind.SEMANTIC_ONLY;
+        };
+    }
+
+    private PracticeSession requireOwnedSessionRead(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        return practiceSessionRepository
+                .findOwned(sessionId, trustedUserId, languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "owned practice session row is missing after completion"));
+    }
+
+    private LearningTask requireOwnedTaskRead(UUID taskId, UUID trustedUserId, UUID languageProfileId) {
+        return learningTaskRepository
+                .findOwned(taskId, trustedUserId, languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "owned learning task row is missing after completion"));
+    }
+
+    private DeterministicAssessment requireOwnedAssessmentRead(
+            UUID sessionId, UUID trustedUserId, UUID languageProfileId) {
+        return practiceSessionRepository
+                .findOwnedAssessment(sessionId, trustedUserId, languageProfileId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "completed practice session is missing its deterministic assessment"));
+    }
+
+    /**
      * 只按 Task 锁定的 materialId + publishedVersion + supportLanguage 解析，并验证 resolved
      * material 与 Task snapshot 完全一致；任何缺失或不一致都 fail closed，不 fallback 到其他
      * version 或语言。
@@ -275,6 +477,51 @@ public class PracticeSessionApplicationService {
 
         /** Task 锁定的 exact material 缺失或与 Task snapshot 不一致。 */
         record MaterialUnavailable() implements SubmitResult {
+        }
+    }
+
+    /** completion 的互斥 Application 结果；Created / Replayed 携带同一事务内 durable reread 后的数据。 */
+    public sealed interface CompletionResult {
+
+        record Created(
+                PracticeSession session,
+                LearningTask task,
+                DeterministicAssessment assessment) implements CompletionResult {
+
+            public Created {
+                Objects.requireNonNull(session, "session must not be null");
+                Objects.requireNonNull(task, "task must not be null");
+                Objects.requireNonNull(assessment, "assessment must not be null");
+            }
+        }
+
+        /** completed Session 的重复 / 并发 completion：返回同一 durable assessment，零 mutation。 */
+        record Replayed(
+                PracticeSession session,
+                LearningTask task,
+                DeterministicAssessment assessment) implements CompletionResult {
+
+            public Replayed {
+                Objects.requireNonNull(session, "session must not be null");
+                Objects.requireNonNull(task, "task must not be null");
+                Objects.requireNonNull(assessment, "assessment must not be null");
+            }
+        }
+
+        /** Session 不存在或不属于 caller；两者不可区分，避免资源枚举。 */
+        record SessionNotFound() implements CompletionResult {
+        }
+
+        /** Session 为 ABANDONED，不能进入 COMPLETED。 */
+        record NotCompletable() implements CompletionResult {
+        }
+
+        /** material 尚有 step 缺少已接受 response；可恢复的 client state，零 mutation。 */
+        record Incomplete() implements CompletionResult {
+        }
+
+        /** Task 锁定的 exact material 缺失或与 Task snapshot 不一致。 */
+        record MaterialUnavailable() implements CompletionResult {
         }
     }
 

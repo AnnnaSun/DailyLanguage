@@ -17,10 +17,20 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import com.dailylanguage.content.domain.MaterialDifficulty;
+import com.dailylanguage.content.domain.MaterialIdentity;
+import com.dailylanguage.planner.domain.LearningTask;
+import com.dailylanguage.planner.domain.LearningTaskPlan;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.CompletionResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.PracticeMaterialView;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.domain.DeterministicAssessment;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepKind;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepOutcome;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepResult;
+import com.dailylanguage.practice.domain.DeterministicTextAssessmentPolicy;
 import com.dailylanguage.practice.domain.PracticeSession;
 import com.dailylanguage.security.config.SecurityConfiguration;
 import com.dailylanguage.security.domain.UserContext;
@@ -54,11 +64,14 @@ class PracticeSessionControllerTests {
     private static final UUID SESSION_ID = UUID.fromString("019cc10c-a56a-7000-8000-000000000054");
     private static final OffsetDateTime STARTED_AT = OffsetDateTime.parse("2026-09-04T10:15:30.123Z");
     private static final OffsetDateTime SUBMITTED_AT = OffsetDateTime.parse("2026-09-04T10:18:00.456Z");
+    private static final OffsetDateTime COMPLETED_AT = OffsetDateTime.parse("2026-09-04T10:22:00.123Z");
     private static final String START_ENDPOINT =
             "/api/language-profiles/" + PROFILE_ID + "/learning-tasks/" + TASK_ID + "/practice-sessions";
     private static final String RESPONSE_ENDPOINT =
             "/api/language-profiles/" + PROFILE_ID + "/practice-sessions/" + SESSION_ID
                     + "/responses/order-drink";
+    private static final String COMPLETION_ENDPOINT =
+            "/api/language-profiles/" + PROFILE_ID + "/practice-sessions/" + SESSION_ID + "/completion";
 
     @Autowired
     private MockMvc mockMvc;
@@ -263,6 +276,123 @@ class PracticeSessionControllerTests {
                 .hasRootCauseInstanceOf(IllegalStateException.class);
     }
 
+    // --- completion ---
+
+    @Test
+    void rejectsUnauthenticatedCompletion() throws Exception {
+        mockMvc.perform(put(COMPLETION_ENDPOINT).with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(practiceSessionApplicationService);
+    }
+
+    @Test
+    void missingCsrfStopsCompletionBeforeApplicationService() throws Exception {
+        mockMvc.perform(put(COMPLETION_ENDPOINT).with(authenticatedAs(AUTHENTICATED_USER_ID)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(practiceSessionApplicationService);
+    }
+
+    @Test
+    void firstCompletionReturnsCreatedWithLocationAndDerivedStatistics() throws Exception {
+        when(practiceSessionApplicationService.complete(eq(PROFILE_ID), eq(SESSION_ID), any(UserContext.class)))
+                .thenReturn(new CompletionResult.Created(
+                        completedSession(), completedTask(), completedAssessment()));
+
+        mockMvc.perform(put(COMPLETION_ENDPOINT)
+                        .with(authenticatedAs(AUTHENTICATED_USER_ID)).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", COMPLETION_ENDPOINT))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.sessionId").value(SESSION_ID.toString()))
+                .andExpect(jsonPath("$.assessmentPolicyVersion").value("M1_TEXT_EXACT_V1"))
+                .andExpect(jsonPath("$.durationSeconds").value(390))
+                .andExpect(jsonPath("$.createdAt").value("2026-09-04T10:22:00.123Z"))
+                .andExpect(jsonPath("$.totalStepCount").value(2))
+                .andExpect(jsonPath("$.answeredStepCount").value(2))
+                .andExpect(jsonPath("$.exactMatchedCount").value(1))
+                .andExpect(jsonPath("$.exactNotMatchedCount").value(0))
+                .andExpect(jsonPath("$.semanticOnlyCount").value(1))
+                .andExpect(jsonPath("$.sessionStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.taskStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.startedAt").value("2026-09-04T10:15:30.123Z"))
+                .andExpect(jsonPath("$.completedAt").value("2026-09-04T10:22:00.123Z"))
+                // 安全 projection：不下发 userId、learner text、accepted answers 或 rubric 引用。
+                .andExpect(jsonPath("$.userId").doesNotExist())
+                .andExpect(jsonPath("$.learnerText").doesNotExist())
+                .andExpect(jsonPath("$.acceptedAnswers").doesNotExist());
+    }
+
+    @Test
+    void completedReplayReturnsTheSameDurableResultWithoutLocation() throws Exception {
+        when(practiceSessionApplicationService.complete(eq(PROFILE_ID), eq(SESSION_ID), any(UserContext.class)))
+                .thenReturn(new CompletionResult.Replayed(
+                        completedSession(), completedTask(), completedAssessment()));
+
+        mockMvc.perform(put(COMPLETION_ENDPOINT)
+                        .with(authenticatedAs(AUTHENTICATED_USER_ID)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Location"))
+                .andExpect(jsonPath("$.sessionId").value(SESSION_ID.toString()))
+                .andExpect(jsonPath("$.assessmentPolicyVersion").value("M1_TEXT_EXACT_V1"))
+                .andExpect(jsonPath("$.sessionStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.taskStatus").value("COMPLETED"));
+    }
+
+    @Test
+    void mapsCompletionFailuresToTheirStableCodes() throws Exception {
+        arrangeCompletionFailure(new CompletionResult.SessionNotFound(), 404, "PRACTICE_SESSION_NOT_FOUND");
+        arrangeCompletionFailure(new CompletionResult.Incomplete(), 409, "PRACTICE_SESSION_INCOMPLETE");
+        arrangeCompletionFailure(
+                new CompletionResult.NotCompletable(), 409, "PRACTICE_SESSION_NOT_COMPLETABLE");
+        arrangeCompletionFailure(
+                new CompletionResult.MaterialUnavailable(), 503, "PRACTICE_MATERIAL_UNAVAILABLE");
+    }
+
+    @Test
+    void ignoresClientSuppliedUserIdForCompletion() throws Exception {
+        UUID requestedUserId = UUID.randomUUID();
+        when(practiceSessionApplicationService.complete(eq(PROFILE_ID), eq(SESSION_ID), any(UserContext.class)))
+                .thenReturn(new CompletionResult.Replayed(
+                        completedSession(), completedTask(), completedAssessment()));
+
+        mockMvc.perform(put(COMPLETION_ENDPOINT)
+                        .with(authenticatedAs(AUTHENTICATED_USER_ID)).with(csrf())
+                        .header("X-User-Id", requestedUserId.toString())
+                        .queryParam("userId", requestedUserId.toString()))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<UserContext> completionContext =
+                org.mockito.ArgumentCaptor.forClass(UserContext.class);
+        verify(practiceSessionApplicationService)
+                .complete(eq(PROFILE_ID), eq(SESSION_ID), completionContext.capture());
+        org.assertj.core.api.Assertions.assertThat(completionContext.getValue().userId())
+                .isEqualTo(AUTHENTICATED_USER_ID);
+    }
+
+    @Test
+    void unexpectedCompletionFailureIsNotMappedToABusinessResponse() {
+        when(practiceSessionApplicationService.complete(eq(PROFILE_ID), eq(SESSION_ID), any(UserContext.class)))
+                .thenThrow(new IllegalStateException("internal database detail"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> mockMvc.perform(put(COMPLETION_ENDPOINT)
+                                .with(authenticatedAs(AUTHENTICATED_USER_ID)).with(csrf())))
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+    }
+
+    private void arrangeCompletionFailure(CompletionResult result, int status, String code) throws Exception {
+        when(practiceSessionApplicationService.complete(eq(PROFILE_ID), eq(SESSION_ID), any(UserContext.class)))
+                .thenReturn(result);
+
+        mockMvc.perform(put(COMPLETION_ENDPOINT)
+                        .with(authenticatedAs(AUTHENTICATED_USER_ID)).with(csrf()))
+                .andExpect(status().is(status))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value(code));
+    }
+
     private void arrangeStartFailure(StartResult result, int status, String code) throws Exception {
         when(practiceSessionApplicationService.start(eq(PROFILE_ID), eq(TASK_ID), any(UserContext.class)))
                 .thenReturn(result);
@@ -316,6 +446,43 @@ class PracticeSessionControllerTests {
         return new PracticeSession(
                 SESSION_ID, TASK_ID, PracticeSession.Status.IN_PROGRESS, STARTED_AT,
                 Optional.empty(), Optional.empty());
+    }
+
+    private static PracticeSession completedSession() {
+        return new PracticeSession(
+                SESSION_ID, TASK_ID, PracticeSession.Status.COMPLETED, STARTED_AT,
+                Optional.of(COMPLETED_AT), Optional.empty());
+    }
+
+    private static LearningTask completedTask() {
+        return new LearningTask(
+                TASK_ID,
+                AUTHENTICATED_USER_ID,
+                PROFILE_ID,
+                new MaterialIdentity("en-builtin-cafe-request", "v1"),
+                "en",
+                "zh-cn",
+                MaterialDifficulty.FOUNDATION,
+                10,
+                "CAFE_SIMPLE_REQUEST",
+                "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.",
+                LearningTaskPlan.TaskType.TEXT_PRACTICE,
+                LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK,
+                LearningTask.Status.COMPLETED,
+                OffsetDateTime.parse("2026-09-04T10:10:00.000Z"),
+                Optional.of(STARTED_AT),
+                Optional.of(COMPLETED_AT));
+    }
+
+    private static DeterministicAssessment completedAssessment() {
+        return new DeterministicAssessment(
+                SESSION_ID,
+                DeterministicTextAssessmentPolicy.ASSESSMENT_POLICY_VERSION,
+                390L,
+                COMPLETED_AT,
+                List.of(
+                        new StepResult("order-drink", StepKind.EXACT, StepOutcome.MATCHED),
+                        new StepResult("answer-to-go", StepKind.SEMANTIC_ONLY, StepOutcome.NOT_APPLICABLE)));
     }
 
     private static PracticeMaterialView cafeMaterialView() {

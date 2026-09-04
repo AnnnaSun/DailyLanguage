@@ -2,8 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: M1-S5 COMPLETE (`b6cde9d`)
-> Current gate: M1-S5 COMPLETE / M1-S6 SCOPE_NOT_APPROVED
+> Production baseline: M1-S5 COMPLETE (`b6cde9d`)
+> Current candidate: M1-S6 implementation / Critical Review / PostgreSQL-Flyway-Integration verification PASS；uncommitted
+> Current gate: M1-S6 READY_TO_COMMIT
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -72,10 +73,12 @@ M0 已提供：
 - PostgreSQL-backed `ModelCallJob` execution / consumption lifecycle；
 - transient Credential boundary 与安全 metadata Trace。
 
-当前 Production 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、M1-S4
-owner-scoped planning API 与 M1-S5 PracticeSession start / response lifecycle；尚无 completion、assessment、
-Evaluator 或 Evidence implementation。后续必须继续按 slice 完成 Session-level evaluation boundary，再把已有
-Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob` 不拥有 Learning Workflow 或长期状态。
+当前 committed Production baseline 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、
+M1-S4 owner-scoped planning API 与 M1-S5 PracticeSession start / response lifecycle。当前 uncommitted M1-S6
+candidate 已实现 completion 与 deterministic assessment，并通过 Critical Review 与 PostgreSQL/Flyway/Integration
+verification；Ownership 尚未完成。Evaluator 与 Evidence 尚未实现。后续必须继续按 slice 完成 Session-level
+evaluation boundary，再把已有 Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob` 不拥有
+Learning Workflow 或长期状态。
 
 ## 4. Target architecture
 
@@ -315,6 +318,31 @@ integration-test finding 均已关闭；PostgreSQL 18.6 / Flyway V1–V9、S5 in
 regression 与 wider server regression 均通过；Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为
 `b6cde9d`。真实调用链见 `docs/flow/practice-session-lifecycle.md`。
 
+### 7.5 Implemented M1-S6 candidate boundary
+
+M1-S6 当前 uncommitted candidate 已在既有 `practice` module 内接入 authenticated、CSRF-protected completion
+HTTP API。`PracticeSessionApplicationService.complete` 先以 owner/profile scope 对 Session 执行
+`SELECT ... FOR UPDATE OF session`，并与 response submission 保持相同的 Session-row-first 锁序；随后校验
+Session `IN_PROGRESS`、Task `STARTED`，按 Task 保存的 exact `materialId + publishedVersion` 解析完整
+`TextPracticeStep` 集合，并要求每个 material step 都已有一条 accepted response。
+
+Java 使用版本化 `M1_TEXT_EXACT_V1` policy 计算 step 结果：`EXACT` 只执行 outer strip、Unicode NFC 与
+case-sensitive exact comparison，产生 `MATCHED / NOT_MATCHED`；`SEMANTIC_ONLY` 固定产生
+`NOT_APPLICABLE`。wrong answer 不阻止 completion，`COMPLETED` 只表示练习流程完成，不表示掌握或长期状态变化。
+
+首次合法 completion 在同一个 transaction 内依次执行 Session `IN_PROGRESS → COMPLETED`、一条
+`deterministic_assessment` header、每个 material step 一条 `deterministic_step_assessment`、Task
+`STARTED → COMPLETED`，最后 durable reread。任一步 mutation、constraint 或 reread 失败都会回滚整个 transaction，
+不留下 completed Session、started Task 或部分 assessment。重复或并发 completion 只读取 durable Session、Task
+与 assessment，不重新依赖 catalog；completion 与 response submission 的共同 Session 行锁阻止 terminal Session
+接受迟到 response。
+
+本 slice 不实现 abandon、semantic evaluation、Evidence、Weakness、Level、Mastery 或 Learning Memory mutation，
+不调用 Model Gateway，也不接触 Credential。Critical Review / Architecture PASS；PostgreSQL 18.6 上 Flyway
+V1–V10、targeted integration 47/47 与 wider server regression 564 tests / 0 failures / 0 errors / 11 Redis 相关
+条件跳过均已验证；Behavior Flow 已同步，Ownership `UNDERSTOOD`。真实调用链见
+`docs/flow/practice-session-lifecycle.md`。
+
 ## 8. Practice lifecycle and deterministic assessment
 
 M1 conceptual lifecycle：
@@ -507,13 +535,14 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: M1-S5 COMPLETE (`b6cde9d`)；implementation / Review / external verification PASS；
+Production Baseline: M1-S5 COMPLETE (`b6cde9d`)
+Current Candidate: M1-S6 implementation / Review / external verification / Behavior Flow PASS；uncommitted；
   Ownership `UNDERSTOOD`
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S5 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
-verification、Human Ownership 与 implementation commit 均已完成。M1-S6 deterministic completion / assessment
-必须另行完成 Design / Current Slice Contract / Scope approval，不因 M1-S5 完成自动开始。
+当前 Stop Point：M1-S6 deterministic completion / assessment 已完成 approved implementation、Critical Review、
+PostgreSQL/Flyway/Integration verification、Behavior Flow 同步与 Human Ownership，当前 candidate 未 commit。
+下一动作只能由用户完成 Commit Decision；不自动 commit，也不开始 M1-S7。
