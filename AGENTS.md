@@ -1287,7 +1287,46 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 
 ---
 
-## 34. CURRENT_HANDOFF / Codex 与 Zcode 交接约定
+## 34. Codex / Zcode Collaboration Boundary / 项目内协作边界
+
+除非用户对当前 Task 明确另有分工，Codex 与 Zcode 按以下项目内边界协作。
+
+### 34.1 Codex Responsibilities
+
+- 负责 Architecture-sensitive Design、Critical Diff Review 和最终架构把关；
+- 负责 Docker、PostgreSQL、Redis、Flyway、Integration / E2E 等外部环境验证与诊断；
+- 外部验证发现业务 Production Code 问题时，输出可定位的 Finding 并交回 Zcode 修复；除非用户明确重新分配实现责任，不在 Review 阶段接管 Zcode 的 Production Code；
+- 有限额度优先用于 Architecture Decision、外部验证和 Critical Review，不重复实现已由 Zcode 完成的 Slice。
+
+Codex 可执行和诊断外部环境，但 Docker / deployment config、Flyway migration 或其他 repository file
+的修改仍必须属于当前已批准 Scope。涉及破坏性数据操作时，继续遵守本文档的授权与停止条件。
+
+### 34.2 Zcode Responsibilities
+
+- 负责已批准 Current Slice 的 Production Code、Unit / Module Tests 和实现内修复；
+- 负责修复 Codex Review 或外部验证发现的业务代码问题，保持同一 Slice 的实现 Ownership；
+- 开发阶段优先运行 targeted Unit / Module Tests；Docker / Database / Integration / E2E 的最终验证证据由 Codex 确认；
+- 不得因为外部验证未完成而把 Slice 描述为已通过最终验证。
+
+### 34.3 Review and Verification Loop
+
+```text
+Codex Design / Scope
+  → Zcode Implementation + Unit / Module Tests
+  → Codex Critical Review + External Verification
+  → Zcode fixes application findings
+  → Codex delta-only Review + affected external regression
+  → User Ownership / Commit Decision
+```
+
+- Codex 应尽量一次性汇总 blocking findings；Zcode 批量修复后，Codex 优先只复查增量 Diff 与受影响 Critical Flow；
+- 外部验证在 candidate 稳定后集中执行；修复阶段先重跑受影响范围，最终 Diff 确认后再执行必要的 wider regression；
+- Review 发现 Current Slice Contract 本身有问题时，标记为 Design / Scope Issue 并请求用户决定，不由任一 Agent 静默改变架构；
+- 两个 Agent 均不得因上述分工自动 commit、push、merge 或开始未批准的下一 Slice。
+
+---
+
+## 35. CURRENT_HANDOFF / Codex 与 Zcode 交接约定
 
 `docs/planning/CURRENT_HANDOFF.md` 是 Codex 与 Zcode 共享的、可覆盖更新的当前工作快照。
 
@@ -1306,7 +1345,7 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 - Feature Dossier / ADR；
 - Git、source code、tests 与真实 Diff。
 
-### 34.1 Read and Verify / 接手规则
+### 35.1 Read and Verify / 接手规则
 
 Codex 与 Zcode 每次接手 repository work 时，必须在 `AGENTS.md` 之后读取
 `docs/planning/CURRENT_HANDOFF.md`，并在修改前至少核对：
@@ -1319,7 +1358,7 @@ Codex 与 Zcode 每次接手 repository work 时，必须在 `AGENTS.md` 之后�
 `CURRENT_HANDOFF.md` 中的陈述与 Git、source、tests 或正式决策冲突时，以后者为事实依据；接手 Agent
 必须把冲突标记为 `UNKNOWN` 或 stale，并在影响范围内停止修改，不能静默选择一个版本或覆盖未提交工作。
 
-### 34.2 Conditional Maintenance / 条件维护
+### 35.2 Conditional Maintenance / 条件维护
 
 `CURRENT_HANDOFF.md` 不再因为普通 Slice Stop Point、commit、Scope Decision、新验证结果或 Worktree 变化而
 自动更新。Codex 与 Zcode 只在以下情况更新：
@@ -1337,7 +1376,7 @@ commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定�
 如果额度突然耗尽导致离开者无法更新，接手 Agent 必须先根据 Git 与正式文档重建快照，将
 `Handoff State` 标记为 `RECOVERED`，并把无法确认的意图、验证或 ownership 标记为 `UNKNOWN`。
 
-### 34.3 Required Snapshot / 必填内容
+### 35.3 Required Snapshot / 必填内容
 
 每次更新至少包含：
 
@@ -1357,7 +1396,7 @@ commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定�
 
 ---
 
-## 35. Repository Navigation / 项目导航
+## 36. Repository Navigation / 项目导航
 
 如果以下文件存在：
 
@@ -1379,7 +1418,7 @@ commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定�
 
 ---
 
-## 36. Architecture Change / 架构修改
+## 37. Architecture Change / 架构修改
 
 以下项目级核心原则不得作为普通 implementation detail 修改：
 
@@ -1410,7 +1449,7 @@ commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定�
 
 ---
 
-## 37. Final Project Rule / 最终项目规则
+## 38. Final Project Rule / 最终项目规则
 
 每次核心功能开发都应避免两个方向。
 

@@ -581,6 +581,15 @@ Target:
 
 `OPERATED`
 
+### M1-S2 learning note — `sealed interface` 与 `record`
+
+- `sealed` 表示这个 class / interface 只允许一组明确指定的类型继承或实现；
+- `PlanningResult` 可以作为 method 的返回类型，但实际创建和返回的对象是
+  `PlanningResult.Planned` 或 `PlanningResult.Unavailable`；
+- `record` 仍然是一种 class，适合表示主要由数据组成的结果对象；
+- `public Planned { ... }` 和 `public Unavailable { ... }` 是 record 的紧凑构造器，用来在对象
+  创建时维护非空 invariant。
+
 ---
 
 ## 11.3 Evaluator Architecture

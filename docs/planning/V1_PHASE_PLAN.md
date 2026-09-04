@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-03 — M1 Minimum Text Practice Architecture
+> Last updated: 2026-09-03 — M1-S1 post-commit closeout
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -138,8 +138,8 @@ integration、failure invariant 与完整 slices 见
 
 | Slice | Goal | Status |
 | --- | --- | --- |
-| M1-D1 | 同步 approved M1 Scope / Architecture / slice plan | REVIEW_PENDING |
-| M1-S1 | Built-in Content boundary + English artifact | SCOPE_NOT_APPROVED |
+| M1-D1 | 同步 approved M1 Scope / Architecture / slice plan | COMPLETE |
+| M1-S1 | Built-in Content boundary + English artifact | COMPLETE (`d3eeadc`) |
 | M1-S2 | Deterministic Planner core | SCOPE_NOT_APPROVED |
 | M1-S3 | LearningTask persistence | SCOPE_NOT_APPROVED |
 | M1-S4 | Owner-scoped planning API | SCOPE_NOT_APPROVED |

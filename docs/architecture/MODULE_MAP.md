@@ -2261,8 +2261,9 @@ RAG Result 返回 Context。
 | Learning Memory | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Weakness / Skill | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Review | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Built-in Learning Material Boundary | `server/src/main/java/com/dailylanguage/content`, `server/src/main/resources/content/builtin`, `server/tools/GenerateBuiltInMaterialHash.java` | `LearningMaterialCatalog` | `PublishedLearningMaterial`, `TargetPracticeCore`, `SupportScaffold`, `MaterialSourceLineage`, `MaterialQueryResult`, `ClasspathBuiltInMaterialLoader`, `BuiltInLearningMaterialCatalog` | `ClasspathBuiltInMaterialLoaderTests`, `BuiltInLearningMaterialCatalogTests`, `BuiltInLearningMaterialCatalogContextTests` | PARTIAL — M1-S1：language-pair generic typed content schema + classpath Built-in pack（strict binding、manifest SHA-256 lineage、eager fail-closed startup validation）已实现，当前只发布 `en + zh-cn` 两个 FOUNDATION materials；Planner / Practice 尚未消费该 boundary，M3 Content pipeline / publish storage 未开始 |
 | Content Pipeline | TBD | TBD | TBD | TBD | NOT_STARTED |
-| Public Language Reference Sources | TBD | TBD | TBD | TBD | NOT_STARTED — APPROVED DESIGN；M1 source lineage、M3 read-only text reference / public-personal isolation、M5 verified audio |
+| Public Language Reference Sources | TBD | TBD | TBD | TBD | NOT_STARTED — APPROVED DESIGN；M1 Built-in artifact source lineage 已随 M1-S1 content manifest 开始（`PROJECT_ORIGINAL` source / AGPL-3.0 / sha256 content hash）；public source catalog、read-only connector 与 M3 / M5 能力未开始 |
 | RAG | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Context Manager | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Tool Gateway | TBD | TBD | TBD | TBD | NOT_STARTED |

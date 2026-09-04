@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: NOT_APPROVED
-> Current gate: M1-D1 DOCUMENTATION_REVIEW_PENDING
+> Production implementation scope: M1-S1 COMPLETE (`d3eeadc`); M1-S2 NOT_APPROVED
+> Current gate: M1-S1 COMPLETE / M1-S2 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -192,6 +192,10 @@ published content；source manifest 必须能解析 Target Core、selected Suppo
 
 修改 target content、support scaffold、rubric 或 source lineage 必须产生新 published version，不能覆盖旧
 artifact 并改变历史 PracticeSession 的解释依据。
+
+Built-in manifest 使用显式 `planningAvailability` 区分版本用途：`PLANNABLE` 版本可以进入新的 Planner
+candidate list，`HISTORICAL_ONLY` 版本只供已有 `LearningTask` 按 `materialId + publishedVersion` 精确解析。
+同一 `materialId` 最多只能有一个 `PLANNABLE` 版本；历史版本仍需完成完整 hash 与 artifact validation。
 
 ### 6.3 Availability and isolation
 
@@ -445,11 +449,11 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: NOT_APPROVED
+Production Current Slice Scope: M1-S1 COMPLETE (`d3eeadc`); M1-S2 NOT_APPROVED
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：完成 M1-D1 Documentation Review 后，单独提出 `M1-S1` Current Slice Contract；未获批准前不修改
-Production Code、schema、API 或 Built-in Production artifact。
+当前 Stop Point：M1-S1 已完成并提交。下一步只提出 `M1-S2 — Deterministic Planner core` Current Slice Contract；
+未获批准前不修改 Planner Production Code、schema 或 API。
