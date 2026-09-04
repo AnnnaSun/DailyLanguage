@@ -203,3 +203,4 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | Model Provider Connection Verification | IMPLEMENTED | M0-S7D / M0-S8C | [`model-provider-connection-verification.md`](model-provider-connection-verification.md) |
 | Text Generation Job Start | IMPLEMENTED | M0-S9K1 / M0-S9K2 / M0-S9K3 | [`text-generation-job-start.md`](text-generation-job-start.md) |
 | LearningTask Persistence | IMPLEMENTED | M1-S3 | [`learning-task-persistence.md`](learning-task-persistence.md) |
+| Owner-scoped LearningTask Planning | IMPLEMENTED | M1-S4 | [`owner-scoped-learning-task-planning.md`](owner-scoped-learning-task-planning.md) |

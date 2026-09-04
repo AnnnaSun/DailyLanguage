@@ -11,9 +11,11 @@
 PostgreSQL-backed durable `LearningTask`，以可信 `trustedUserId`、`languageProfileId` 和 Profile target language
 共同裁决创建权限，并提供 owner/profile-scoped read 与单向 lifecycle transition。
 
-当前尚未接入 authenticated HTTP API 或完整 Planner Application flow；`trustedUserId` 必须由未来 S4 的
-authenticated `UserContext` 提供。`LearningTaskPlan` 不是 authorization proof。当前也不创建
-`PracticeSession`、保存 learner response、调用 Model，或修改 Evidence、Weakness、Level、Mastery、Memory。
+自 M1-S4 起，authenticated 调用入口是 owner-scoped planning HTTP API（见
+[`owner-scoped-learning-task-planning.md`](owner-scoped-learning-task-planning.md)）；`trustedUserId` 由
+该 Application flow 从 authenticated `UserContext` 提供。`LearningTaskPlan` 不是 authorization proof。
+本 Flow 自身不创建 `PracticeSession`、保存 learner response、调用 Model，或修改 Evidence、Weakness、
+Level、Mastery、Memory。
 
 ## 2. Main Call Chain
 
