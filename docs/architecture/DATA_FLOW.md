@@ -2082,7 +2082,8 @@ Progress 不应该重新计算另一套学习状态。
 | Logical Flow | Entry | Application Service | Domain Service | Repository | Storage | Main Test |
 |---|---|---|---|---|---|---|
 | Planner Flow | `LearningTaskPlanner.plan` | `DeterministicLearningTaskPlanner` | `PlanningRequest` → `LearningTaskPlan` / typed `PlanningResult` | N/A — S2 Planner core 自身不持久化 | N/A | `DeterministicLearningTaskPlannerTests` |
-| LearningTask Persistence | `LearningTaskRepository.createOwned / findOwned / tryStart / tryComplete` | N/A — module-local repository entry，S4 Application flow 尚未接入 | `LearningTaskPlan` → durable `LearningTask`；trusted owner + Profile + target language validation；单向 lifecycle | `LearningTaskRepository`, `LearningTaskMapper` | PostgreSQL `learning_task`（Flyway V8） | `LearningTaskTests`, `LearningTaskPersistenceIntegrationTests` |
+| Owner-scoped LearningTask Planning | `POST /api/language-profiles/{languageProfileId}/learning-tasks` | `LearningTaskPlanningService` | owned Profile → `PlanningRequest` → deterministic `LearningTaskPlan`；Profile identity guard | `LearningTaskRepository`, `LearningTaskMapper` | PostgreSQL `learning_task`（Flyway V8） | `LearningTaskPlanningControllerTests`, `LearningTaskPlanningServiceTests`, `LearningTaskPlanningIntegrationTests` |
+| LearningTask Persistence | `LearningTaskRepository.createOwned / findOwned / tryStart / tryComplete` | M1-S4 create 由 `LearningTaskPlanningService` 接入；transition 尚无 HTTP Application flow | `LearningTaskPlan` → durable `LearningTask`；trusted owner + Profile + target language validation；单向 lifecycle | `LearningTaskRepository`, `LearningTaskMapper` | PostgreSQL `learning_task`（Flyway V8） | `LearningTaskTests`, `LearningTaskPersistenceIntegrationTests` |
 | Practice Flow | TBD | TBD | TBD | TBD | TBD | TBD |
 | Evaluator Flow | TBD | TBD | TBD | TBD | TBD | TBD |
 | Memory Flow | TBD | TBD | TBD | TBD | TBD | TBD |

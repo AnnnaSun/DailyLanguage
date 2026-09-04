@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-03 — M1-S2 documentation reconciliation
+> Last updated: 2026-09-04 — M1-S4 documentation reconciliation
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -142,7 +142,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S1 | Built-in Content boundary + English artifact | COMPLETE (`d3eeadc`) |
 | M1-S2 | Deterministic Planner core | COMPLETE (`fcefedb` + review fixes `4322499`) |
 | M1-S3 | LearningTask persistence | COMPLETE (`45143af`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
-| M1-S4 | Owner-scoped planning API | SCOPE_NOT_APPROVED |
+| M1-S4 | Owner-scoped planning API | COMPLETE (`dd9559d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S5 | PracticeSession lifecycle | SCOPE_NOT_APPROVED |
 | M1-S6 | Deterministic completion / assessment | SCOPE_NOT_APPROVED |
 | M1-S7 | Grounded Evaluator contract | SCOPE_NOT_APPROVED |
@@ -157,6 +157,12 @@ validation 与 typed `Planned / Unavailable` result；Planner 不拥有 persiste
 learner-state mutation authority。Review fixes 同步补齐 immutable published material 与历史版本解析边界。
 2026-09-03 fresh evidence：Planner + affected Content 64/64 PASS；non-database server regression 389 tests /
 0 failures / 0 errors / 85 environment-gated skips；Code Review PASS；Ownership `UNDERSTOOD`（Planner L3）。
+
+M1-S4 已完成 owner-scoped planning HTTP flow：authenticated `UserContext` → owned Profile → deterministic
+Planner → Profile identity guard → `INSERT ... SELECT` durable create。Code Review / Architecture PASS；unit 18/18、
+HTTP 12/12、Application integration 7/7、S3 regression 10/10、empty-database Flyway V1–V8 8/8、wider server
+regression 456/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `dd9559d`。M1-S5 仍需独立
+Current Slice Contract 与 Scope Decision。
 
 ### M2 — Persistent Adaptation Loop
 

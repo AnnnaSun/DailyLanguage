@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: M1-S3 COMPLETE (`45143af`)
-> Current gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
+> Production implementation scope: M1-S4 COMPLETE (`dd9559d`)
+> Current gate: M1-S4 COMPLETE / M1-S5 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -72,10 +72,10 @@ M0 已提供：
 - PostgreSQL-backed `ModelCallJob` execution / consumption lifecycle；
 - transient Credential boundary 与安全 metadata Trace。
 
-当前 Production 已实现 M1-S2 deterministic Planner core 与 M1-S3 module-local LearningTask persistence；
-尚无 owner-scoped planning API、PracticeSession、Evaluator 或 Evidence implementation。后续必须继续按 slice 建立
-Learning Domain lifecycle，再把已有 Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob`
-不拥有 Learning Workflow 或长期状态。
+当前 Production 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence 与 M1-S4
+owner-scoped planning API；尚无 PracticeSession、Evaluator 或 Evidence implementation。后续必须继续按 slice
+建立 Learning Domain lifecycle，再把已有 Model infrastructure 作为 bounded semantic capability 接入；
+`ModelCallJob` 不拥有 Learning Workflow 或长期状态。
 
 ## 4. Target architecture
 
@@ -282,6 +282,20 @@ target language 从同一 `language_profile` row 还原，不在 task row 重复
 Ownership `UNDERSTOOD`，implementation 已提交为 `45143af`。
 真实调用链见 `docs/flow/learning-task-persistence.md`。
 
+### 7.3 Implemented M1-S4 boundary
+
+M1-S4 已在既有 `planner` module 内接入 authenticated、CSRF-protected owner-scoped planning HTTP API：
+`LearningTaskPlanningService` 使用 trusted `UserContext` 读取 owned Profile，调用 deterministic Planner，并在
+持久化前校验 Planner result 仍绑定请求的 Profile；`LearningTaskRepository.createOwned` 再通过 PostgreSQL
+`INSERT ... SELECT` 原子重校验 owner、Profile 与 target language。成功返回数据库创建后的 durable
+`PLANNED` task；invalid request、unknown / wrong-owner Profile、无 eligible material 与 Content contract
+不一致使用 stable typed result，拒绝路径不产生 row。
+
+本 slice 不创建 PracticeSession、不推进 Task lifecycle、不调用 Model，也不保存 Content 本体、learner response、
+Credential、Evidence 或长期学习状态。Critical Review、PostgreSQL 18.6 / Flyway V1–V8、Application integration、
+S3 regression 与 wider server regression 均通过；Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为
+`dd9559d`。真实调用链见 `docs/flow/owner-scoped-learning-task-planning.md`。
+
 ## 8. Practice lifecycle and deterministic assessment
 
 M1 conceptual lifecycle：
@@ -474,13 +488,13 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: M1-S3 COMPLETE (`45143af`)；implementation / Review / external verification PASS；
+Production Current Slice Scope: M1-S4 COMPLETE (`dd9559d`)；implementation / Review / external verification PASS；
   Ownership `UNDERSTOOD`
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S3 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
-verification、Human Ownership 与 implementation commit 均已完成。M1-S4 owner-scoped planning API 必须另行
-完成 Design / Scope approval，不因 M1-S3 完成自动开始。
+当前 Stop Point：M1-S4 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
+verification、Human Ownership 与 implementation commit 均已完成。M1-S5 PracticeSession lifecycle 必须另行
+完成 Design / Current Slice Contract / Scope approval，不因 M1-S4 完成自动开始。

@@ -2,8 +2,8 @@
 
 > Last updated: 2026-09-04
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
-> Production baseline: M1-S3 COMPLETE (`45143af`)
+> Current Gate: M1-S4 COMPLETE / M1-S5 SCOPE_NOT_APPROVED
+> Production baseline: M1-S4 COMPLETE (`dd9559d`)
 
 ## Approved Decisions
 
@@ -46,6 +46,13 @@
   8/8 PASS，LearningTask domain 7/7、persistence integration 10/10、full server regression 419 tests / 0 failures /
   0 errors / 11 Redis 或 Redis+login environment-gated skips。Behavior Flow 已同步；Ownership `UNDERSTOOD`，
   implementation、tests 与 pre-Ownership documentation 已提交为 `45143af`。
+- M1-S4 Owner-scoped planning API 已完成 implementation、Critical Diff Review、external verification 与
+  Ownership（2026-09-04）：authenticated `UserContext` 是唯一 user identity authority；Application 串联
+  owned Profile、deterministic Planner、Planner result Profile guard 与 `LearningTaskRepository.createOwned`；
+  成功返回 durable `PLANNED` task，unknown / wrong-owner Profile 对外不可区分。unit 18/18、HTTP 12/12、
+  PostgreSQL Application integration 7/7、S3 persistence regression 10/10、empty-database Flyway V1–V8 8/8、
+  wider server regression 456 tests / 0 failures / 0 errors / 3 expected Redis-down skips；Behavior Flow
+  `CURRENT`，Code Review / Architecture PASS，Ownership `UNDERSTOOD`，由用户提交为 `dd9559d`。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -192,12 +199,16 @@
 41. M1-S3 LearningTask persistence：Scope MATCH；Code Review / Architecture / PostgreSQL 18.6 + Flyway V1–V8 /
     Integration / wider regression PASS；无 blocking Production finding；Behavior Flow `CURRENT`；Ownership
     `UNDERSTOOD`；implementation、tests 与 pre-Ownership documentation 已提交为 `45143af`。
+42. M1-S4 Owner-scoped planning API：Scope MATCH；Code Review / Architecture / owner-profile isolation /
+    PostgreSQL-Flyway-Integration / S3 regression / wider regression PASS；HIGH Profile guard finding 已关闭；
+    Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；implementation、tests 与 flow documentation 已由用户提交为
+    `dd9559d`。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
+Gate: M1-S4 COMPLETE / M1-S5 SCOPE_NOT_APPROVED
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -209,7 +220,7 @@ Compose infrastructure: PostgreSQL / Redis healthy
 Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and ownership
 Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
 M0 integrated closeout: PASS
-Production baseline: M1-S3 COMPLETE (`45143af`)
+Production baseline: M1-S4 COMPLETE (`dd9559d`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -233,17 +244,25 @@ M1-S3 PostgreSQL / Flyway / Integration verification: PASS — PostgreSQL 18.6�
   419 tests / 0 failures / 0 errors / 11 Redis 或 Redis+login environment-gated skips
 M1-S3 Behavior Flow: CURRENT (`docs/flow/learning-task-persistence.md`)
 M1-S3 Ownership Review: UNDERSTOOD
-M1-S4+ implementation scope: NOT_APPROVED
+M1-S4 Current Slice Contract: APPROVED (2026-09-04)
+M1-S4 implementation: COMPLETE (`dd9559d`)
+M1-S4 Code Review / Architecture: PASS (no remaining blocking finding)
+M1-S4 PostgreSQL / Flyway / Integration verification: PASS — unit 18/18；HTTP 12/12；Application integration 7/7；
+  S3 persistence regression 10/10；empty database Flyway V1–V8 8/8；wider server regression
+  456 tests / 0 failures / 0 errors / 3 expected Redis-down skips
+M1-S4 Behavior Flow: CURRENT (`docs/flow/owner-scoped-learning-task-planning.md`)
+M1-S4 Ownership Review: UNDERSTOOD
+M1-S5+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-由用户决定是否提交 M1-S3 post-Ownership documentation closeout；M1-S4 仍需单独完成
-Design / Scope approval，不因 M1-S3 完成自动开始。
+Codex 基于当前 Production 与 approved M1 Architecture 输出完整 M1-S5 Current Slice Contract；由用户完成
+Scope Decision 后再交由 Zcode 实现。不得因 M1-S4 完成自动修改 Production 或开始 M1-S5 implementation。
 
 ## Blockers
 
-没有已发现的 M0 closeout blocker。Primary local database 已从 empty schema 重建并由真实 backend startup
+没有已发现的 M0 或 M1-S4 closeout blocker。Primary local database 已从 empty schema 重建并由真实 backend startup
 成功执行 / validate Flyway V1–V7；原 V4 checksum mismatch 已通过重建解决，没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。
 Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output 只有 module-local validation，
