@@ -30,8 +30,13 @@ import com.dailylanguage.planner.domain.LearningTask;
 import com.dailylanguage.planner.domain.LearningTaskPlan;
 import com.dailylanguage.planner.infrastructure.LearningTaskRepository;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.CompletionResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.domain.DeterministicAssessment;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepKind;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepOutcome;
+import com.dailylanguage.practice.domain.DeterministicAssessment.StepResult;
 import com.dailylanguage.practice.domain.PracticeSession;
 import com.dailylanguage.security.domain.UserContext;
 import com.dailylanguage.user.infrastructure.UserRepository;
@@ -503,9 +508,307 @@ class PracticeSessionPersistenceIntegrationTests {
         assertThat(countResponsesForSession(sessionId)).isEqualTo(1);
     }
 
+    // --- completion：deterministic assessment、原子 transition 与并发裁决 ---
+
+    @Test
+    void completionPersistsDeterministicAssessmentAndCompletesSessionAndTask() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+
+        CompletionResult result = practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), new UserContext(prepared.ownerId()));
+
+        assertThat(result).isInstanceOfSatisfying(CompletionResult.Created.class, created -> {
+            assertThat(created.session().status()).isEqualTo(PracticeSession.Status.COMPLETED);
+            assertThat(created.session().completedAt()).isPresent();
+            assertThat(created.task().status()).isEqualTo(LearningTask.Status.COMPLETED);
+            DeterministicAssessment assessment = created.assessment();
+            assertThat(assessment.assessmentPolicyVersion()).isEqualTo("M1_TEXT_EXACT_V1");
+            assertThat(assessment.durationSeconds()).isGreaterThanOrEqualTo(0);
+            // assessment createdAt 与 completedAt 来自同一 completion transaction 的 CURRENT_TIMESTAMP。
+            assertThat(assessment.createdAt()).isEqualTo(created.session().completedAt().orElseThrow());
+            assertThat(assessment.stepResults()).containsExactlyInAnyOrder(
+                    new StepResult("answer-to-go", StepKind.SEMANTIC_ONLY, StepOutcome.NOT_APPLICABLE),
+                    new StepResult("ask-price", StepKind.EXACT, StepOutcome.NOT_MATCHED),
+                    new StepResult("order-drink", StepKind.EXACT, StepOutcome.MATCHED));
+        });
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isEqualTo(1);
+        assertThat(countStepAssessmentsForSession(prepared.sessionId())).isEqualTo(3);
+    }
+
+    @Test
+    void repeatedCompletionReplaysTheSameDurableAssessment() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        UserContext context = new UserContext(prepared.ownerId());
+
+        CompletionResult.Created first = (CompletionResult.Created) practiceSessionApplicationService
+                .complete(prepared.profileId(), prepared.sessionId(), context);
+        CompletionResult.Replayed replay = (CompletionResult.Replayed) practiceSessionApplicationService
+                .complete(prepared.profileId(), prepared.sessionId(), context);
+
+        assertThat(replay.assessment()).isEqualTo(first.assessment());
+        assertThat(replay.session()).isEqualTo(first.session());
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isEqualTo(1);
+        assertThat(countStepAssessmentsForSession(prepared.sessionId())).isEqualTo(3);
+    }
+
+    @Test
+    void missingStepResponseLeavesCompletionIncompleteWithZeroMutation() {
+        OwnedTask owned = createOwnedPlannedTask();
+        StartResult.Created started = (StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), new UserContext(owned.ownerId()));
+        UUID sessionId = started.session().id();
+        UserContext context = new UserContext(owned.ownerId());
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "order-drink", context, "Could I have a medium coffee, please?");
+        // ask-price 与 answer-to-go 未提交。
+
+        assertThat(practiceSessionApplicationService.complete(owned.profileId(), sessionId, context))
+                .isEqualTo(new CompletionResult.Incomplete());
+
+        assertThat(practiceSessionRepository.findOwned(sessionId, owned.ownerId(), owned.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status())
+                        .isEqualTo(PracticeSession.Status.IN_PROGRESS));
+        assertThat(countAssessmentsForSession(sessionId)).isZero();
+        assertThat(learningTaskRepository.findOwned(owned.taskId(), owned.ownerId(), owned.profileId()))
+                .hasValueSatisfying(task -> assertThat(task.status())
+                        .isEqualTo(LearningTask.Status.STARTED));
+    }
+
+    @Test
+    void abandonedSessionIsNotCompletable() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        jdbcTemplate.update(
+                "UPDATE practice_session SET status = 'ABANDONED', abandoned_at = CURRENT_TIMESTAMP "
+                        + "WHERE id = ?",
+                prepared.sessionId());
+
+        assertThat(practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), new UserContext(prepared.ownerId())))
+                .isEqualTo(new CompletionResult.NotCompletable());
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isZero();
+    }
+
+    @Test
+    void wrongOwnerOrForeignProfileCannotComplete() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        UUID otherUserId = userRepository.create();
+        LanguageProfileIdentity otherProfile = languageProfileRepository
+                .create(prepared.ownerId(), "ja")
+                .orElseThrow();
+
+        assertThat(practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), new UserContext(otherUserId)))
+                .isEqualTo(new CompletionResult.SessionNotFound());
+        assertThat(practiceSessionApplicationService.complete(
+                otherProfile.id(), prepared.sessionId(), new UserContext(prepared.ownerId())))
+                .isEqualTo(new CompletionResult.SessionNotFound());
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isZero();
+    }
+
+    // 同上：expected CHECK violation 与 rollback 断言各自运行在独立事务（或无事务）中，
+    // 以 jdbcTemplate 读取已提交的 durable state。
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void unknownResponseStepFailsClosedAndRollsBackTheWholeCompletion() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        // 故障注入：material 未定义的 response step（绕过 service 的 stepId 校验），
+        // 属 durable invariant violation：completion 必须整体回滚而不是返回可恢复 result。
+        jdbcTemplate.update(
+                "INSERT INTO practice_response (session_id, step_id, learner_text) "
+                        + "VALUES (?, 'unknown-step', 'text')",
+                prepared.sessionId());
+
+        assertThatThrownBy(() -> practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), new UserContext(prepared.ownerId())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unknown-step");
+
+        assertThat(practiceSessionRepository.findOwned(
+                prepared.sessionId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status())
+                        .isEqualTo(PracticeSession.Status.IN_PROGRESS));
+        assertThat(learningTaskRepository.findOwned(prepared.taskId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(task -> assertThat(task.status())
+                        .isEqualTo(LearningTask.Status.STARTED));
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isZero();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void assessmentInsertFailureRollsBackSessionAndTaskTransitions() {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        // 故障注入：预占 deterministic_assessment 主键，复现 contract 的事务场景——
+        // Session transition 之后 assessment insert 失败必须整体回滚。
+        jdbcTemplate.update(
+                "INSERT INTO deterministic_assessment "
+                        + "(session_id, assessment_policy_version, duration_seconds) "
+                        + "VALUES (?, 'M1_TEXT_EXACT_V1', 0)",
+                prepared.sessionId());
+
+        assertThatThrownBy(() -> practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), new UserContext(prepared.ownerId())))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(practiceSessionRepository.findOwned(
+                prepared.sessionId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status())
+                        .isEqualTo(PracticeSession.Status.IN_PROGRESS));
+        assertThat(learningTaskRepository.findOwned(prepared.taskId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(task -> assertThat(task.status())
+                        .isEqualTo(LearningTask.Status.STARTED));
+        assertThat(countStepAssessmentsForSession(prepared.sessionId())).isZero();
+    }
+
+    @Test
+    void assessmentWritesAreOwnerScopedAndRequireTerminalState() {
+        OwnedTask owned = createOwnedStartedTask();
+        PracticeSession session = practiceSessionRepository.insertForOwnedTask(
+                owned.taskId(), owned.ownerId(), owned.profileId());
+        UUID otherUserId = userRepository.create();
+
+        // Session 仍 IN_PROGRESS 或 caller 非 owner：assessment insert gate 零行。
+        assertThat(practiceSessionRepository.insertOwnedAssessment(
+                session.id(), "M1_TEXT_EXACT_V1", 10, owned.ownerId(), owned.profileId())).isEmpty();
+        assertThat(practiceSessionRepository.insertOwnedAssessment(
+                session.id(), "M1_TEXT_EXACT_V1", 10, otherUserId, owned.profileId())).isEmpty();
+
+        jdbcTemplate.update(
+                "UPDATE practice_session SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP "
+                        + "WHERE id = ?",
+                session.id());
+        assertThat(practiceSessionRepository.insertOwnedAssessment(
+                session.id(), "M1_TEXT_EXACT_V1", 10, owned.ownerId(), owned.profileId())).isPresent();
+
+        // step 只能写入 owner 匹配的既有 assessment 之下；foreign caller 零行。
+        assertThat(practiceSessionRepository.insertOwnedStepAssessment(
+                session.id(), "order-drink", "EXACT", "MATCHED",
+                owned.ownerId(), owned.profileId())).isTrue();
+        assertThat(practiceSessionRepository.insertOwnedStepAssessment(
+                session.id(), "ask-price", "EXACT", "MATCHED",
+                otherUserId, owned.profileId())).isFalse();
+
+        assertThat(practiceSessionRepository.findOwnedAssessment(
+                session.id(), owned.ownerId(), owned.profileId()))
+                .hasValueSatisfying(assessment -> assertThat(assessment.stepResults())
+                        .containsExactly(new StepResult("order-drink", StepKind.EXACT, StepOutcome.MATCHED)));
+        assertThat(practiceSessionRepository.findOwnedAssessment(
+                session.id(), otherUserId, owned.profileId())).isEmpty();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void durableAssessmentConstraintsRejectInvalidShapes() {
+        OwnedTask owned = createOwnedStartedTask();
+        PracticeSession session = practiceSessionRepository.insertForOwnedTask(
+                owned.taskId(), owned.ownerId(), owned.profileId());
+        jdbcTemplate.update(
+                "UPDATE practice_session SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP "
+                        + "WHERE id = ?",
+                session.id());
+
+        // policy version 在数据库层封闭为 M1_TEXT_EXACT_V1。
+        assertThatThrownBy(() -> practiceSessionRepository.insertOwnedAssessment(
+                session.id(), "M2_SEMANTIC_V1", 10, owned.ownerId(), owned.profileId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(countAssessmentsForSession(session.id())).isZero();
+
+        assertThat(practiceSessionRepository.insertOwnedAssessment(
+                session.id(), "M1_TEXT_EXACT_V1", 10, owned.ownerId(), owned.profileId())).isPresent();
+        // outcome 由 stepKind 决定；identifier 不允许 surrounding whitespace。
+        assertThatThrownBy(() -> practiceSessionRepository.insertOwnedStepAssessment(
+                session.id(), "s1", "EXACT", "NOT_APPLICABLE", owned.ownerId(), owned.profileId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> practiceSessionRepository.insertOwnedStepAssessment(
+                session.id(), "s1", "SEMANTIC_ONLY", "MATCHED", owned.ownerId(), owned.profileId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> practiceSessionRepository.insertOwnedStepAssessment(
+                session.id(), " s1", "EXACT", "MATCHED", owned.ownerId(), owned.profileId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(countStepAssessmentsForSession(session.id())).isZero();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentCompletionCreatesExactlyOneAssessmentAndReplaysForTheLoser() throws Exception {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        UserContext context = new UserContext(prepared.ownerId());
+
+        var outcomes = runConcurrently(2, () -> practiceSessionApplicationService.complete(
+                prepared.profileId(), prepared.sessionId(), context));
+
+        long createdCount = outcomes.stream().filter(CompletionResult.Created.class::isInstance).count();
+        long replayedCount = outcomes.stream().filter(CompletionResult.Replayed.class::isInstance).count();
+        assertThat(createdCount).as("exactly one completion wins: %s", outcomes).isEqualTo(1);
+        assertThat(replayedCount).as("the loser replays the durable assessment: %s", outcomes).isEqualTo(1);
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isEqualTo(1);
+        assertThat(countStepAssessmentsForSession(prepared.sessionId())).isEqualTo(3);
+        assertThat(practiceSessionRepository.findOwned(
+                prepared.sessionId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status())
+                        .isEqualTo(PracticeSession.Status.COMPLETED));
+        assertThat(learningTaskRepository.findOwned(prepared.taskId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(task -> assertThat(task.status())
+                        .isEqualTo(LearningTask.Status.COMPLETED));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void completionVersusLateResponseRaceKeepsDurableStateConsistent() throws Exception {
+        PreparedSession prepared = prepareFullyAnsweredCafeSession();
+        UserContext context = new UserContext(prepared.ownerId());
+
+        // response 先获锁：completion 可包含它（此处为重放既有 response）；
+        // completion 先获锁：迟到 response 看到 terminal Session 被拒绝。两个方向都不破坏 durable state。
+        List<Object> outcomes = runConcurrently(2, index -> index == 0
+                ? (Object) practiceSessionApplicationService.complete(
+                        prepared.profileId(), prepared.sessionId(), context)
+                : (Object) practiceSessionApplicationService.submit(
+                        prepared.profileId(), prepared.sessionId(), "order-drink", context,
+                        "Could I have a medium coffee, please?"));
+
+        assertThat(outcomes.get(0)).isInstanceOf(CompletionResult.Created.class);
+        boolean replayedBeforeTerminal = outcomes.get(1) instanceof SubmitResult.Replayed;
+        boolean rejectedAfterTerminal =
+                outcomes.get(1) instanceof SubmitResult.SessionNotAcceptingResponses;
+        assertThat(replayedBeforeTerminal || rejectedAfterTerminal)
+                .as("late response either replays or hits the terminal session: %s", outcomes)
+                .isTrue();
+
+        assertThat(countResponsesForSession(prepared.sessionId())).isEqualTo(3);
+        assertThat(countAssessmentsForSession(prepared.sessionId())).isEqualTo(1);
+        assertThat(countStepAssessmentsForSession(prepared.sessionId())).isEqualTo(3);
+        assertThat(practiceSessionRepository.findOwned(
+                prepared.sessionId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status())
+                        .isEqualTo(PracticeSession.Status.COMPLETED));
+        assertThat(learningTaskRepository.findOwned(prepared.taskId(), prepared.ownerId(), prepared.profileId()))
+                .hasValueSatisfying(task -> assertThat(task.status())
+                        .isEqualTo(LearningTask.Status.COMPLETED));
+    }
+
     // --- helpers ---
 
     private record OwnedTask(UUID ownerId, UUID profileId, UUID taskId) {
+    }
+
+    /** 已提交全部 3 个 step response、可直接 completion 的 cafe Session。 */
+    private record PreparedSession(UUID ownerId, UUID profileId, UUID taskId, UUID sessionId) {
+    }
+
+    private PreparedSession prepareFullyAnsweredCafeSession() {
+        OwnedTask owned = createOwnedPlannedTask();
+        StartResult.Created started = (StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), new UserContext(owned.ownerId()));
+        UUID sessionId = started.session().id();
+        UserContext context = new UserContext(owned.ownerId());
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "order-drink", context, "Could I have a medium coffee, please?");
+        // ask-price 提交不在 acceptedAnswers 的答案：wrong-answer 不阻止 completion，只产生 NOT_MATCHED。
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "ask-price", context, "What is the price?");
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "answer-to-go", context, "To go, please. Thank you!");
+        return new PreparedSession(owned.ownerId(), owned.profileId(), owned.taskId(), sessionId);
     }
 
     private OwnedTask createOwnedPlannedTask() {
@@ -552,6 +855,22 @@ class PracticeSessionPersistenceIntegrationTests {
     private int countResponsesForSession(UUID sessionId) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM practice_response WHERE session_id = ?",
+                Integer.class,
+                sessionId);
+        return count == null ? 0 : count;
+    }
+
+    private int countAssessmentsForSession(UUID sessionId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM deterministic_assessment WHERE session_id = ?",
+                Integer.class,
+                sessionId);
+        return count == null ? 0 : count;
+    }
+
+    private int countStepAssessmentsForSession(UUID sessionId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM deterministic_step_assessment WHERE session_id = ?",
                 Integer.class,
                 sessionId);
         return count == null ? 0 : count;

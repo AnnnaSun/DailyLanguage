@@ -144,7 +144,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S3 | LearningTask persistence | COMPLETE (`45143af`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S4 | Owner-scoped planning API | COMPLETE (`dd9559d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
-| M1-S6 | Deterministic completion / assessment | SCOPE_NOT_APPROVED |
+| M1-S6 | Deterministic completion / assessment | READY_TO_COMMIT — implementation / Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；uncommitted |
 | M1-S7 | Grounded Evaluator contract | SCOPE_NOT_APPROVED |
 | M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
@@ -169,7 +169,15 @@ M1-S5 已完成 owner-scoped PracticeSession start 与 learner response flow：T
 exact replay 或 different-payload conflict。Code Review / Architecture PASS；unit/application/HTTP/Mapper 43/43、
 PostgreSQL 18.6 S5 integration/concurrency 19/19、S3 regression 10/10、S4 regression 7/7、empty-database Flyway
 V1–V9 9/9、wider server regression 501/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为
-`b6cde9d`。M1-S6 仍需独立 Current Slice Contract 与 Scope Decision。
+`b6cde9d`。
+
+M1-S6 Current Slice Contract 已批准，当前 uncommitted candidate 已实现 owner-scoped deterministic completion：
+Session-row-first 行锁串行化 response/completion，exact material step 集合与 accepted response 集合完整匹配后，
+Java 以 `M1_TEXT_EXACT_V1` 计算 `MATCHED / NOT_MATCHED / NOT_APPLICABLE`。Session `COMPLETED`、一条 assessment
+header、每个 step 的 assessment row 与 Task `COMPLETED` 在同一个 transaction 内原子提交；completed replay
+只读 durable assessment，不重新依赖 catalog。Code Review / Architecture PASS；PostgreSQL 18.6 Flyway V1–V10、
+targeted integration 47/47、wider server regression 564 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；Behavior
+Flow `CURRENT`。Ownership `UNDERSTOOD`，candidate 未 commit；M1-S7 未批准。
 
 ### M2 — Persistent Adaptation Loop
 

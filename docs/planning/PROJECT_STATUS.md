@@ -2,8 +2,9 @@
 
 > Last updated: 2026-09-04
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S5 COMPLETE / M1-S6 SCOPE_NOT_APPROVED
+> Current Gate: M1-S6 READY_TO_COMMIT
 > Production baseline: M1-S5 COMPLETE (`b6cde9d`)
+> Current candidate: M1-S6 implementation / Review / PostgreSQL-Flyway-Integration / Behavior Flow PASS；uncommitted
 
 ## Approved Decisions
 
@@ -62,6 +63,13 @@
   PostgreSQL 18.6 S5 integration/concurrency 19/19、S3 regression 10/10、S4 regression 7/7、empty-database
   Flyway V1–V9 9/9、wider server regression 501 tests / 0 failures / 0 errors / 119 environment-gated skips；
   Behavior Flow `CURRENT`，Code Review / Architecture PASS，Ownership `UNDERSTOOD`，由用户提交为 `b6cde9d`。
+- M1-S6 Current Slice Contract 已批准，当前 uncommitted candidate 已完成 implementation、Critical Diff Review、
+  PostgreSQL/Flyway/Integration verification 与 Behavior Flow 同步：completion 使用 Session-row-first 行锁串行化
+  response/completion；按 Task 的 exact material identity 取得全部 step，要求每个 step 都有 accepted response；Java
+  `M1_TEXT_EXACT_V1` 只产生 `MATCHED / NOT_MATCHED / NOT_APPLICABLE`。Session、assessment header、step
+  assessments 与 Task completion 在同一 transaction 原子提交，completed replay 只读 durable assessment。
+  targeted PostgreSQL integration 47/47、Flyway V1–V10、wider server regression 564 tests / 0 failures /
+  0 errors / 11 Redis 相关条件跳过；Code Review / Architecture PASS，Ownership `UNDERSTOOD`，未 commit。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -217,22 +225,26 @@
     response owner/profile/status gate 的 HIGH findings、integration-test transaction finding 均已关闭；Behavior
     Flow `CURRENT`；Ownership `UNDERSTOOD`；implementation、tests 与 flow documentation 已由用户提交为
     `b6cde9d`。
+44. M1-S6 deterministic completion / assessment：Current Slice Contract APPROVED；Scope MATCH；Code Review /
+    Architecture / PostgreSQL 18.6 + Flyway V1–V10 / targeted integration 47/47 / wider regression 564 tests
+    PASS；Session/Task/assessment 原子提交、Session-row-first concurrency、durable replay 与 Java deterministic
+    authority 已验证；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；candidate uncommitted。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S5 COMPLETE / M1-S6 SCOPE_NOT_APPROVED
+Gate: M1-S6 READY_TO_COMMIT
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
-Behavior Flow: CURRENT (`docs/flow/text-generation-job-start.md`)
-Fresh server verification: PASS (338 unique tests all executed; 0 failures; 0 errors)
-Fresh migration verification: PASS (PostgreSQL 18; Flyway V1-V7)
-Fresh client production build: PASS
+Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`)
+Fresh server verification: PASS (564 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
+Fresh migration verification: PASS (PostgreSQL 18.6; Flyway V1-V10)
+Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S6
 Compose infrastructure: PostgreSQL / Redis healthy
-Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and ownership
-Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
+Documentation reconciliation: COMPLETE for M1-S6 Feature / Phase / Project Status / Behavior Flow
+Primary local database: MIGRATED / VERIFIED (existing V7 -> Flyway V10; integration fixtures remain)
 M0 integrated closeout: PASS
 Production baseline: M1-S5 COMPLETE (`b6cde9d`)
 M1 Architecture Decision: APPROVED
@@ -275,20 +287,29 @@ M1-S5 PostgreSQL / Flyway / Integration verification: PASS — unit/application/
   119 DB 或 Redis environment-gated skips
 M1-S5 Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`)
 M1-S5 Ownership Review: UNDERSTOOD
-M1-S6+ implementation scope: NOT_APPROVED
+M1-S6 Current Slice Contract: APPROVED (2026-09-04)
+M1-S6 implementation: COMPLETE (uncommitted candidate)
+M1-S6 Code Review / Architecture: PASS (no remaining blocking finding)
+M1-S6 PostgreSQL / Flyway / Integration verification: PASS — PostgreSQL 18.6；Flyway V1–V10；
+  targeted integration 47/47；wider server regression 564 tests / 0 failures / 0 errors /
+  11 Redis 或 Redis+login environment-gated skips；`git diff --check` PASS
+M1-S6 Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`)
+M1-S6 Ownership Review: UNDERSTOOD
+M1-S6 commit: NOT_DONE
+M1-S7+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-Codex 基于当前 Production 与 approved M1 Architecture 进入 M1-S6 deterministic completion / assessment 的
-Design Scope，并在用户确认后输出完整 Current Slice Contract 交由 Zcode 实现。不得因 M1-S5 完成自动修改
-Production 或开始 M1-S6 implementation。
+用户执行 M1-S6 Commit Decision。当前 candidate 已达到 `READY_TO_COMMIT`，但不得自动 commit、push、merge
+或开始 M1-S7。
 
 ## Blockers
 
-没有已发现的 M0 或 M1-S5 closeout blocker。Primary local database 已从 empty schema 重建并由真实 backend startup
-成功执行 / validate Flyway V1–V7；原 V4 checksum mismatch 已通过重建解决，没有执行 `Flyway repair` 或直接修改
-`flyway_schema_history`。
+没有已发现的 M0、M1-S5 closeout 或 M1-S6 Code Review / external verification / Ownership blocker。M1-S6 当前只剩
+Commit Decision。Primary compose database 当前已由 Flyway 从 V7 顺序迁移并验证至 V10；integration
+tests 留有 8 条 deterministic assessment 与 12 条 step-assessment fixture，未擅自清理。更早的 V4 checksum
+mismatch 已通过数据库重建解决，本次没有执行 `Flyway repair` 或直接修改 `flyway_schema_history`。
 Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output 只有 module-local validation，
 Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、Browser local/session storage UI、业务 Agent
 Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured

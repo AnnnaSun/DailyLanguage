@@ -32,6 +32,27 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="storedDeterministicAssessmentResult"
+               type="com.dailylanguage.practice.infrastructure.StoredDeterministicAssessment">
+        <constructor>
+            <idArg column="session_id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="assessment_policy_version" javaType="java.lang.String"/>
+            <arg column="duration_seconds" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedStepAssessmentResult"
+               type="com.dailylanguage.practice.infrastructure.StoredStepAssessment">
+        <constructor>
+            <arg column="step_id" javaType="java.lang.String"/>
+            <arg column="step_kind" javaType="java.lang.String"/>
+            <arg column="outcome" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
     <!-- ownership 不在 practice_session 中重复存储，owned read 通过 join learning_task 还原。 -->
     <sql id="ownedSessionFrom">
         FROM practice_session session
@@ -120,5 +141,102 @@
           AND response.step_id = #{stepId, jdbcType=VARCHAR}
           AND task.user_id = #{trustedUserId, jdbcType=OTHER}
           AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <!-- completion 计算读取该 Session 的全部已接受 response；ownership 同样通过
+         response → session → task 链路重校验，ORDER BY step_id 保证 deterministic 顺序。 -->
+    <select id="findOwnedResponses" resultMap="storedLearnerResponseResult">
+        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at
+        FROM practice_response response
+        JOIN practice_session session ON session.id = response.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE response.session_id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        ORDER BY response.step_id
+    </select>
+
+    <!-- conditional IN_PROGRESS → COMPLETED：guard 由 WHERE status = 'IN_PROGRESS' 在数据库内原子
+         裁决，owner/profile 通过 task join 重校验；completed_at 以 PostgreSQL CURRENT_TIMESTAMP 为
+         authority。调用方已持有同一事务内的 Session 行锁，gate 不匹配返回空行由调用方 fail closed。 -->
+    <select id="completeOwnedAndReturnCompletedAt"
+            resultType="java.time.OffsetDateTime"
+            affectData="true"
+            flushCache="true">
+        UPDATE practice_session AS session
+        SET status = 'COMPLETED',
+            completed_at = CURRENT_TIMESTAMP
+        FROM learning_task task
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND task.id = session.task_id
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND session.status = 'IN_PROGRESS'
+        RETURNING session.completed_at
+    </select>
+
+    <!-- assessment insert 在数据库内重校验 Session 归属同一 owner/profile 的 Task 且已进入 COMPLETED；
+         PRIMARY KEY(session_id) 保证一个 Session 只有一个 deterministic assessment，冲突以异常表达并由
+         外层事务回滚，不产生部分提交。 -->
+    <select id="insertOwnedAssessmentAndReturnCreatedAt"
+            resultType="java.time.OffsetDateTime"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO deterministic_assessment (session_id, assessment_policy_version, duration_seconds)
+        SELECT session.id,
+               #{assessmentPolicyVersion, jdbcType=VARCHAR},
+               #{durationSeconds, jdbcType=BIGINT}
+        FROM practice_session session
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND session.status = 'COMPLETED'
+        RETURNING created_at
+    </select>
+
+    <!-- step 结果只能写入已存在且 owner/profile 匹配的 assessment 之下；gate 不匹配产生零行，
+         由调用方以异常 fail closed，不允许 step 行脱离 assessment 或跨 owner 写入。 -->
+    <select id="insertOwnedStepAssessmentAndReturnSessionId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO deterministic_step_assessment (session_id, step_id, step_kind, outcome)
+        SELECT assessment.session_id,
+               #{stepId, jdbcType=VARCHAR},
+               #{stepKind, jdbcType=VARCHAR},
+               #{outcome, jdbcType=VARCHAR}
+        FROM deterministic_assessment assessment
+        JOIN practice_session session ON session.id = assessment.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE assessment.session_id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        RETURNING session_id
+    </select>
+
+    <!-- completed replay 只读取已持久化的 assessment，不重新依赖 catalog；ownership 通过
+         assessment → session → task 链路重校验。 -->
+    <select id="findOwnedAssessment" resultMap="storedDeterministicAssessmentResult">
+        SELECT assessment.session_id, assessment.assessment_policy_version,
+               assessment.duration_seconds, assessment.created_at
+        FROM deterministic_assessment assessment
+        JOIN practice_session session ON session.id = assessment.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE assessment.session_id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <select id="findOwnedStepAssessments" resultMap="storedStepAssessmentResult">
+        SELECT step.step_id, step.step_kind, step.outcome
+        FROM deterministic_step_assessment step
+        JOIN deterministic_assessment assessment ON assessment.session_id = step.session_id
+        JOIN practice_session session ON session.id = assessment.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE step.session_id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        ORDER BY step.step_id
     </select>
 </mapper>

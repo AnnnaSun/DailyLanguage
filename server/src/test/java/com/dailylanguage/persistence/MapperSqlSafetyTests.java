@@ -82,6 +82,10 @@ class MapperSqlSafetyTests {
                 .contains("#{languageProfileId, jdbcType=OTHER}")
                 .contains("#{stepId, jdbcType=VARCHAR}")
                 .contains("#{learnerText, jdbcType=VARCHAR}")
+                .contains("#{assessmentPolicyVersion, jdbcType=VARCHAR}")
+                .contains("#{durationSeconds, jdbcType=BIGINT}")
+                .contains("#{stepKind, jdbcType=VARCHAR}")
+                .contains("#{outcome, jdbcType=VARCHAR}")
                 .contains("ON CONFLICT DO NOTHING")
                 .contains("FOR UPDATE OF session")
                 .doesNotContain("${");

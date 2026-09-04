@@ -2,6 +2,7 @@ package com.dailylanguage.practice.api;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -15,17 +16,20 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.dailylanguage.practice.application.PracticeSessionApplicationService;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.CompletionResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.PracticeMaterialView;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.PracticeSession;
+import com.dailylanguage.planner.domain.LearningTask;
 import com.dailylanguage.security.domain.UserContext;
 
 /**
  * PracticeSession lifecycle 的 HTTP 入口。资源归属只接受 Spring Security 建立的 UserContext；
  * request body、query parameter 或 header 中的 userId 不参与授权判断。成功响应来自数据库裁决后的
- * durable Session / response，material 只下发安全 projection，不回传 userId、acceptedAnswers
- * 或 rubric 引用。
+ * durable Session / response / assessment，material 只下发安全 projection，completion 只下发
+ * deterministic 统计，不回传 userId、learnerText、acceptedAnswers 或 rubric 引用。
  */
 @RestController
 public class PracticeSessionController {
@@ -106,10 +110,99 @@ public class PracticeSessionController {
         return ResponseEntity.status(status).body(new PracticeErrorResponse(code));
     }
 
+    @PutMapping(
+            path = "/api/language-profiles/{languageProfileId}/practice-sessions/{sessionId}/completion")
+    ResponseEntity<?> completePracticeSession(
+            @PathVariable UUID languageProfileId,
+            @PathVariable UUID sessionId,
+            @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext) {
+        CompletionResult result = practiceSessionApplicationService.complete(
+                languageProfileId, sessionId, userContext);
+
+        return switch (result) {
+            case CompletionResult.SessionNotFound ignored ->
+                    practiceFailure(HttpStatus.NOT_FOUND, "PRACTICE_SESSION_NOT_FOUND");
+            case CompletionResult.Incomplete ignored ->
+                    practiceFailure(HttpStatus.CONFLICT, "PRACTICE_SESSION_INCOMPLETE");
+            case CompletionResult.NotCompletable ignored ->
+                    practiceFailure(HttpStatus.CONFLICT, "PRACTICE_SESSION_NOT_COMPLETABLE");
+            case CompletionResult.MaterialUnavailable ignored ->
+                    practiceFailure(HttpStatus.SERVICE_UNAVAILABLE, "PRACTICE_MATERIAL_UNAVAILABLE");
+            case CompletionResult.Replayed replayed ->
+                    ResponseEntity.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(CompletionResponse.from(
+                                    replayed.session(), replayed.task(), replayed.assessment()));
+            case CompletionResult.Created created ->
+                    ResponseEntity
+                            .created(URI.create("/api/language-profiles/" + languageProfileId
+                                    + "/practice-sessions/" + sessionId + "/completion"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(CompletionResponse.from(
+                                    created.session(), created.task(), created.assessment()));
+        };
+    }
+
     record SubmitLearnerResponseRequest(String learnerText) {
     }
 
     record PracticeErrorResponse(String code) {
+    }
+
+    /**
+     * completion 响应只携带 durable deterministic 结果与派生统计：不含 learner text、accepted
+     * answers、normalized text、userId 或任何 semantic / 长期学习状态；taskCompletion 由同一
+     * transaction 内的 Session/Task COMPLETED 状态表达，不保存冗余 boolean。
+     */
+    record CompletionResponse(
+            UUID sessionId,
+            String assessmentPolicyVersion,
+            long durationSeconds,
+            OffsetDateTime createdAt,
+            int totalStepCount,
+            int answeredStepCount,
+            int exactMatchedCount,
+            int exactNotMatchedCount,
+            int semanticOnlyCount,
+            String sessionStatus,
+            String taskStatus,
+            OffsetDateTime startedAt,
+            OffsetDateTime completedAt) {
+
+        static CompletionResponse from(
+                PracticeSession session, LearningTask task, DeterministicAssessment assessment) {
+            List<DeterministicAssessment.StepResult> stepResults = assessment.stepResults();
+            int exactMatched = 0;
+            int exactNotMatched = 0;
+            int semanticOnly = 0;
+            for (DeterministicAssessment.StepResult stepResult : stepResults) {
+                switch (stepResult.stepKind()) {
+                    case EXACT -> {
+                        if (stepResult.outcome() == DeterministicAssessment.StepOutcome.MATCHED) {
+                            exactMatched++;
+                        } else {
+                            exactNotMatched++;
+                        }
+                    }
+                    case SEMANTIC_ONLY -> semanticOnly++;
+                }
+            }
+            // completion precondition 保证每个 material step 都有已接受 response。
+            return new CompletionResponse(
+                    session.id(),
+                    assessment.assessmentPolicyVersion(),
+                    assessment.durationSeconds(),
+                    assessment.createdAt(),
+                    stepResults.size(),
+                    stepResults.size(),
+                    exactMatched,
+                    exactNotMatched,
+                    semanticOnly,
+                    session.status().name(),
+                    task.status().name(),
+                    session.startedAt(),
+                    session.completedAt().orElseThrow());
+        }
     }
 
     record StartSessionResponse(
