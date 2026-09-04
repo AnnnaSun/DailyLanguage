@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.practice.infrastructure.PracticeSessionMapper">
+
+    <resultMap id="storedPracticeSessionResult"
+               type="com.dailylanguage.practice.infrastructure.StoredPracticeSession">
+        <constructor>
+            <idArg column="id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="task_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="started_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="abandoned_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedLearnerResponseResult"
+               type="com.dailylanguage.practice.infrastructure.StoredLearnerResponse">
+        <constructor>
+            <idArg column="session_id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="step_id" javaType="java.lang.String"/>
+            <arg column="learner_text" javaType="java.lang.String"/>
+            <arg column="submitted_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!-- ownership 不在 practice_session 中重复存储，owned read 通过 join learning_task 还原。 -->
+    <sql id="ownedSessionFrom">
+        FROM practice_session session
+        JOIN learning_task task ON task.id = session.task_id
+    </sql>
+
+    <sql id="ownedSessionFilters">
+        task.user_id = #{trustedUserId, jdbcType=OTHER}
+        AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </sql>
+
+    <!-- INSERT … SELECT：insert 时在数据库内原子重校验 session 归属同一 owner/profile 的 Task、
+         且该 Task 已进入 STARTED；PLANNED/COMPLETED/foreign Task 产生零行，由调用方以异常 fail closed。
+         UNIQUE(task_id) 是 concurrent start 的第二层 guard，冲突以异常表达并由外层事务回滚。 -->
+    <select id="insertOwnedAndReturnId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO practice_session (task_id)
+        SELECT task.id
+        FROM learning_task task
+        WHERE task.id = #{taskId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND task.status = 'STARTED'
+        RETURNING id
+    </select>
+
+    <select id="findOwnedByTaskId" resultMap="storedPracticeSessionResult">
+        SELECT session.id, session.task_id, session.status,
+               session.started_at, session.completed_at, session.abandoned_at
+        <include refid="ownedSessionFrom"/>
+        WHERE session.task_id = #{taskId, jdbcType=OTHER}
+          AND <include refid="ownedSessionFilters"/>
+    </select>
+
+    <select id="findOwnedById" resultMap="storedPracticeSessionResult">
+        SELECT session.id, session.task_id, session.status,
+               session.started_at, session.completed_at, session.abandoned_at
+        <include refid="ownedSessionFrom"/>
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND <include refid="ownedSessionFilters"/>
+    </select>
+
+    <!-- 只锁定 practice_session 行，不锁定 join 的 task 行；response 提交与后续 completion
+         必须按同一顺序先锁 Session，再裁决 response 写入，避免 terminal race。 -->
+    <select id="findOwnedByIdForUpdate" resultMap="storedPracticeSessionResult">
+        SELECT session.id, session.task_id, session.status,
+               session.started_at, session.completed_at, session.abandoned_at
+        <include refid="ownedSessionFrom"/>
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND <include refid="ownedSessionFilters"/>
+        FOR UPDATE OF session
+    </select>
+
+    <!-- owner-scoped response insert：数据库内重校验 Session 归属同一 owner/profile 的 Task 且
+         仍为 IN_PROGRESS；首次接受返回 submitted_at。ON CONFLICT DO NOTHING 命中既有
+         (session_id, step_id) 时不返回行，由调用方在同一锁定事务内读取既有 response 并以
+         exact equality 裁决 replay 或 conflict；gate 不匹配同样为空，属 fail-closed。 -->
+    <select id="insertOwnedResponseAndReturnSubmittedAt"
+            resultType="java.time.OffsetDateTime"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO practice_response (session_id, step_id, learner_text)
+        SELECT session.id,
+               #{stepId, jdbcType=VARCHAR},
+               #{learnerText, jdbcType=VARCHAR}
+        FROM practice_session session
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND session.status = 'IN_PROGRESS'
+        ON CONFLICT DO NOTHING
+        RETURNING submitted_at
+    </select>
+
+    <!-- private learner text 只能由 owner 在其 profile workspace 内读取；ownership 通过
+         practice_response → practice_session → learning_task 链路重校验。 -->
+    <select id="findOwnedResponse" resultMap="storedLearnerResponseResult">
+        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at
+        FROM practice_response response
+        JOIN practice_session session ON session.id = response.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE response.session_id = #{sessionId, jdbcType=OTHER}
+          AND response.step_id = #{stepId, jdbcType=VARCHAR}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+</mapper>
