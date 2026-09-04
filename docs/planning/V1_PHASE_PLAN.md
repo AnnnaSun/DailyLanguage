@@ -141,7 +141,7 @@ integration、failure invariant 与完整 slices 见
 | M1-D1 | 同步 approved M1 Scope / Architecture / slice plan | COMPLETE |
 | M1-S1 | Built-in Content boundary + English artifact | COMPLETE (`d3eeadc`) |
 | M1-S2 | Deterministic Planner core | COMPLETE (`fcefedb` + review fixes `4322499`) |
-| M1-S3 | LearningTask persistence | OWNERSHIP_PENDING — implementation / Review / PostgreSQL-Flyway-Integration verification PASS；uncommitted |
+| M1-S3 | LearningTask persistence | COMPLETE (`45143af`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S4 | Owner-scoped planning API | SCOPE_NOT_APPROVED |
 | M1-S5 | PracticeSession lifecycle | SCOPE_NOT_APPROVED |
 | M1-S6 | Deterministic completion / assessment | SCOPE_NOT_APPROVED |

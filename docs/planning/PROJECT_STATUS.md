@@ -2,8 +2,8 @@
 
 > Last updated: 2026-09-04
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S3 OWNERSHIP_PENDING / M1-S4 SCOPE_NOT_APPROVED
-> Production baseline: M1-S2 COMPLETE；M1-S3 implementation candidate REVIEWED / VERIFIED / UNCOMMITTED
+> Current Gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
+> Production baseline: M1-S3 COMPLETE (`45143af`)
 
 ## Approved Decisions
 
@@ -41,10 +41,11 @@
   `LearningTask`、PostgreSQL `learning_task` schema、owner/profile-scoped repository 与
   `PLANNED → STARTED → COMPLETED` conditional transition；不接入 S4 API、PracticeSession、Model、Evidence、
   Memory 或 learner-state mutation。
-- M1-S3 implementation candidate 已完成 Critical Diff Review 与 external verification（2026-09-04）：Scope / Architecture
+- M1-S3 implementation 已完成 Critical Diff Review 与 external verification（2026-09-04）：Scope / Architecture
   PASS、无 blocking Production finding；disposable PostgreSQL 18.6 database 从 empty schema 执行 Flyway V1–V8
   8/8 PASS，LearningTask domain 7/7、persistence integration 10/10、full server regression 419 tests / 0 failures /
-  0 errors / 11 Redis 或 Redis+login environment-gated skips。Behavior Flow 已同步；Ownership 尚未执行，当前修改未提交。
+  0 errors / 11 Redis 或 Redis+login environment-gated skips。Behavior Flow 已同步；Ownership `UNDERSTOOD`，
+  implementation、tests 与 pre-Ownership documentation 已提交为 `45143af`。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -190,13 +191,13 @@
     （当前是无持久化、无 API、无 Model 的 module-local deterministic flow）。
 41. M1-S3 LearningTask persistence：Scope MATCH；Code Review / Architecture / PostgreSQL 18.6 + Flyway V1–V8 /
     Integration / wider regression PASS；无 blocking Production finding；Behavior Flow `CURRENT`；Ownership
-    `NOT_RUN`，implementation 与 documentation candidate 均未提交。
+    `UNDERSTOOD`；implementation、tests 与 pre-Ownership documentation 已提交为 `45143af`。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S3 OWNERSHIP_PENDING / M1-S4 SCOPE_NOT_APPROVED
+Gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -208,7 +209,7 @@ Compose infrastructure: PostgreSQL / Redis healthy
 Documentation reconciliation: COMPLETE for formal M0-S9 status, module map and ownership
 Primary local database: REBUILT / VERIFIED (empty schema -> Flyway V1-V7; backend startup PASS)
 M0 integrated closeout: PASS
-Production baseline: M1-S2 COMPLETE (`fcefedb` + review fixes `4322499`)
+Production baseline: M1-S3 COMPLETE (`45143af`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -225,20 +226,20 @@ M1-S2 verification: PASS — Planner + affected Content 64/64；non-database ser
 M1-S2 Code Review: PASS (no blocking finding；Behavior Flow NOT_REQUIRED)
 M1-S2 Ownership Review: UNDERSTOOD（Planner L3）
 M1-S3 Current Slice Contract: APPROVED (2026-09-04)
-M1-S3 implementation candidate: COMPLETE / UNCOMMITTED
+M1-S3 implementation: COMPLETE (`45143af`)
 M1-S3 Code Review: PASS (no blocking finding)
 M1-S3 PostgreSQL / Flyway / Integration verification: PASS — PostgreSQL 18.6；empty database Flyway V1–V8
   8/8；LearningTask domain 7/7；persistence integration 10/10；full server regression
   419 tests / 0 failures / 0 errors / 11 Redis 或 Redis+login environment-gated skips
 M1-S3 Behavior Flow: CURRENT (`docs/flow/learning-task-persistence.md`)
-M1-S3 Ownership Review: NOT_RUN
+M1-S3 Ownership Review: UNDERSTOOD
 M1-S4+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-完成 `M1-S3 — LearningTask persistence` Human Ownership Check；在结果为 `UNDERSTOOD` 前不进入
-`READY_TO_COMMIT`，不批准或开始 M1-S4。
+由用户决定是否提交 M1-S3 post-Ownership documentation closeout；M1-S4 仍需单独完成
+Design / Scope approval，不因 M1-S3 完成自动开始。
 
 ## Blockers
 

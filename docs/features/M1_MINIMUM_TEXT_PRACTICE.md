@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: M1-S2 COMPLETE；M1-S3 implementation candidate REVIEWED / VERIFIED / UNCOMMITTED
-> Current gate: M1-S3 OWNERSHIP_PENDING / M1-S4 SCOPE_NOT_APPROVED
+> Production implementation scope: M1-S3 COMPLETE (`45143af`)
+> Current gate: M1-S3 COMPLETE / M1-S4 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -72,7 +72,7 @@ M0 已提供：
 - PostgreSQL-backed `ModelCallJob` execution / consumption lifecycle；
 - transient Credential boundary 与安全 metadata Trace。
 
-当前 Production 已实现 M1-S2 deterministic Planner core 与 M1-S3 module-local LearningTask persistence candidate；
+当前 Production 已实现 M1-S2 deterministic Planner core 与 M1-S3 module-local LearningTask persistence；
 尚无 owner-scoped planning API、PracticeSession、Evaluator 或 Evidence implementation。后续必须继续按 slice 建立
 Learning Domain lifecycle，再把已有 Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob`
 不拥有 Learning Workflow 或长期状态。
@@ -268,7 +268,7 @@ Profile、Evidence、Weakness、Level 或 Memory；durable task identity 与 lif
 
 ### 7.2 Implemented M1-S3 boundary
 
-M1-S3 已在既有 `planner` module 内实现尚未提交的 LearningTask persistence candidate：
+M1-S3 已在既有 `planner` module 内实现并提交 LearningTask persistence：
 `LearningTaskRepository.createOwned` 接收可信 `trustedUserId` 与 S2 `LearningTaskPlan`，通过 PostgreSQL
 `INSERT ... SELECT` 原子校验 owner、Profile identity 与 target language；成功创建 UUIDv7 `PLANNED` row，保存
 exact `materialId + publishedVersion`。`findOwned`、`tryStart` 与 `tryComplete` 始终使用
@@ -278,7 +278,8 @@ exact `materialId + publishedVersion`。`findOwned`、`tryStart` 与 `tryComplet
 PostgreSQL 是 id、status 与 lifecycle timestamp authority；Java `LearningTask` 只恢复并复核 durable snapshot。
 target language 从同一 `language_profile` row 还原，不在 task row 重复存储。本 slice 不接入 authenticated API、
 不创建 PracticeSession、不调用 Model，也不保存 Content 本体、learner response、Prompt、Credential、Evidence 或
-长期学习状态。Critical Review、PostgreSQL 18.6 / Flyway V1–V8 与 Integration verification 已通过；Ownership 尚未执行。
+长期学习状态。Critical Review、PostgreSQL 18.6 / Flyway V1–V8 与 Integration verification 已通过；
+Ownership `UNDERSTOOD`，implementation 已提交为 `45143af`。
 真实调用链见 `docs/flow/learning-task-persistence.md`。
 
 ## 8. Practice lifecycle and deterministic assessment
@@ -473,13 +474,13 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: M1-S3 APPROVED；implementation / Review / external verification PASS；
-  Ownership PENDING；implementation 与 documentation uncommitted
+Production Current Slice Scope: M1-S3 COMPLETE (`45143af`)；implementation / Review / external verification PASS；
+  Ownership `UNDERSTOOD`
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S3 implementation、Critical Review、Behavior Flow 与 PostgreSQL/Flyway/Integration
-verification 已完成；Human Ownership Check 尚未执行。Ownership 结果为 `UNDERSTOOD` 前不进入
-`READY_TO_COMMIT`，也不批准或开始 M1-S4 owner-scoped planning API。
+当前 Stop Point：M1-S3 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
+verification、Human Ownership 与 implementation commit 均已完成。M1-S4 owner-scoped planning API 必须另行
+完成 Design / Scope approval，不因 M1-S3 完成自动开始。

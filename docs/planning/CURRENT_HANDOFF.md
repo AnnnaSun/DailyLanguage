@@ -6,18 +6,18 @@
 ## Snapshot
 
 ```text
-Updated At: 2026-09-04 12:22 CST
+Updated At: 2026-09-04 13:04 CST
 Updated By: Codex
 Handoff State: CURRENT
-Handoff Reason: 用户批准同步 M1-S3 Review / verification 后的正式状态与 Behavior Flow
+Handoff Reason: 用户明确要求在 M1-S3 commit 与 Human Ownership 完成后刷新交接快照
 ```
 
 ## Branch / HEAD / Worktree
 
 ```text
 Branch: codex/M1-S3
-HEAD: fc1761d（S2 document complete）
-Worktree Summary: DIRTY — M1-S3 implementation candidate + tests + documentation reconciliation；均未提交
+HEAD: 45143af（learning task 构造）
+Worktree Summary: DIRTY — 仅 M1-S3 post-Ownership documentation closeout；Production / tests 无未提交修改
 ```
 
 ## Current Product Gate
@@ -25,8 +25,8 @@ Worktree Summary: DIRTY — M1-S3 implementation candidate + tests + documentati
 ```text
 Current Phase: M1 — Minimum Text Practice Loop
 Current Slice: M1-S3 — LearningTask persistence
-Slice Gate: OWNERSHIP_PENDING
-Stop Point: implementation / Critical Review / external verification / Behavior Flow complete；等待 Human Ownership
+Slice Gate: COMPLETE
+Stop Point: implementation / Critical Review / external verification / Behavior Flow / Human Ownership / implementation commit complete；M1-S4 Scope 未批准
 ```
 
 ## Approved Scope / Explicit Non-scope
@@ -49,8 +49,9 @@ Stop Point: implementation / Critical Review / external verification / Behavior 
 3. Codex external verification：disposable PostgreSQL 18.6、Flyway V1–V8、schema inspection、targeted Integration
    与 full server regression PASS；
 4. Behavior Flow：新增 `docs/flow/learning-task-persistence.md` 并同步 index；
-5. 正式状态、Feature dossier、Architecture implementation mappings 与 Ownership Matrix 已同步为
-   M1-S3 `OWNERSHIP_PENDING`，未虚增 Ownership 等级。
+5. Human Ownership：用户可解释 `INSERT … SELECT` 的原子 create gate 与 conditional transition 零行失败语义，
+   结果 `UNDERSTOOD`；
+6. M1-S3 implementation、tests 与 pre-Ownership documentation 已由用户提交为 `45143af`。
 
 ## Verification Evidence
 
@@ -66,42 +67,31 @@ Stop Point: implementation / Critical Review / external verification / Behavior 
   - 项目 PostgreSQL / Redis containers 已恢复到验证前的 stopped 状态。
 - first attempt：受 sandbox local socket policy 阻止，根因 `SocketException: Operation not permitted`；提升本机连接
   权限后同一 targeted command PASS，不属于 implementation failure。
-- not run：S3 Human Ownership / Explain Back、Redis-only integration、client build、S4 API behavior。
+- Ownership（2026-09-04）：S3 Explain Back `UNDERSTOOD`。
+- not run：Redis-only integration、client build、S4 API behavior。
 
 ## Uncommitted Changes
 
-- M1-S3 Production candidate：
-  - `server/src/main/java/com/dailylanguage/planner/domain/LearningTask.java`；
-  - `server/src/main/java/com/dailylanguage/planner/infrastructure/LearningTaskRepository.java`；
-  - `server/src/main/java/com/dailylanguage/planner/infrastructure/LearningTaskMapper.java`；
-  - `server/src/main/resources/mapper/LearningTaskMapper.xml`；
-  - `server/src/main/resources/db/migration/V8__add_learning_task.sql`。
-- M1-S3 tests：
-  - `server/src/test/java/com/dailylanguage/planner/domain/LearningTaskTests.java`；
-  - `server/src/test/java/com/dailylanguage/planner/infrastructure/LearningTaskPersistenceIntegrationTests.java`。
-- M1-S3 documentation reconciliation：
-  - `docs/flow/learning-task-persistence.md`、`docs/flow/README.md`；
-  - `docs/planning/PROJECT_STATUS.md`、`docs/planning/V1_PHASE_PLAN.md`、本 handoff；
+- 仅 post-Ownership documentation closeout：
+  - `docs/planning/CURRENT_HANDOFF.md`、`docs/planning/PROJECT_STATUS.md`、`docs/planning/V1_PHASE_PLAN.md`；
   - `docs/features/M1_MINIMUM_TEXT_PRACTICE.md`；
-  - `docs/architecture/MODULE_MAP.md`、`docs/architecture/DATA_FLOW.md`、`docs/architecture/AGENT_FLOW.md`；
+  - `docs/architecture/MODULE_MAP.md`；
   - `docs/ownership/OWNERSHIP_MATRIX.md`。
-- 接手前已有修改：上述 7 个 S3 implementation / test untracked files；本次 documentation 修改由 Codex 新增。
+- Production Code 与 tests：无未提交修改。
 
 ## Decisions / Blockers / Risks / UNKNOWN
 
 - Decisions：当前线性 lifecycle 使用 current-status predicate 实现原子一次性 transition，不引入 `rowVersion`；
   target language 从 immutable-by-current-API Profile row 还原，不在 task table 重复保存；Content 不建立数据库 FK。
-- Blockers：无 technical / Review / verification blocker；Ownership 尚未完成，因此不能进入 `READY_TO_COMMIT`。
-- Risks：S3 implementation 与 documentation 都未提交；任何 commit 仍由用户决定。M1-S4 Scope 未批准。
-- UNKNOWN：M1-S3 Explain Back 结果与 Human Touch evidence 尚未产生，不得推断为 `UNDERSTOOD`。
+- Blockers：无 technical / Review / verification / Ownership blocker。
+- Risks：post-Ownership documentation closeout 尚未提交；M1-S4 Scope 未批准。
+- UNKNOWN：无 M1-S3 completion UNKNOWN。
 
 ## Next Action（单一）
 
-执行 M1-S3 Human Ownership Check，聚焦 trusted owner/profile/language create gate、PostgreSQL lifecycle authority
-与 conditional transition failure semantics。
+由用户决定是否提交本次 post-Ownership documentation closeout；不自动开始 M1-S4。
 
 ## 需要用户完成的 Decision
 
-1. 完成 M1-S3 Explain Back / Ownership Review；
-2. Ownership 通过后作出 S3 Commit Decision；
-3. M1-S4 必须另行完成 Design / Scope approval，不因 S3 完成自动开始。
+1. 决定是否提交 post-Ownership documentation closeout；
+2. M1-S4 必须另行完成 Design / Scope approval，不因 S3 完成自动开始。

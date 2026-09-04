@@ -371,7 +371,7 @@ I understand Planner.
 | ----------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
 | Language Management           | A                 | UNASSESSED        | L3        | L3               |          |
 | Language Profile              | A                 | UNASSESSED        | L3        | L4               |          |
-| Planner                       | A                 | L3                | L3        | L5               | M1-S2 Ownership `UNDERSTOOD`：可追踪 prevalidated `LanguageProfileIdentity` / hard constraints → Catalog candidate list → Java filtering / stable fallback → exact material re-resolution → `LearningTaskPlan` 或 typed `Unavailable`。M1-S3 durable persistence implementation / Review / PostgreSQL-Flyway-Integration verification 已完成，但 Ownership `NOT_RUN`，因此不提升等级；尚无 S4 owner-scoped API、S9 Model enrichment 或 integrated workflow evidence |
+| Planner                       | A                 | L3                | L3        | L5               | M1-S2 Ownership `UNDERSTOOD`：可追踪 prevalidated `LanguageProfileIdentity` / hard constraints → Catalog candidate list → Java filtering / stable fallback → exact material re-resolution → `LearningTaskPlan` 或 typed `Unavailable`。M1-S3 Ownership `UNDERSTOOD`：可解释 trusted owner/profile/language atomic create gate、PostgreSQL lifecycle authority 与 conditional transition 零行失败语义；尚无 S4 owner-scoped API、S9 Model enrichment 或 integrated workflow evidence |
 | Practice Runtime              | A                 | UNASSESSED        | L3        | L4               |          |
 | Conversation                  | A                 | UNASSESSED        | L3        | L5               |          |
 | Reading                       | A                 | UNASSESSED        | L3        | L4               |          |
@@ -1016,7 +1016,7 @@ L5
 
 | Module                   | Ownership  | Interview Readiness | Main Gap |
 | ------------------------ | ---------- | ------------------- | -------- |
-| Planner                  | L3        | I2                  | 可解释 S2 deterministic filtering、stable fallback、list/resolve fail-closed 与 Java authority；S3 durable task persistence 已实现并验证但 Ownership 尚未完成，且仍无 owner-scoped API、optional Model ranking 或完整 Learning Workflow evidence |
+| Planner                  | L3        | I2                  | 可解释 S2 deterministic filtering、stable fallback、list/resolve fail-closed 与 Java authority，以及 S3 trusted create gate、durable lifecycle 与 failure semantics；仍无 owner-scoped API、optional Model ranking 或完整 Learning Workflow evidence |
 | Conversation             | UNASSESSED | I0                  |          |
 | Evaluator                | UNASSESSED | I0                  |          |
 | Learning Memory          | UNASSESSED | I0                  |          |
