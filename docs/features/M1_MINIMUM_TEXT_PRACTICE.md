@@ -2,8 +2,8 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production implementation scope: M1-S4 COMPLETE (`dd9559d`)
-> Current gate: M1-S4 COMPLETE / M1-S5 SCOPE_NOT_APPROVED
+> Production implementation scope: M1-S5 COMPLETE (`b6cde9d`)
+> Current gate: M1-S5 COMPLETE / M1-S6 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -72,10 +72,10 @@ M0 已提供：
 - PostgreSQL-backed `ModelCallJob` execution / consumption lifecycle；
 - transient Credential boundary 与安全 metadata Trace。
 
-当前 Production 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence 与 M1-S4
-owner-scoped planning API；尚无 PracticeSession、Evaluator 或 Evidence implementation。后续必须继续按 slice
-建立 Learning Domain lifecycle，再把已有 Model infrastructure 作为 bounded semantic capability 接入；
-`ModelCallJob` 不拥有 Learning Workflow 或长期状态。
+当前 Production 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、M1-S4
+owner-scoped planning API 与 M1-S5 PracticeSession start / response lifecycle；尚无 completion、assessment、
+Evaluator 或 Evidence implementation。后续必须继续按 slice 完成 Session-level evaluation boundary，再把已有
+Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob` 不拥有 Learning Workflow 或长期状态。
 
 ## 4. Target architecture
 
@@ -296,6 +296,25 @@ Credential、Evidence 或长期学习状态。Critical Review、PostgreSQL 18.6 
 S3 regression 与 wider server regression 均通过；Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为
 `dd9559d`。真实调用链见 `docs/flow/owner-scoped-learning-task-planning.md`。
 
+### 7.4 Implemented M1-S5 boundary
+
+M1-S5 已在新的 `practice` module 内接入 authenticated、CSRF-protected PracticeSession start 与 learner response
+HTTP API。`PracticeSessionApplicationService.start` 在同一 Spring transaction 内执行 owned Task read、exact
+material resolution、`PLANNED → STARTED` conditional transition 与唯一 Session insert；数据库
+`INSERT ... SELECT` 重校验 owner/profile/`STARTED`，`UNIQUE(task_id)` 提供第二层 guard。重复或并发 start
+返回同一个 durable `IN_PROGRESS` Session，insert 失败整体 rollback，不留下孤立 `STARTED` Task。
+
+response submission 先验证 exact material version 与 stepId，再以 `FOR UPDATE OF session` 锁定 owned Session；
+PostgreSQL insert gate 重校验 owner/profile/`IN_PROGRESS`，`PRIMARY KEY(session_id, step_id)` 与
+`ON CONFLICT DO NOTHING` 裁决首次接受、exact payload replay 或 different-payload conflict。learner text 原样保存，
+HTTP 不回显 private text；start material projection 不包含 userId、accepted answers 或 semantic rubric。
+
+本 slice 不提供 complete / abandon transition，不做 deterministic assessment 或语义评分，不调用 Model，也不写
+Evidence、Weakness、Level、Mastery 或 Learning Memory。Critical Review 的两个 HIGH findings 与 external
+integration-test finding 均已关闭；PostgreSQL 18.6 / Flyway V1–V9、S5 integration/concurrency、S3+S4 affected
+regression 与 wider server regression 均通过；Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为
+`b6cde9d`。真实调用链见 `docs/flow/practice-session-lifecycle.md`。
+
 ## 8. Practice lifecycle and deterministic assessment
 
 M1 conceptual lifecycle：
@@ -488,13 +507,13 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Current Slice Scope: M1-S4 COMPLETE (`dd9559d`)；implementation / Review / external verification PASS；
+Production Current Slice Scope: M1-S5 COMPLETE (`b6cde9d`)；implementation / Review / external verification PASS；
   Ownership `UNDERSTOOD`
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S4 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
-verification、Human Ownership 与 implementation commit 均已完成。M1-S5 PracticeSession lifecycle 必须另行
-完成 Design / Current Slice Contract / Scope approval，不因 M1-S4 完成自动开始。
+当前 Stop Point：M1-S5 implementation、Critical Review、Behavior Flow、PostgreSQL/Flyway/Integration
+verification、Human Ownership 与 implementation commit 均已完成。M1-S6 deterministic completion / assessment
+必须另行完成 Design / Current Slice Contract / Scope approval，不因 M1-S5 完成自动开始。
