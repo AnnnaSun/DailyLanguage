@@ -2048,6 +2048,7 @@ Optimization / Self-improvement 当前保持受控：
 | Agent / Runtime | Source Path | Main Entry | Prompt | Context Policy | Tools | Output Schema | Tests |
 |---|---|---|---|---|---|---|---|
 | Planner | `server/src/main/java/com/dailylanguage/planner` | `LearningTaskPlanner`, `DeterministicLearningTaskPlanner` | N/A — M1-S2 deterministic only | Prevalidated `LanguageProfileIdentity` + task hard constraints；不读取完整历史或长期 Memory | `LearningMaterialCatalog` read boundary | `PlanningResult.Planned` / `PlanningResult.Unavailable` | `DeterministicLearningTaskPlannerTests` |
+| LearningTask Persistence Java Runtime | `server/src/main/java/com/dailylanguage/planner`, `server/src/main/resources/mapper/LearningTaskMapper.xml` | `LearningTaskRepository.createOwned / findOwned / tryStart / tryComplete` | N/A | trusted owner identity + S2 `LearningTaskPlan`；不读取 Prompt、Conversation、Evidence 或长期 Memory | PostgreSQL-bound MyBatis Mapper；不是 Agent Tool | durable `LearningTask` / `Optional.empty` | `LearningTaskTests`, `LearningTaskPersistenceIntegrationTests` |
 | Conversation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Evaluator | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Context Manager | TBD | TBD | N/A | TBD | N/A | TBD | TBD |

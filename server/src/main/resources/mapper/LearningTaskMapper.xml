@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.planner.infrastructure.LearningTaskMapper">
+
+    <resultMap id="storedLearningTaskResult"
+               type="com.dailylanguage.planner.infrastructure.StoredLearningTask">
+        <constructor>
+            <idArg column="id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="user_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="language_profile_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="material_id" javaType="java.lang.String"/>
+            <arg column="published_version" javaType="java.lang.String"/>
+            <arg column="target_language" javaType="java.lang.String"/>
+            <arg column="support_language" javaType="java.lang.String"/>
+            <arg column="difficulty" javaType="java.lang.String"/>
+            <arg column="estimated_duration_minutes" javaType="_int"/>
+            <arg column="scenario" javaType="java.lang.String"/>
+            <arg column="primary_goal" javaType="java.lang.String"/>
+            <arg column="task_type" javaType="java.lang.String"/>
+            <arg column="planning_reason" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="started_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!-- target language 不在 learning_task 中重复持久化，owned read 通过 join language_profile 还原。 -->
+    <sql id="ownedTaskColumns">
+        task.id, task.user_id, task.language_profile_id, task.material_id, task.published_version,
+        profile.language_code AS target_language, task.support_language, task.difficulty,
+        task.estimated_duration_minutes, task.scenario, task.primary_goal, task.task_type,
+        task.planning_reason, task.status, task.created_at, task.started_at, task.completed_at
+    </sql>
+
+    <!-- INSERT … SELECT：只有 owner、profile 与 target language 同时匹配同一 Profile 行时才落库；
+         任何不匹配都产生零行，避免持久化与 Profile 不一致的 target language，也避免 check-then-insert race。 -->
+    <select id="insertOwnedAndReturnId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        INSERT INTO learning_task (
+            user_id, language_profile_id, material_id, published_version, support_language,
+            difficulty, estimated_duration_minutes, scenario, primary_goal, task_type, planning_reason
+        )
+        SELECT profile.user_id,
+               profile.id,
+               #{materialId, jdbcType=VARCHAR},
+               #{publishedVersion, jdbcType=VARCHAR},
+               #{supportLanguage, jdbcType=VARCHAR},
+               #{difficulty, jdbcType=VARCHAR},
+               #{estimatedDurationMinutes, jdbcType=SMALLINT},
+               #{scenario, jdbcType=VARCHAR},
+               #{primaryGoal, jdbcType=VARCHAR},
+               #{taskType, jdbcType=VARCHAR},
+               #{planningReason, jdbcType=VARCHAR}
+        FROM language_profile profile
+        WHERE profile.id = #{languageProfileId, jdbcType=OTHER}
+          AND profile.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND profile.language_code = #{targetLanguage, jdbcType=VARCHAR}
+        RETURNING id
+    </select>
+
+    <select id="findOwned" resultMap="storedLearningTaskResult">
+        SELECT <include refid="ownedTaskColumns"/>
+        FROM learning_task task
+        JOIN language_profile profile ON profile.id = task.language_profile_id
+        WHERE task.id = #{taskId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <select id="tryStartAndReturnId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        UPDATE learning_task
+        SET status = 'STARTED',
+            started_at = CURRENT_TIMESTAMP
+        WHERE id = #{taskId, jdbcType=OTHER}
+          AND user_id = #{trustedUserId, jdbcType=OTHER}
+          AND language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND status = 'PLANNED'
+        RETURNING id
+    </select>
+
+    <select id="tryCompleteAndReturnId"
+            resultType="java.util.UUID"
+            affectData="true"
+            flushCache="true">
+        UPDATE learning_task
+        SET status = 'COMPLETED',
+            completed_at = CURRENT_TIMESTAMP
+        WHERE id = #{taskId, jdbcType=OTHER}
+          AND user_id = #{trustedUserId, jdbcType=OTHER}
+          AND language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND status = 'STARTED'
+        RETURNING id
+    </select>
+</mapper>

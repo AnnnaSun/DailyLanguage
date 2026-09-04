@@ -6,90 +6,102 @@
 ## Snapshot
 
 ```text
-Updated At: 2026-09-03 23:30 CST
+Updated At: 2026-09-04 12:22 CST
 Updated By: Codex
 Handoff State: CURRENT
-Handoff Reason: 用户明确要求同步 M1-S2 正式状态与 Ownership 文档
+Handoff Reason: 用户批准同步 M1-S3 Review / verification 后的正式状态与 Behavior Flow
 ```
 
 ## Branch / HEAD / Worktree
 
 ```text
 Branch: codex/M1-S3
-HEAD: 91b6c91（Document Codex and Zcode collaboration boundaries）
-Worktree Summary: DIRTY — 仅本次 M1-S2 documentation reconciliation；
-  Production / tests / resources clean，开始同步时 worktree clean
+HEAD: fc1761d（S2 document complete）
+Worktree Summary: DIRTY — M1-S3 implementation candidate + tests + documentation reconciliation；均未提交
 ```
 
 ## Current Product Gate
 
 ```text
 Current Phase: M1 — Minimum Text Practice Loop
-Current Slice: M1-S2 — Deterministic Planner core
-Slice Gate: COMPLETE（implementation / Review / verification / Ownership complete）
-Stop Point: M1-S3 SCOPE_NOT_APPROVED；已提出 Current Slice Contract，等待用户批准
+Current Slice: M1-S3 — LearningTask persistence
+Slice Gate: OWNERSHIP_PENDING
+Stop Point: implementation / Critical Review / external verification / Behavior Flow complete；等待 Human Ownership
 ```
 
 ## Approved Scope / Explicit Non-scope
 
-- Approved：M1-S2 module-local deterministic Planner——从 exact language-pair Catalog candidate set 执行
-  target/support/difficulty/duration/exclusion hard filtering、stable identity fallback、final material re-resolution
-  validation，返回尚未持久化的 `LearningTaskPlan` 或 typed `Unavailable`。
-- Review amendment：immutable published material；Built-in manifest 以 `PLANNABLE / HISTORICAL_ONLY` 区分新规划
-  candidate 与历史 identity resolution，同一 materialId 最多一个 PLANNABLE version。
-- Explicit Non-scope：PostgreSQL / LearningTask lifecycle（S3）、owner-scoped API（S4）、PracticeSession（S5）、
-  deterministic completion（S6）、Evaluator（S7–S8）、optional Planner Model enrichment（S9）、Japanese pack（S10）、
-  Vue UX（S11）与 M1 closeout（S12）。
+- Approved：在既有 `planner` module 内新增 durable `LearningTask`、Flyway V8 `learning_task` schema、
+  `LearningTaskRepository` + MyBatis Mapper，以及 owner/profile-scoped create/read 与
+  `PLANNED → STARTED → COMPLETED` conditional transition。
+- Invariants：可信 `trustedUserId` 只能来自 future authenticated Application flow；`LearningTaskPlan` 不是
+  authorization proof；PostgreSQL 是 UUIDv7 identity、status 与 lifecycle timestamp authority；保存 exact
+  `materialId + publishedVersion`；所有 read/mutation 绑定 task + owner + language profile。
+- Explicit Non-scope：S4 owner-scoped API / orchestration、PracticeSession、deterministic assessment、Evaluator、
+  Model enrichment、skip/replace、expiration/cancellation/list、rowVersion / generic state machine / outbox、Content
+  database FK、S4 implementation 与 commit。
 
 ## Completed Work
 
-1. `fcefedb`：`LearningTaskPlanner`、`DeterministicLearningTaskPlanner`、typed request/result/plan 与 14 个
-   Planner tests；
-2. `4322499`：Review fixes，补齐 Content collection immutability、完整 published-version retention、
-   `PLANNABLE / HISTORICAL_ONLY` availability、manifest v2 与相关 regression tests；
-3. S2 Critical Review：无 blocking finding；Behavior Flow `NOT_REQUIRED`（module-local、无 durable state/API/Model）；
-4. Ownership：用户确认已完成，结果 `UNDERSTOOD`；Planner 记录为 L3；
-5. 本次只同步正式状态、Feature dossier、Architecture implementation mappings、Ownership Matrix 与本 handoff，
-   不修改实现。
+1. Zcode implementation candidate：新增 `LearningTask` domain snapshot、`LearningTaskRepository`、package-local
+   Mapper contract、MyBatis XML、Flyway V8 migration、7 个 domain tests 与 10 个 persistence integration tests；
+2. Codex Critical Diff Review：Scope MATCH、Architecture PASS、无 blocking Production finding；
+3. Codex external verification：disposable PostgreSQL 18.6、Flyway V1–V8、schema inspection、targeted Integration
+   与 full server regression PASS；
+4. Behavior Flow：新增 `docs/flow/learning-task-persistence.md` 并同步 index；
+5. 正式状态、Feature dossier、Architecture implementation mappings 与 Ownership Matrix 已同步为
+   M1-S3 `OWNERSHIP_PENDING`，未虚增 Ownership 等级。
 
 ## Verification Evidence
 
-- fresh（2026-09-03，本次状态核对）：
-  - Planner + affected Content tests：64/64 PASS（Planner 14 + Content 50）；
-  - non-database server regression：389 tests / 0 failures / 0 errors / 85 environment-gated skips；
-  - Java 25 首次 wider run 因 Mockito self-attach 环境失败；使用本地 Byte Buddy agent 重跑后 PASS；
-  - `git diff --check 6b0212f..91b6c91`：PASS；开始同步时 `git status --short` clean。
-- prior / user-confirmed：S2 technical implementation、Critical Review、verification 与 Ownership complete。
-- not run：PostgreSQL/Flyway integration、Redis tests、client build、S3 behavior（S2 无 DB/API/UI scope）。
+- fresh（2026-09-04）：
+  - `LearningTaskTests`：7/7 PASS；
+  - `LearningTaskPersistenceIntegrationTests`：10/10 PASS；
+  - empty disposable PostgreSQL 18.6 database：Flyway V1–V8 validated 8/8、applied 8/8，schema version `v8`；
+  - schema inspection：16 个预期 columns、UUIDv7 default、composite ownership FK、enum / duration / text /
+    lifecycle constraints 均存在；
+  - full server regression：419 tests / 0 failures / 0 errors / 11 Redis 或 Redis+login environment-gated skips；
+  - mapper 使用 MyBatis `#{...}` binding，无 `${...}`；
+  - disposable database `daily_language_m1_s3_verify_20260904` 已删除，primary `daily_language` 未改动；
+  - 项目 PostgreSQL / Redis containers 已恢复到验证前的 stopped 状态。
+- first attempt：受 sandbox local socket policy 阻止，根因 `SocketException: Operation not permitted`；提升本机连接
+  权限后同一 targeted command PASS，不属于 implementation failure。
+- not run：S3 Human Ownership / Explain Back、Redis-only integration、client build、S4 API behavior。
 
 ## Uncommitted Changes
 
-- 本次 S2 documentation reconciliation：
-  - `docs/planning/PROJECT_STATUS.md`；
-  - `docs/planning/V1_PHASE_PLAN.md`；
-  - `docs/planning/CURRENT_HANDOFF.md`；
+- M1-S3 Production candidate：
+  - `server/src/main/java/com/dailylanguage/planner/domain/LearningTask.java`；
+  - `server/src/main/java/com/dailylanguage/planner/infrastructure/LearningTaskRepository.java`；
+  - `server/src/main/java/com/dailylanguage/planner/infrastructure/LearningTaskMapper.java`；
+  - `server/src/main/resources/mapper/LearningTaskMapper.xml`；
+  - `server/src/main/resources/db/migration/V8__add_learning_task.sql`。
+- M1-S3 tests：
+  - `server/src/test/java/com/dailylanguage/planner/domain/LearningTaskTests.java`；
+  - `server/src/test/java/com/dailylanguage/planner/infrastructure/LearningTaskPersistenceIntegrationTests.java`。
+- M1-S3 documentation reconciliation：
+  - `docs/flow/learning-task-persistence.md`、`docs/flow/README.md`；
+  - `docs/planning/PROJECT_STATUS.md`、`docs/planning/V1_PHASE_PLAN.md`、本 handoff；
   - `docs/features/M1_MINIMUM_TEXT_PRACTICE.md`；
-  - `docs/architecture/MODULE_MAP.md`；
-  - `docs/architecture/AGENT_FLOW.md`；
-  - `docs/architecture/DATA_FLOW.md`；
+  - `docs/architecture/MODULE_MAP.md`、`docs/architecture/DATA_FLOW.md`、`docs/architecture/AGENT_FLOW.md`；
   - `docs/ownership/OWNERSHIP_MATRIX.md`。
-- Production / tests / resources：none。
-- 接手前已有修改：无；开始本次同步时 worktree clean。
+- 接手前已有修改：上述 7 个 S3 implementation / test untracked files；本次 documentation 修改由 Codex 新增。
 
 ## Decisions / Blockers / Risks / UNKNOWN
 
-- Decisions：S2 final implementation identity 是 `fcefedb` + review fixes `4322499`；`91b6c91` 只修改
-  collaboration harness，不属于 S2 behavior；Planner 保持无 persistence / Model / downstream mutation authority。
-- Blockers：无 S2 blocker；M1-S3 仍需用户明确 Scope approval。
-- Risks：正式文档本次尚未 commit；不得把 docs sync 当作 M1-S3 implementation approval。
-- UNKNOWN：历史 Explain Back 的问题数量未保留，因此 Ownership Matrix 明确记录为 `UNKNOWN`，不补造数字。
+- Decisions：当前线性 lifecycle 使用 current-status predicate 实现原子一次性 transition，不引入 `rowVersion`；
+  target language 从 immutable-by-current-API Profile row 还原，不在 task table 重复保存；Content 不建立数据库 FK。
+- Blockers：无 technical / Review / verification blocker；Ownership 尚未完成，因此不能进入 `READY_TO_COMMIT`。
+- Risks：S3 implementation 与 documentation 都未提交；任何 commit 仍由用户决定。M1-S4 Scope 未批准。
+- UNKNOWN：M1-S3 Explain Back 结果与 Human Touch evidence 尚未产生，不得推断为 `UNDERSTOOD`。
 
 ## Next Action（单一）
 
-用户 Review 本次 M1-S2 documentation reconciliation diff；确认无误后再决定是否批准已提出的
-`M1-S3 — LearningTask persistence` Current Slice Contract。
+执行 M1-S3 Human Ownership Check，聚焦 trusted owner/profile/language create gate、PostgreSQL lifecycle authority
+与 conditional transition failure semantics。
 
 ## 需要用户完成的 Decision
 
-1. 本次 S2 documentation reconciliation 的 Review / Commit Decision；
-2. M1-S3 Current Slice Contract 的 Scope / Architecture Approval。
+1. 完成 M1-S3 Explain Back / Ownership Review；
+2. Ownership 通过后作出 S3 Commit Decision；
+3. M1-S4 必须另行完成 Design / Scope approval，不因 S3 完成自动开始。
