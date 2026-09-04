@@ -6,95 +6,92 @@
 ## Snapshot
 
 ```text
-Updated At: 2026-09-03 16:19 CST
+Updated At: 2026-09-04 13:04 CST
 Updated By: Codex
 Handoff State: CURRENT
-Handoff Reason: 用户明确要求完成 M1-S1 post-commit documentation closeout
+Handoff Reason: 用户明确要求在 M1-S3 commit 与 Human Ownership 完成后刷新交接快照
 ```
 
 ## Branch / HEAD / Worktree
 
 ```text
-Branch: codex/M1-S1
-HEAD: d3eeadc（feat(content): 实现 M1-S1 Built-in 内容边界与 en+zh-cn 内置材料包）
-Worktree Summary: DIRTY — 仅 M1-S1 post-commit closeout 的 4 个 documentation files；
-  Production / tests / resources clean，无接手前遗留修改
+Branch: codex/M1-S3
+HEAD: 45143af（learning task 构造）
+Worktree Summary: DIRTY — 仅 M1-S3 post-Ownership documentation closeout；Production / tests 无未提交修改
 ```
 
 ## Current Product Gate
 
 ```text
 Current Phase: M1 — Minimum Text Practice Loop
-Current Slice: M1-S1 — Built-in Content boundary + English artifact
-Slice Gate: COMPLETE（Code Review PASS；Ownership Review UNDERSTOOD；committed as d3eeadc）
-Stop Point: M1-S2 SCOPE_NOT_APPROVED；只可提出 Current Slice Contract，不得直接实现
+Current Slice: M1-S3 — LearningTask persistence
+Slice Gate: COMPLETE
+Stop Point: implementation / Critical Review / external verification / Behavior Flow / Human Ownership / implementation commit complete；M1-S4 Scope 未批准
 ```
 
 ## Approved Scope / Explicit Non-scope
 
-- Approved：M1-S1 Current Slice Contract（2026-09-03 用户批准）——`LearningMaterialCatalog`
-  read boundary、classpath Built-in loader（strict binding + manifest SHA-256 lineage +
-  eager fail-closed startup validation）、`en + zh-cn` pack（2 个 FOUNDATION materials）、
-  hash 工具、测试；catalog/schema 为 language-pair generic，只发布英语 pack。
-- Explicit Non-scope：Planner（S2）、LearningTask persistence/DB migration（S3）、API（S4）、
-  PracticeSession（S5）、deterministic matcher（S6）、semantic rubric 资源（S7+）、日语 pack（S10）、
-  Vue UI（S11）、Content publish pipeline（M3）。
+- Approved：在既有 `planner` module 内新增 durable `LearningTask`、Flyway V8 `learning_task` schema、
+  `LearningTaskRepository` + MyBatis Mapper，以及 owner/profile-scoped create/read 与
+  `PLANNED → STARTED → COMPLETED` conditional transition。
+- Invariants：可信 `trustedUserId` 只能来自 future authenticated Application flow；`LearningTaskPlan` 不是
+  authorization proof；PostgreSQL 是 UUIDv7 identity、status 与 lifecycle timestamp authority；保存 exact
+  `materialId + publishedVersion`；所有 read/mutation 绑定 task + owner + language profile。
+- Explicit Non-scope：S4 owner-scoped API / orchestration、PracticeSession、deterministic assessment、Evaluator、
+  Model enrichment、skip/replace、expiration/cancellation/list、rowVersion / generic state machine / outbox、Content
+  database FK、S4 implementation 与 commit。
 
-## Completed Work（M1-S1，已提交为 `d3eeadc`）
+## Completed Work
 
-1. M1-D1 Documentation Review 标记通过；`PROJECT_STATUS` / `V1_PHASE_PLAN` /
-   `M1_MINIMUM_TEXT_PRACTICE` gate 同步至 M1-S1；
-2. 新模块 `com.dailylanguage.content`：domain 13 个 typed 类型 + port；infrastructure
-   loader / catalog / manifest 绑定 / SAM reader seam / fail-closed exception；
-3. Built-in artifact：`manifest.json` + 2 个 `en + zh-cn` materials
-   （`en-builtin-greeting-intro` / `en-builtin-cafe-request`，PROJECT_ORIGINAL / AGPL-3.0）；
-4. `server/tools/GenerateBuiltInMaterialHash.java`（生成 / `--check`）；
-5. 测试 3 类 40 个：真实 pack 加载、26 类 fail-closed 矩阵、多 pair 无 fallback、context 启动；
-6. 类级 Javadoc 补齐（用户要求）；
-7. `MODULE_MAP.md` 新增 Built-in Learning Material Boundary 物理 mapping 行；
-8. Code Ownership Review 完成：Scope MATCH、无 blocking finding、Explain Back UNDERSTOOD。
+1. Zcode implementation candidate：新增 `LearningTask` domain snapshot、`LearningTaskRepository`、package-local
+   Mapper contract、MyBatis XML、Flyway V8 migration、7 个 domain tests 与 10 个 persistence integration tests；
+2. Codex Critical Diff Review：Scope MATCH、Architecture PASS、无 blocking Production finding；
+3. Codex external verification：disposable PostgreSQL 18.6、Flyway V1–V8、schema inspection、targeted Integration
+   与 full server regression PASS；
+4. Behavior Flow：新增 `docs/flow/learning-task-persistence.md` 并同步 index；
+5. Human Ownership：用户可解释 `INSERT … SELECT` 的原子 create gate 与 conditional transition 零行失败语义，
+   结果 `UNDERSTOOD`；
+6. M1-S3 implementation、tests 与 pre-Ownership documentation 已由用户提交为 `45143af`。
 
 ## Verification Evidence
 
-- fresh（本次 post-commit documentation closeout）：
-  - branch / HEAD / clean starting worktree 核对：`codex/M1-S1@d3eeadc`；
-  - closeout scope：仅 4 个 documentation files；Production / tests / resources 无修改；
-  - `git diff --check`：PASS；M1-S1 stale gate / commit wording targeted search：PASS。
-- prior（M1-S1 implementation / Review handoff evidence；本次 closeout 未复跑）：
-  - content 模块 `mvnw test -Dtest='com.dailylanguage.content.**'`：40/40 PASS；
-  - 全量 `RUN_DATABASE_TESTS=true DATABASE_PORT=15432 ./mvnw test`：378 run / 0 failures /
-    0 errors / 11 既有 conditional skip（= M0 基线 338 + M1-S1 40）；
-  - `GenerateBuiltInMaterialHash --check`：PASS；Code Review PASS；Ownership Review UNDERSTOOD。
-- prior（引用 `PROJECT_STATUS.md`；本次未复跑）：M0-S9 closeout、client build、migration 验证。
-- not run：backend tests、client build、compose 全栈启动、M1-S2 behavior（docs-only closeout）。
+- fresh（2026-09-04）：
+  - `LearningTaskTests`：7/7 PASS；
+  - `LearningTaskPersistenceIntegrationTests`：10/10 PASS；
+  - empty disposable PostgreSQL 18.6 database：Flyway V1–V8 validated 8/8、applied 8/8，schema version `v8`；
+  - schema inspection：16 个预期 columns、UUIDv7 default、composite ownership FK、enum / duration / text /
+    lifecycle constraints 均存在；
+  - full server regression：419 tests / 0 failures / 0 errors / 11 Redis 或 Redis+login environment-gated skips；
+  - mapper 使用 MyBatis `#{...}` binding，无 `${...}`；
+  - disposable database `daily_language_m1_s3_verify_20260904` 已删除，primary `daily_language` 未改动；
+  - 项目 PostgreSQL / Redis containers 已恢复到验证前的 stopped 状态。
+- first attempt：受 sandbox local socket policy 阻止，根因 `SocketException: Operation not permitted`；提升本机连接
+  权限后同一 targeted command PASS，不属于 implementation failure。
+- Ownership（2026-09-04）：S3 Explain Back `UNDERSTOOD`。
+- not run：Redis-only integration、client build、S4 API behavior。
 
 ## Uncommitted Changes
 
-- M1-S1 Production / tests / resources：none；已提交为 `d3eeadc`。
-- Post-commit closeout docs：`CURRENT_HANDOFF.md`、`PROJECT_STATUS.md`、`V1_PHASE_PLAN.md`、
-  `M1_MINIMUM_TEXT_PRACTICE.md`。
-- 接手前已有修改：无；开始本次 closeout 时 worktree clean。
+- 仅 post-Ownership documentation closeout：
+  - `docs/planning/CURRENT_HANDOFF.md`、`docs/planning/PROJECT_STATUS.md`、`docs/planning/V1_PHASE_PLAN.md`；
+  - `docs/features/M1_MINIMUM_TEXT_PRACTICE.md`；
+  - `docs/architecture/MODULE_MAP.md`；
+  - `docs/ownership/OWNERSHIP_MATRIX.md`。
+- Production Code 与 tests：无未提交修改。
 
 ## Decisions / Blockers / Risks / UNKNOWN
 
-- Decisions（M1-S1 contract 内）：语言代码用 canonical lowercase BCP-47（与
-  `LanguageProfileRepository.normalizeLanguageCode` 存库形式一致，非 canonical fail closed）；
-  eager 启动校验；strict binding feature 集与 modelgateway `StructuredOutputValidator` 对齐但
-  不跨模块依赖；hash 先于结构校验；`listAvailable` 按 materialId 排序保证可重放。
-- Decisions（用户会话中决定）：补类注释（已做）；命名约定文档化、content 按 modality 分包、
-  相应 Backlog 条目——均「暂时先不修改」，未记录。
-- Blockers：无；M1-S2 仍需独立 Scope approval。
-- Risks：本机 5432 端口是另一个 PostgreSQL 实例（凭据不符）；本项目 DB 在 **15432**
-  （`.env` 已配），跑 DB 测试需 `DATABASE_PORT=15432` + `RUN_DATABASE_TESTS=true`。
-- UNKNOWN：M1-S2 的 Current Slice Contract 尚未形成，Expected Files、data / API impact 与具体 verification
-  commands 尚未批准。
+- Decisions：当前线性 lifecycle 使用 current-status predicate 实现原子一次性 transition，不引入 `rowVersion`；
+  target language 从 immutable-by-current-API Profile row 还原，不在 task table 重复保存；Content 不建立数据库 FK。
+- Blockers：无 technical / Review / verification / Ownership blocker。
+- Risks：post-Ownership documentation closeout 尚未提交；M1-S4 Scope 未批准。
+- UNKNOWN：无 M1-S3 completion UNKNOWN。
 
 ## Next Action（单一）
 
-提出 `M1-S2 — Deterministic Planner core` Current Slice Contract；完成 Design / Scope 后停止并等待用户批准，
-不自动修改 Planner Production Code、schema 或 API。
+由用户决定是否提交本次 post-Ownership documentation closeout；不自动开始 M1-S4。
 
 ## 需要用户完成的 Decision
 
-1. 当前 4 份 post-commit closeout documentation 的 Review / Commit Decision；
-2. M1-S2 Current Slice Contract 形成后的 Scope Decision。
+1. 决定是否提交 post-Ownership documentation closeout；
+2. M1-S4 必须另行完成 Design / Scope approval，不因 S3 完成自动开始。
