@@ -8,7 +8,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -883,15 +882,16 @@ class PracticeSessionPersistenceIntegrationTests {
     private static <T> List<T> runConcurrently(int threads, ConcurrentAction<T> action)
             throws Exception {
         CountDownLatch startBarrier = new CountDownLatch(1);
-        AtomicInteger sequence = new AtomicInteger();
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         try {
             List<Future<T>> futures = new java.util.ArrayList<>();
             for (int i = 0; i < threads; i++) {
+                // index 必须取提交槽位：结果按 Future 提交顺序收集，调用方依赖 results.get(i)
+                // 与 index == i 对应；并发竞争仍由 barrier 释放后的真实执行顺序决定。
                 int index = i;
                 futures.add(executor.submit(() -> {
                     startBarrier.await();
-                    return action.run(sequence.getAndIncrement());
+                    return action.run(index);
                 }));
             }
             startBarrier.countDown();

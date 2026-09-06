@@ -144,8 +144,8 @@ integration、failure invariant 与完整 slices 见
 | M1-S3 | LearningTask persistence | COMPLETE (`45143af`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S4 | Owner-scoped planning API | COMPLETE (`dd9559d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
-| M1-S6 | Deterministic completion / assessment | READY_TO_COMMIT — implementation / Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；uncommitted |
-| M1-S7 | Grounded Evaluator contract | SCOPE_NOT_APPROVED |
+| M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
+| M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720`) — follow-up Rubric source extraction READY_TO_COMMIT；uncommitted |
 | M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
@@ -171,13 +171,25 @@ PostgreSQL 18.6 S5 integration/concurrency 19/19、S3 regression 10/10、S4 regr
 V1–V9 9/9、wider server regression 501/0/0；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为
 `b6cde9d`。
 
-M1-S6 Current Slice Contract 已批准，当前 uncommitted candidate 已实现 owner-scoped deterministic completion：
+M1-S6 已实现 owner-scoped deterministic completion：
 Session-row-first 行锁串行化 response/completion，exact material step 集合与 accepted response 集合完整匹配后，
 Java 以 `M1_TEXT_EXACT_V1` 计算 `MATCHED / NOT_MATCHED / NOT_APPLICABLE`。Session `COMPLETED`、一条 assessment
 header、每个 step 的 assessment row 与 Task `COMPLETED` 在同一个 transaction 内原子提交；completed replay
 只读 durable assessment，不重新依赖 catalog。Code Review / Architecture PASS；PostgreSQL 18.6 Flyway V1–V10、
 targeted integration 47/47、wider server regression 564 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；Behavior
-Flow `CURRENT`。Ownership `UNDERSTOOD`，candidate 未 commit；M1-S7 未批准。
+Flow `CURRENT`。Ownership `UNDERSTOOD`，用户提交为 `82aced2`。
+
+M1-S7 Current Slice Contract 已批准并提交为 `7deb720`，已实现 module-local Grounded Evaluator contract：
+不可信 JSON 先按真实 token 类型拒绝 scalar coercion，再进行 strict record binding；trusted input 校验
+owner/profile、completed Task/Session、assessment、exact material 与完整 response set 的一致性；claim 只引用 learner
+原文，Java 裁决 literal occurrence、UTF-16 offsets、surrogate boundary 与 versioned rubric issue allowlist。任一 claim
+失败整批拒绝，且不修改 deterministic assessment。当前无 Model、Credential、API、persistence 或长期 learner-state
+mutation。Code Review / Architecture PASS；PostgreSQL 18.6 empty schema Flyway V1–V10、affected integration 50/50、
+wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；Behavior Flow `CURRENT`；Ownership
+`UNDERSTOOD`。随后批准的 non-behavioral delta 将 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前
+结构为 7 个 Production Java files / 643 行；delta Review 与本地 unit 55/55 PASS，database integration 3 个因
+未设置 `RUN_DATABASE_TESTS` 而跳过，按用户要求未重跑外部容器验证。该 extraction candidate 尚未提交；M1-S8
+未批准。
 
 ### M2 — Persistent Adaptation Loop
 

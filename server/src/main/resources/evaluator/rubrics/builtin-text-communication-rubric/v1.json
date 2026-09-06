@@ -1,0 +1,21 @@
+{
+  "rubricReference": "builtin-text-communication-rubric/v1",
+  "targetLanguage": "en",
+  "issueDefinitions": [
+    {
+      "issueType": "GRAMMAR",
+      "scope": "Target-language grammar problems observable in the quoted learner text, such as word order, agreement, tense, or missing function words.",
+      "explanationRequirement": "Name the grammar problem visible in the quote and give a corrected target-language version of the quoted span."
+    },
+    {
+      "issueType": "NATURALNESS",
+      "scope": "Phrasing in the quoted learner text that a fluent speaker would find awkward or unidiomatic in the practice scenario, even when it is grammatical.",
+      "explanationRequirement": "Explain why the quoted phrasing sounds unnatural and give a more natural target-language alternative for the quoted span."
+    },
+    {
+      "issueType": "TASK_RESPONSE",
+      "scope": "Ways the quoted learner text falls short of the step prompt or the material communication objective, such as a missing or off-topic answer.",
+      "explanationRequirement": "State which required part of the step prompt or communication objective the quoted text does not fulfill and what is missing."
+    }
+  ]
+}
