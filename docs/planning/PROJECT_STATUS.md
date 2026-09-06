@@ -2,12 +2,21 @@
 
 > Last updated: 2026-09-06
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
+> Current Gate: M1-S8A READY_TO_COMMIT；M1-S8 overall IN_PROGRESS
 > Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-> Current candidate: NONE；M1-S8 尚未批准
+> Current candidate: M1-S8A owner-scoped grounded evaluation input；Review / external verification PASS；未 commit
 
 ## Approved Decisions
 
+- M1-S8 整体设计方向 D1–D4 与 S8A Current Slice Contract 已批准：显式触发可选 evaluation、Run / Job 原子关联后
+  在事务外 dispatch、业务 outcome 与 Job consumption 原子完成、首版限制重复评估并区分迟到与 expiry。
+  本次仅 S8A 获得实施授权；S8B–E implementation scope 尚未批准。
+- M1-S8 Ownership 节奏已批准：每个子 slice 保留 Critical Review 与相关验证；S8A 不单独 Explain Back，
+  S8B / S8C 只在关键事务或并发边界存在理解缺口时简短确认；正式 Ownership Check 留到 S8 完整闭环完成。
+- M1-S8A 已完成 implementation、Critical / delta Review 与适用验证：新增 owner-scoped Reader，零写入、无新
+  schema / API / Model 调用；Codex unit regression 73/73 PASS；正常配置下 Reader integration 5/5 与 S7
+  integration 3/3 PASS（0 failures / 0 errors / 0 skipped），disposable PostgreSQL 18.6 empty schema Flyway
+  V1–V10 10/10 PASS。两处 integration-test findings 已关闭；临时容器已清理。当前 READY_TO_COMMIT，未提交。
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
@@ -253,18 +262,18 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
+Gate: M1-S8A READY_TO_COMMIT；M1-S8 overall IN_PROGRESS
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
 Behavior Flow: CURRENT (`docs/flow/grounded-semantic-validation.md`)
 M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
 M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
-Current extraction verification: FRESH PASS — relevant unit 55/55；database integration 3 SKIPPED because
+S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database integration 3 SKIPPED because
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
 Compose infrastructure: PostgreSQL / Redis healthy
-Documentation reconciliation: COMPLETE for M1-S7 Rubric source extraction
+Documentation reconciliation: COMPLETE for M1-S8A
 Primary local database: MIGRATED / VERIFIED (existing V7 -> Flyway V10; integration fixtures remain)
 M0 integrated closeout: PASS
 Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
@@ -329,18 +338,29 @@ M1-S7 current structure: 7 Production Java files / 643 lines after approved non-
 M1-S7 baseline commit: COMPLETE (`7deb720`)
 M1-S7 Rubric source extraction: COMPLETE (`e93f624`)；DELTA REVIEW PASS；local unit 55/55 PASS；
   merge confirmed by user
-M1-S8+ implementation scope: NOT_APPROVED
+M1-S8 overall design direction: APPROVED；overall implementation INCOMPLETE
+M1-S8A Current Slice Contract: APPROVED
+M1-S8A implementation / Critical Review / delta Review: PASS；READY_TO_COMMIT；uncommitted
+M1-S8A unit verification: PRIOR PASS — Reader 18/18 + S7 validator 33/33 + rubric 22/22 = 73/73
+M1-S8A external verification: PASS (2026-09-06) — disposable PostgreSQL 18.6；empty schema Flyway V1–V10 10/10；
+  Reader integration 5/5 + S7 integration 3/3；0 failures / 0 errors / 0 skipped；normal MyBatis cache settings
+M1-S8A test findings: CLOSED — duplicate submit assertion；JdbcTemplate fixture deletion / MyBatis local cache
+M1-S8A Behavior Flow: CURRENT
+M1-S8A standalone Ownership Check: NOT_REQUIRED by user decision；formal check deferred to completed S8 loop
+M1-S8B–E implementation scope: NOT_APPROVED
+M1-S9+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-M1-S7 已完成文档收口。下一步由用户决定是否进入 M1-S8 Design / Scope；在批准前不得修改 M1-S8
-Production、schema 或 API。
+用户执行 M1-S8A Commit Decision。当前代码、适用验证与文档已收口为 READY_TO_COMMIT；不要求单独
+Explain Back，不自动 commit、push、merge 或开始 S8B。
 
 ## Blockers
 
-没有已发现的 M0、M1-S6 closeout 或 M1-S7 的 Code Review / Documentation / Ownership blocker。M1-S8 Scope
-尚未批准。M1-S7 baseline external verification 使用 disposable
+M1-S8A 无剩余 Code Review / Verification / Documentation blocker，当前只剩 Commit Decision。
+S8B–E 尚未获实施批准，S8 整体仍未完成。S8A 使用独立临时 PostgreSQL 验证，测试数据回滚、容器已清理；
+未将 primary database 作为测试目标，未重跑 full server suite。M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。

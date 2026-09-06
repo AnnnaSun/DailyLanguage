@@ -1,9 +1,9 @@
 # Grounded Semantic Validation Flow
 
-- Document Status: `IMPLEMENTED`
-- Feature / Slice: `M1-S7`
+- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A）；S8A `READY_TO_COMMIT`
+- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A` owner-scoped read entry
 - Last Verified: `2026-09-06`
-- Entry: `SemanticGroundingValidator.validate`
+- Entry: `SemanticGroundingValidator.validate`；`GroundedEvaluationInputReader.readOwned`（S8A）
 
 ## 1. Behavior Boundary
 
@@ -14,6 +14,8 @@ failure category 的 `Rejected`。
 S7 本身没有 HTTP、Model、Credential 或 database entry。`GroundedEvaluationInput` 的对象一致性不是 authorization
 proof；M1-S8 production flow 必须从 authenticated `UserContext.userId` 出发，通过 owner/profile-scoped Repository
 读取 Task、Session、responses 与 deterministic assessment，再按 Task 的 exact material identity 解析 material。
+M1-S8A `GroundedEvaluationInputReader.readOwned` 已把该组装前提落实为生产读取入口（见第 6 节）；ModelCallJob
+submission / consumption（S8B+）尚未实现。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，
@@ -98,8 +100,46 @@ sequenceDiagram
 - `Rejected` 不携带 learner text、完整 Model output 或 explanation；S7 没有持久化或日志 side effect。
 - rejection 不回滚、删除或覆盖既有 completed Practice 与 deterministic assessment。
 
-## 6. Verification Evidence
+## 6. Owner-Scoped Read Entry（M1-S8A）
 
+S8A 在同一 `evaluator` package 内新增 production 读取入口 `GroundedEvaluationInputReader.readOwned(
+languageProfileId, sessionId, userContext)`，返回 sealed `GroundedEvaluationInputResult`：
+
+| Result | 语义 |
+|---|---|
+| `Ready(GroundedEvaluationInput)` | 已通过 ownership、completion 与 snapshot 完整性检查 |
+| `NotFound` | Session 不存在或不属于该 caller/Profile；对外不可区分 |
+| `NotCompleted` | owned Session 尚未 completed |
+| `MaterialUnavailable` | exact material/scaffold 无法按 Task identity 解析 |
+| `InconsistentSnapshot` | durable 数据或依赖返回不满足已完成 Practice 的结构约束 |
+
+固定读取顺序：caller identity 只取自 `UserContext` → `PracticeSessionRepository.findOwned`（ownership 失败
+在读取任何 private learner text 之前裁决）→ completion gate → `LearningTaskRepository.findOwned` → owned
+assessment 与全部 accepted responses → `LearningMaterialCatalog.findByIdentity`（只按 Task 保存的完整
+identity + supportLanguage 精确解析，HISTORICAL_ONLY 版本同样可读，绝不 `listAvailable` 重选或读取最新版本）
+→ snapshot 一致性检查（Task/Session 均 COMPLETED、assessment 归属、material identity/target language、
+material steps 非空不重复、response step 集合与 material steps 完整相等）→ `Ready`。
+
+入口运行在 Spring bean 的短 readOnly transaction 内，不加 FOR UPDATE、零写入、不调用 Model / Job / Credential；
+learner text 原样透传；基础设施异常原样上抛，不吞成业务 failure。`Ready` 只代表输入可用于 evaluation，不代表
+Model diagnosis 正确，也不授权长期状态变化。S7 validator 的独立一致性检查保持不变，两者不抽取公共 validator。
+
+## 7. Verification Evidence
+
+- M1-S8A prior unit evidence（2026-09-06）：`GroundedEvaluationInputReaderTests` 18/18 PASS（Ready、
+  NotFound/NotCompleted 前置裁决、Task/assessment/material/response 全部 InconsistentSnapshot 分支、HISTORICAL
+  exact-identity-only、learner text 原样透传、基础设施异常传播、readOnly transaction 注解契约、AfterEach 零
+  persistence mutation）；affected regression `SemanticGroundingValidatorTests` 33/33、`ClasspathRubricSourceTests`
+  22/22、`LearningTaskPlanningServiceTests` 18/18、`PracticeSessionApplicationServiceTests` 33/33 PASS。
+- M1-S8A Codex unit regression：Reader 18/18 + validator 33/33 + rubric 22/22 = 73/73 PASS。
+- M1-S8A Codex final external verification（2026-09-06）：disposable PostgreSQL 18.6 empty schema Flyway
+  V1–V10 10/10 PASS；正常 MyBatis cache 配置下 `GroundedEvaluationInputReaderIntegrationTests` 5/5 与
+  `SemanticGroundingIntegrationTests` 3/3 PASS（0 failures / 0 errors / 0 skipped）。覆盖 wrong owner / 另一
+  Profile 隔离、读取前后零 mutation、Reader → S7 Validator durable text offsets；测试数据回滚，临时容器已清理。
+- 首轮 integration 的 2 个 test-level findings 已关闭：移除重复 submit 的 Accepted 断言；JdbcTemplate 删除
+  fixture 后在测试内清理 `SqlSessionTemplate` 一级缓存，零写入前后比较同样清缓存再读。未修改 Production
+  cache 配置；早期 environment-gated skipped 不作为 PASS。Critical / delta Review PASS，S8A READY_TO_COMMIT；
+  按用户决定不单独 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
 - source extraction delta（2026-09-06）：`SemanticGroundingValidatorTests` 33/33、`ClasspathRubricSourceTests`
   22/22，本地合计 55/55 PASS；`SemanticGroundingIntegrationTests` 3 个因未设置 `RUN_DATABASE_TESTS` 而跳过，
   按用户要求未重跑外部数据库或容器验证。
@@ -114,11 +154,13 @@ sequenceDiagram
 - final wider server regression：622 tests / 0 failures / 0 errors / 11 Redis 或 Redis+login conditional skips。
 - `git diff --check`: PASS。
 
-## 7. Source References
+## 8. Source References
 
 - `server/src/main/java/com/dailylanguage/evaluator/application/SemanticGroundingValidator.java`
 - `server/src/main/java/com/dailylanguage/evaluator/application/RubricSource.java`
 - `server/src/main/java/com/dailylanguage/evaluator/application/ClasspathRubricSource.java`
+- `server/src/main/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputReader.java`（M1-S8A）
+- `server/src/main/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputResult.java`（M1-S8A）
 - `server/src/main/java/com/dailylanguage/evaluator/domain/GroundedEvaluationInput.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationOutput.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationRubric.java`
@@ -128,3 +170,5 @@ sequenceDiagram
 - `server/src/test/java/com/dailylanguage/evaluator/application/SemanticGroundingValidatorTests.java`
 - `server/src/test/java/com/dailylanguage/evaluator/application/ClasspathRubricSourceTests.java`
 - `server/src/test/java/com/dailylanguage/evaluator/application/SemanticGroundingIntegrationTests.java`
+- `server/src/test/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputReaderTests.java`（M1-S8A）
+- `server/src/test/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputReaderIntegrationTests.java`（M1-S8A）

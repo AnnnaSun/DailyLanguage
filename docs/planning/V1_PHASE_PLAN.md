@@ -146,7 +146,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
+| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — 整体设计方向 APPROVED；S8A READY_TO_COMMIT；S8B–E 实施未批准 |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
@@ -189,7 +189,19 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 `UNDERSTOOD`。随后批准的 non-behavioral delta 将 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前
 结构为 7 个 Production Java files / 643 行；delta Review 与本地 unit 55/55 PASS，database integration 3 个因
 未设置 `RUN_DATABASE_TESTS` 而跳过，按用户要求未重跑外部容器验证。source extraction 已提交为 `e93f624`，
-并由用户确认已 merge；M1-S8 未批准。
+并由用户确认已 merge。
+
+M1-S8 整体设计方向已批准，按 S8A trusted input 读取、S8B Run / Job 原子关联、S8C grounding outcome /
+candidate 原子消费、S8D prompt / route / transient dispatch、S8E API / reconciliation 拆分；仅 S8A
+Current Slice Contract 获得实施授权，后续子 slice 仍需各自 Scope 批准。
+
+S8A 已实现 `GroundedEvaluationInputReader.readOwned`，通过 authenticated caller 的 owner/profile-scoped
+读取与 exact material identity 组装 completed snapshot；零写入、不新增 schema / API 或 Model 调用。
+Critical / delta Review PASS；Codex unit regression 73/73 PASS；2026-09-06 正常配置下 Reader integration
+5/5 与 S7 integration 3/3 PASS（无失败、错误或跳过）；disposable PostgreSQL 18.6 empty schema Flyway
+V1–V10 10/10 PASS。重复提交断言与 fixture 删除后的 MyBatis 一级缓存问题均已在测试内修复，临时容器已清理。
+S8A 文档已收口，READY_TO_COMMIT，未 commit。用户批准每个子 slice 保留 Review / verification，S8A 不单独
+Explain Back；S8B / S8C 仅针对重要理解缺口简短确认，正式 Ownership Check 留到 S8 完整闭环后统一进行。
 
 ### M2 — Persistent Adaptation Loop
 

@@ -3,8 +3,8 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
 > Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-> Current candidate: NONE；M1-S8 尚未批准
-> Current gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
+> Current candidate: M1-S8A owner-scoped grounded evaluation input（`READY_TO_COMMIT`，未 commit）
+> Current gate: M1-S8 IN_PROGRESS — S8A `READY_TO_COMMIT`；S8B–E 实施未批准、未开始
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -78,8 +78,9 @@ M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecyc
 completion / assessment 与 M1-S7 module-local Grounded Evaluator contract。M1-S7 已完成 Critical Review、
 PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership，并提交为 `7deb720`；随后将
 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件的 non-behavioral extraction 已提交为 `e93f624`，并由
-用户确认已 merge。Evaluator 的 Model
-调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8；长期 Evidence 从 M2 开始。
+用户确认已 merge。M1-S8A 已实现 owner-scoped `GroundedEvaluationInputReader` 读取入口（见 7.7，
+`READY_TO_COMMIT`，未 commit）。Evaluator 的 Model
+调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8B–E；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -353,7 +354,7 @@ M1-S7 committed baseline 在独立 `evaluator` package 内实现无副作用的 
 
 Java 随后校验 Task、completed Session、DeterministicAssessment、exact material identity 与全部 learner responses
 属于同一个 user / `languageProfileId` / Session / material step 集合。该对象一致性检查不是 authorization proof；
-M1-S8 的 production assembler 仍必须从 authenticated `UserContext` 出发执行 owner-scoped durable reads。
+owner-scoped durable reads 由 M1-S8A `GroundedEvaluationInputReader.readOwned` 承担（见 7.7）。
 
 每条 claim 使用 `sourceTurnId + exactQuote + occurrenceIndex` 引用 learner 原文。定位为 case-sensitive、无 strip、
 无 Unicode normalization 的 literal match；occurrence 为 0-based 且包含重叠匹配，Java 计算 UTF-16
@@ -369,6 +370,32 @@ V1–V10、affected integration 50/50、wider server regression 622 tests / 0 fa
 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前结构为 7 个 Production Java files / 643 行；
 delta Review 与本地 unit 55/55 PASS，按用户要求未重跑外部容器验证。真实调用链见
 `docs/flow/grounded-semantic-validation.md`。
+
+### 7.7 Implemented M1-S8A boundary
+
+M1-S8A（`READY_TO_COMMIT`，未 commit）在 `evaluator` package 内新增
+`GroundedEvaluationInputReader.readOwned(languageProfileId, sessionId, userContext)` 与 sealed
+`GroundedEvaluationInputResult`，把 S7 integration test 手工组装 trusted input 的前提落实为生产读取边界：
+
+- caller identity 只取自 `UserContext`；`findOwned` ownership 失败返回不可区分的 `NotFound`，且发生在读取任何
+  private learner text、assessment 或 Task 之前；
+- 非 COMPLETED owned Session 返回 `NotCompleted`；Task 缺失 / caller-Profile 不一致 / Task 非 COMPLETED /
+  assessment 缺失或跨 Session / material identity 或 target language 不匹配 / material steps 重复 / response
+  缺失、额外、重复或跨 Session 均返回 `InconsistentSnapshot`；exact material 无法按 Task 保存的完整 identity +
+  supportLanguage 解析返回 `MaterialUnavailable`；HISTORICAL_ONLY 版本只要 exact identity 可解析即允许读取，
+  绝不 `listAvailable` 重选或读取最新版本，也不跨 Profile / target language / support language fallback；
+- 入口运行在 Spring bean 短 readOnly transaction（无 FOR UPDATE、零写入、不调用 Model / Job / Credential）；
+  learner text 与全部 accepted responses 原样透传；基础设施异常原样上抛。`Ready` 只代表输入可用于
+  evaluation，不代表 Model diagnosis 正确，也不授权长期状态变化；S7 validator 保留独立检查。
+
+验证：既有 Zcode evidence 为 Reader 18/18、S7 validator 33/33、rubric 22/22、planning 18/18、practice service
+33/33 本地 PASS。Codex unit regression 73/73 PASS；首轮 DB 运行发现 2 个 test-level findings（重复提交断言与
+MyBatis 一级缓存遮蔽 fixture 删除），测试内修复后 delta Review PASS。2026-09-06 正常 MyBatis cache 配置下
+Reader integration 5/5 与 S7 integration 3/3 PASS（0 failures / 0 errors / 0 skipped），覆盖 owner/Profile 隔离、
+读取前后零 mutation 与 Reader → S7 Validator durable text offsets；disposable PostgreSQL 18.6 empty schema
+Flyway V1–V10 10/10 PASS，临时容器已清理。早期因未设置 RUN_DATABASE_TESTS 的 skipped 不作为通过证据。
+Critical Review / external verification / documentation reconciliation 已完成。S8A 不单独 Explain Back，正式
+Ownership Check 按用户决定留到 S8 完整闭环后；S8B–E 实施未批准、未开始。
 
 ## 8. Practice lifecycle and deterministic assessment
 
@@ -563,12 +590,13 @@ Architecture Impact: in-boundary physicalization of approved Learning Domain mod
 New ADR Required: NO
 Phase Slice Plan: APPROVED
 Production Baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-Current Candidate: NONE；M1-S8 尚未批准
+Current Candidate: M1-S8A owner-scoped grounded evaluation input（`READY_TO_COMMIT`，未 commit）
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S7 Grounded Evaluator contract 与 Rubric source extraction 已完成 approved implementation、
-Critical Review、适用验证、Behavior Flow、Human Ownership、commit 与 merge。M1-S8 Scope 尚未批准；批准前不开始
-M1-S8 implementation。
+当前 Stop Point：M1-S8A implementation、Critical / delta Review、external verification 与适用文档已完成（见 7.7），
+进入 `READY_TO_COMMIT`，等待用户 Commit Decision。S8A 不单独 Explain Back；每个子 slice 保留 Review / 验证，
+S8B / S8C 仅针对关键事务或并发理解缺口简短确认，正式 Ownership Check 留到 S8 完整闭环完成后。
+S8B–E 尚未获实施批准；不自动 commit 或开始下一 implementation slice。
