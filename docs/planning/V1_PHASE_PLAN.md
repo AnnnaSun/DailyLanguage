@@ -145,7 +145,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S4 | Owner-scoped planning API | COMPLETE (`dd9559d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
-| M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720`) — follow-up Rubric source extraction READY_TO_COMMIT；uncommitted |
+| M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
 | M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
@@ -188,8 +188,8 @@ mutation。Code Review / Architecture PASS；PostgreSQL 18.6 empty schema Flyway
 wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；Behavior Flow `CURRENT`；Ownership
 `UNDERSTOOD`。随后批准的 non-behavioral delta 将 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前
 结构为 7 个 Production Java files / 643 行；delta Review 与本地 unit 55/55 PASS，database integration 3 个因
-未设置 `RUN_DATABASE_TESTS` 而跳过，按用户要求未重跑外部容器验证。该 extraction candidate 尚未提交；M1-S8
-未批准。
+未设置 `RUN_DATABASE_TESTS` 而跳过，按用户要求未重跑外部容器验证。source extraction 已提交为 `e93f624`，
+并由用户确认已 merge；M1-S8 未批准。
 
 ### M2 — Persistent Adaptation Loop
 

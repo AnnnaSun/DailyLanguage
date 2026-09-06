@@ -2,9 +2,9 @@
 
 > Last updated: 2026-09-06
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S7 Rubric source extraction READY_TO_COMMIT
-> Production baseline: M1-S7 COMPLETE (`7deb720`)
-> Current candidate: `RubricSource` / `ClasspathRubricSource` non-behavioral extraction；delta Review PASS；uncommitted
+> Current Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
+> Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
+> Current candidate: NONE；M1-S8 尚未批准
 
 ## Approved Decisions
 
@@ -80,8 +80,9 @@
   62/62、PostgreSQL 18.6 empty schema Flyway V1–V10、
   affected integration 50/50、wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；
   Code Review / Architecture PASS，Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为 `7deb720`。
-  随后用户批准将 `RubricSource` 与 `ClasspathRubricSource` 从 Validator 迁移到独立文件；当前 working tree 为
-  7 个 Production Java files / 643 行，delta Review PASS，相关本地 unit 55/55 PASS，未执行容器或外部数据库验证。
+  随后用户批准将 `RubricSource` 与 `ClasspathRubricSource` 从 Validator 迁移到独立文件；当前结构为
+  7 个 Production Java files / 643 行，delta Review PASS，相关本地 unit 55/55 PASS，未执行容器或外部数据库验证；
+  source extraction 已提交为 `e93f624`，并由用户确认已 merge。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -246,13 +247,13 @@
     empty schema Flyway V1–V10、affected integration 50/50、wider regression 622 tests / 0 failures / 0 errors /
     11 Redis 相关条件跳过；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `7deb720`。随后批准的
     non-behavioral Rubric source extraction 形成 7 个 Production Java files / 643 行当前结构；delta Review 与本地
-    unit 55/55 PASS，当前 extraction candidate uncommitted。
+    unit 55/55 PASS；已提交为 `e93f624`，并由用户确认已 merge。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S7 Rubric source extraction READY_TO_COMMIT
+Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -266,7 +267,7 @@ Compose infrastructure: PostgreSQL / Redis healthy
 Documentation reconciliation: COMPLETE for M1-S7 Rubric source extraction
 Primary local database: MIGRATED / VERIFIED (existing V7 -> Flyway V10; integration fixtures remain)
 M0 integrated closeout: PASS
-Production baseline: M1-S7 COMPLETE (`7deb720`)
+Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -317,7 +318,7 @@ M1-S6 Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`)
 M1-S6 Ownership Review: UNDERSTOOD
 M1-S6 commit: COMPLETE (`82aced2`)
 M1-S7 Current Slice Contract: APPROVED (2026-09-06)
-M1-S7 implementation: COMPLETE (`7deb720`)
+M1-S7 implementation: COMPLETE (`7deb720`; source extraction `e93f624`)
 M1-S7 Code Review / Architecture: PASS (no remaining blocking finding)
 M1-S7 PostgreSQL / Flyway / Integration verification: PASS — PostgreSQL 18.6；empty schema Flyway V1–V10；
   targeted unit 62/62；affected integration 50/50；wider server regression 622 tests / 0 failures / 0 errors /
@@ -326,19 +327,20 @@ M1-S7 Behavior Flow: CURRENT (`docs/flow/grounded-semantic-validation.md`)
 M1-S7 Ownership Review: UNDERSTOOD
 M1-S7 current structure: 7 Production Java files / 643 lines after approved non-behavioral source extraction
 M1-S7 baseline commit: COMPLETE (`7deb720`)
-M1-S7 Rubric source extraction: DELTA REVIEW PASS；local unit 55/55 PASS；uncommitted
+M1-S7 Rubric source extraction: COMPLETE (`e93f624`)；DELTA REVIEW PASS；local unit 55/55 PASS；
+  merge confirmed by user
 M1-S8+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-用户执行 M1-S7 Rubric source extraction 的 Commit Decision。当前 extraction candidate 已达到
-`READY_TO_COMMIT`，但不得自动 commit、push、merge 或开始 M1-S8。
+M1-S7 已完成文档收口。下一步由用户决定是否进入 M1-S8 Design / Scope；在批准前不得修改 M1-S8
+Production、schema 或 API。
 
 ## Blockers
 
-没有已发现的 M0、M1-S6 closeout、M1-S7 baseline 或当前 source extraction 的 Code Review / Documentation /
-Ownership blocker。当前只剩 extraction Commit Decision。M1-S7 baseline external verification 使用 disposable
+没有已发现的 M0、M1-S6 closeout 或 M1-S7 的 Code Review / Documentation / Ownership blocker。M1-S8 Scope
+尚未批准。M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。

@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S7 COMPLETE (`7deb720`)
-> Current candidate: `RubricSource` / `ClasspathRubricSource` non-behavioral extraction；uncommitted
-> Current gate: M1-S7 Rubric source extraction READY_TO_COMMIT
+> Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
+> Current candidate: NONE；M1-S8 尚未批准
+> Current gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -76,8 +76,9 @@ M0 已提供：
 当前 committed Production baseline 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、
 M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle、M1-S6 deterministic
 completion / assessment 与 M1-S7 module-local Grounded Evaluator contract。M1-S7 已完成 Critical Review、
-PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership，并提交为 `7deb720`；当前未提交
-candidate 只把 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件。Evaluator 的 Model
+PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership，并提交为 `7deb720`；随后将
+`RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件的 non-behavioral extraction 已提交为 `e93f624`，并由
+用户确认已 merge。Evaluator 的 Model
 调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
@@ -561,13 +562,13 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S7 COMPLETE (`7deb720`)
-Current Candidate: M1-S7 Rubric source extraction；delta Review / local unit PASS；uncommitted
+Production Baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
+Current Candidate: NONE；M1-S8 尚未批准
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S7 Grounded Evaluator contract 已完成 approved implementation、Critical Review、
-PostgreSQL/Flyway/Integration verification、wider regression、Behavior Flow、Human Ownership 与 baseline commit。
-当前只剩 Rubric source extraction candidate 的 Commit Decision；不自动 commit，也不开始 M1-S8。
+当前 Stop Point：M1-S7 Grounded Evaluator contract 与 Rubric source extraction 已完成 approved implementation、
+Critical Review、适用验证、Behavior Flow、Human Ownership、commit 与 merge。M1-S8 Scope 尚未批准；批准前不开始
+M1-S8 implementation。
