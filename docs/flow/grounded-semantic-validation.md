@@ -100,6 +100,9 @@ sequenceDiagram
 
 ## 6. Verification Evidence
 
+- source extraction delta（2026-09-06）：`SemanticGroundingValidatorTests` 33/33、`ClasspathRubricSourceTests`
+  22/22，本地合计 55/55 PASS；`SemanticGroundingIntegrationTests` 3 个因未设置 `RUN_DATABASE_TESTS` 而跳过，
+  按用户要求未重跑外部数据库或容器验证。
 - `SemanticGroundingValidatorTests`: 33/33 PASS；覆盖合法 offsets、空 candidate、overlapping occurrence、malformed /
   forged output、scalar coercion、fake/cross-session turn、case/NFC、surrogate、Japanese literal algorithm、rubric
   allowlist、whole-batch rejection 与 immutable result。
@@ -114,6 +117,8 @@ sequenceDiagram
 ## 7. Source References
 
 - `server/src/main/java/com/dailylanguage/evaluator/application/SemanticGroundingValidator.java`
+- `server/src/main/java/com/dailylanguage/evaluator/application/RubricSource.java`
+- `server/src/main/java/com/dailylanguage/evaluator/application/ClasspathRubricSource.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/GroundedEvaluationInput.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationOutput.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationRubric.java`

@@ -2,9 +2,9 @@
 
 > Last updated: 2026-09-06
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S7 READY_TO_COMMIT
-> Production baseline: M1-S6 COMPLETE (`82aced2`)
-> Current candidate: M1-S7 implementation / Review / PostgreSQL-Flyway-Integration / Behavior Flow PASS；uncommitted
+> Current Gate: M1-S7 Rubric source extraction READY_TO_COMMIT
+> Production baseline: M1-S7 COMPLETE (`7deb720`)
+> Current candidate: `RubricSource` / `ClasspathRubricSource` non-behavioral extraction；delta Review PASS；uncommitted
 
 ## Approved Decisions
 
@@ -71,15 +71,17 @@
   targeted PostgreSQL integration 47/47、Flyway V1–V10、wider server regression 564 tests / 0 failures /
   0 errors / 11 Redis 相关条件跳过；Code Review / Architecture PASS，Ownership `UNDERSTOOD`，用户提交为
   `82aced2`。
-- M1-S7 Current Slice Contract 已批准，当前 uncommitted candidate 已完成 implementation、Critical Diff Review、
+- M1-S7 Current Slice Contract 已批准，implementation 已完成 Critical Diff Review、
   PostgreSQL/Flyway/Integration verification、Behavior Flow 与 Ownership：不可信 JSON 先按真实 token 类型拒绝
   scalar coercion，再进行 strict record binding；trusted input 校验 owner/profile、completed Task/Session、assessment、
   exact material 与完整 response set 的一致性；claim 仅引用 learner 原文，Java 计算 literal occurrence 与 UTF-16
   offsets，并按 English versioned rubric 限制 issue 类型。任一 claim 失败整批拒绝，且不修改 completed Session 或
-  deterministic assessment。当前无 Model、Credential、API、persistence 或长期 learner-state mutation。用户批准
-  5 个 Production Java files / 629 行实际 Scope；targeted unit 62/62、PostgreSQL 18.6 empty schema Flyway V1–V10、
+  deterministic assessment。当前无 Model、Credential、API、persistence 或长期 learner-state mutation。targeted unit
+  62/62、PostgreSQL 18.6 empty schema Flyway V1–V10、
   affected integration 50/50、wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过；
-  Code Review / Architecture PASS，Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，未 commit。
+  Code Review / Architecture PASS，Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为 `7deb720`。
+  随后用户批准将 `RubricSource` 与 `ClasspathRubricSource` 从 Validator 迁移到独立文件；当前 working tree 为
+  7 个 Production Java files / 643 行，delta Review PASS，相关本地 unit 55/55 PASS，未执行容器或外部数据库验证。
 - M0-S1 使用 Java 25、Spring Boot 4.1、Maven、Node.js 24、Vue 3、TypeScript 与 Vite；backend/frontend 保持独立 build。
 - M0-S2 使用 Docker Compose 运行 PostgreSQL 18 + pgvector 0.8.6 与 Redis 7.2；backend 通过 externalized configuration 连接，并只暴露 Actuator health endpoint。
 - M0-S3 使用 PostgreSQL 18 native UUIDv7 identity、Flyway 12 与 MyBatis-Plus 3.5.17 / MyBatis Mapper XML；`languageProfileId` 是单列主键，`(user_id, language_code)` 保证单用户单语言 workspace 唯一。
@@ -239,28 +241,32 @@
     Architecture / PostgreSQL 18.6 + Flyway V1–V10 / targeted integration 47/47 / wider regression 564 tests
     PASS；Session/Task/assessment 原子提交、Session-row-first concurrency、durable replay 与 Java deterministic
     authority 已验证；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `82aced2`。
-45. M1-S7 Grounded Evaluator contract：Current Slice Contract APPROVED；实际 5 个 Production Java files / 629 行
-    Scope exception APPROVED；Code Review / Architecture PASS，scalar coercion HIGH finding 已关闭；PostgreSQL 18.6
+45. M1-S7 Grounded Evaluator contract：Current Slice Contract APPROVED；Code Review / Architecture PASS，scalar
+    coercion HIGH finding 已关闭；PostgreSQL 18.6
     empty schema Flyway V1–V10、affected integration 50/50、wider regression 622 tests / 0 failures / 0 errors /
-    11 Redis 相关条件跳过；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；candidate uncommitted。
+    11 Redis 相关条件跳过；Behavior Flow `CURRENT`；Ownership `UNDERSTOOD`；用户提交为 `7deb720`。随后批准的
+    non-behavioral Rubric source extraction 形成 7 个 Production Java files / 643 行当前结构；delta Review 与本地
+    unit 55/55 PASS，当前 extraction candidate uncommitted。
 
 ## Current Gate
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S7 READY_TO_COMMIT
+Gate: M1-S7 Rubric source extraction READY_TO_COMMIT
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
 Behavior Flow: CURRENT (`docs/flow/grounded-semantic-validation.md`)
-Fresh server verification: PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
-Fresh migration verification: PASS (PostgreSQL 18.6; Flyway V1-V10)
+M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
+M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
+Current extraction verification: FRESH PASS — relevant unit 55/55；database integration 3 SKIPPED because
+  RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
 Compose infrastructure: PostgreSQL / Redis healthy
-Documentation reconciliation: COMPLETE for M1-S7 Feature / Phase / Project Status / Module Map / Ownership / Behavior Flow
+Documentation reconciliation: COMPLETE for M1-S7 Rubric source extraction
 Primary local database: MIGRATED / VERIFIED (existing V7 -> Flyway V10; integration fixtures remain)
 M0 integrated closeout: PASS
-Production baseline: M1-S6 COMPLETE (`82aced2`)
+Production baseline: M1-S7 COMPLETE (`7deb720`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -311,28 +317,30 @@ M1-S6 Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`)
 M1-S6 Ownership Review: UNDERSTOOD
 M1-S6 commit: COMPLETE (`82aced2`)
 M1-S7 Current Slice Contract: APPROVED (2026-09-06)
-M1-S7 implementation: COMPLETE (uncommitted candidate)
+M1-S7 implementation: COMPLETE (`7deb720`)
 M1-S7 Code Review / Architecture: PASS (no remaining blocking finding)
 M1-S7 PostgreSQL / Flyway / Integration verification: PASS — PostgreSQL 18.6；empty schema Flyway V1–V10；
   targeted unit 62/62；affected integration 50/50；wider server regression 622 tests / 0 failures / 0 errors /
   11 Redis 或 Redis+login environment-gated skips；`git diff --check` PASS
 M1-S7 Behavior Flow: CURRENT (`docs/flow/grounded-semantic-validation.md`)
 M1-S7 Ownership Review: UNDERSTOOD
-M1-S7 Scope exception: APPROVED — 5 Production Java files / 629 lines
-M1-S7 commit: NOT_DONE
+M1-S7 current structure: 7 Production Java files / 643 lines after approved non-behavioral source extraction
+M1-S7 baseline commit: COMPLETE (`7deb720`)
+M1-S7 Rubric source extraction: DELTA REVIEW PASS；local unit 55/55 PASS；uncommitted
 M1-S8+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-用户执行 M1-S7 Commit Decision。当前 candidate 已达到 `READY_TO_COMMIT`，但不得自动 commit、push、merge
-或开始 M1-S8。
+用户执行 M1-S7 Rubric source extraction 的 Commit Decision。当前 extraction candidate 已达到
+`READY_TO_COMMIT`，但不得自动 commit、push、merge 或开始 M1-S8。
 
 ## Blockers
 
-没有已发现的 M0、M1-S6 closeout 或 M1-S7 Code Review / external verification / Documentation / Ownership blocker。
-M1-S7 当前只剩 Commit Decision。M1-S7 external verification 使用 disposable PostgreSQL 18.6 empty database，
-未修改 primary database；临时容器已停止。本次没有执行 `Flyway repair` 或直接修改
+没有已发现的 M0、M1-S6 closeout、M1-S7 baseline 或当前 source extraction 的 Code Review / Documentation /
+Ownership blocker。当前只剩 extraction Commit Decision。M1-S7 baseline external verification 使用 disposable
+PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
+外部验证。本次没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。
 Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output / grounding 目前只有
 module-local Evaluator validation，Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、

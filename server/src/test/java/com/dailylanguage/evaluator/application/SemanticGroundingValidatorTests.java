@@ -64,7 +64,7 @@ class SemanticGroundingValidatorTests {
     // 真实 classpath rubric：unit 测试同时回归 built-in English resource 的实际可用性。
     private final SemanticGroundingValidator validator = new SemanticGroundingValidator(
             new StructuredOutputValidator(JsonMapper.builder().build()),
-            new SemanticGroundingValidator.ClasspathRubricSource());
+            new ClasspathRubricSource());
 
     // --- happy path ---
 
@@ -629,7 +629,7 @@ class SemanticGroundingValidatorTests {
                 USER_ID, PROFILE_ID, task, session, assessment, responses, material);
     }
 
-    private static SemanticGroundingValidator.RubricSource rubricSupporting(IssueType... issueTypes) {
+    private static RubricSource rubricSupporting(IssueType... issueTypes) {
         List<IssueDefinition> definitions = Arrays.stream(issueTypes)
                 .map(issueType -> new IssueDefinition(issueType, "scope", "requirement"))
                 .toList();

@@ -19,8 +19,8 @@ class ClasspathRubricSourceTests {
 
     private static final String BUILTIN_REFERENCE = "builtin-text-communication-rubric/v1";
 
-    private final SemanticGroundingValidator.ClasspathRubricSource source =
-            new SemanticGroundingValidator.ClasspathRubricSource();
+    private final ClasspathRubricSource source =
+            new ClasspathRubricSource();
 
     @Test
     void resolvesBuiltInEnglishRubricForExactReferenceAndLanguage() {
@@ -57,8 +57,8 @@ class ClasspathRubricSourceTests {
             "builtin-text-communication-rubric\\v1", "builtin-text-communication-rubric/../v1"})
     void unsafeReferencesFailClosedWithoutResourceAccess(String reference) {
         // reader 一旦被调用即失败：unsafe reference 必须在路径拼接前被拒绝。
-        SemanticGroundingValidator.ClasspathRubricSource guardedSource =
-                new SemanticGroundingValidator.ClasspathRubricSource(location -> {
+        ClasspathRubricSource guardedSource =
+                new ClasspathRubricSource(location -> {
                     throw new AssertionError("unsafe reference must not reach the resource reader: " + location);
                 });
 
@@ -92,8 +92,8 @@ class ClasspathRubricSourceTests {
                     + "\"issueDefinitions\":[{\"issueType\":\"GRAMMAR\",\"scope\":\"ok\","
                     + "\"explanationRequirement\":\"ok\"}]}"})
     void adversarialResourcesFailClosedToEmpty(String resourceJson) {
-        SemanticGroundingValidator.ClasspathRubricSource inMemorySource =
-                new SemanticGroundingValidator.ClasspathRubricSource(
+        ClasspathRubricSource inMemorySource =
+                new ClasspathRubricSource(
                         location -> resourceJson.getBytes(StandardCharsets.UTF_8));
 
         assertThat(inMemorySource.resolve(BUILTIN_REFERENCE, "en")).isEmpty();
@@ -101,8 +101,8 @@ class ClasspathRubricSourceTests {
 
     @Test
     void unreadableResourceFailsClosedToEmpty() {
-        SemanticGroundingValidator.ClasspathRubricSource unreadableSource =
-                new SemanticGroundingValidator.ClasspathRubricSource(location -> {
+        ClasspathRubricSource unreadableSource =
+                new ClasspathRubricSource(location -> {
                     throw new IllegalStateException("resource unreadable: " + location);
                 });
 
@@ -114,8 +114,8 @@ class ClasspathRubricSourceTests {
         String resourceJson = "{\"rubricReference\":\"test-rubric/v2\",\"targetLanguage\":\"ja\","
                 + "\"issueDefinitions\":[{\"issueType\":\"NATURALNESS\",\"scope\":\"ok\","
                 + "\"explanationRequirement\":\"ok\"}]}";
-        SemanticGroundingValidator.ClasspathRubricSource inMemorySource =
-                new SemanticGroundingValidator.ClasspathRubricSource(
+        ClasspathRubricSource inMemorySource =
+                new ClasspathRubricSource(
                         location -> resourceJson.getBytes(StandardCharsets.UTF_8));
 
         Optional<SemanticEvaluationRubric> resolved = inMemorySource.resolve("test-rubric/v2", "ja");

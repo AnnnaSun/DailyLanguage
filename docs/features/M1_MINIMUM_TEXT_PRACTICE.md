@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S6 COMPLETE (`82aced2`)
-> Current candidate: M1-S7 Grounded Evaluator contract；uncommitted
-> Current gate: M1-S7 READY_TO_COMMIT
+> Production baseline: M1-S7 COMPLETE (`7deb720`)
+> Current candidate: `RubricSource` / `ClasspathRubricSource` non-behavioral extraction；uncommitted
+> Current gate: M1-S7 Rubric source extraction READY_TO_COMMIT
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -74,9 +74,10 @@ M0 已提供：
 - transient Credential boundary 与安全 metadata Trace。
 
 当前 committed Production baseline 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、
-M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle 与 M1-S6 deterministic
-completion / assessment。当前 uncommitted M1-S7 candidate 已实现 module-local Grounded Evaluator contract，完成
-Critical Review、PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership。Evaluator 的 Model
+M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle、M1-S6 deterministic
+completion / assessment 与 M1-S7 module-local Grounded Evaluator contract。M1-S7 已完成 Critical Review、
+PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership，并提交为 `7deb720`；当前未提交
+candidate 只把 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件。Evaluator 的 Model
 调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
@@ -342,9 +343,9 @@ V1–V10、targeted integration 47/47 与 wider server regression 564 tests / 0 
 条件跳过均已验证；Behavior Flow 已同步，Ownership `UNDERSTOOD`。真实调用链见
 `docs/flow/practice-session-lifecycle.md`。
 
-### 7.6 Implemented M1-S7 candidate boundary
+### 7.6 Implemented M1-S7 boundary
 
-M1-S7 当前 uncommitted candidate 在独立 `evaluator` package 内实现无副作用的 Grounded Evaluator contract。
+M1-S7 committed baseline 在独立 `evaluator` package 内实现无副作用的 Grounded Evaluator contract。
 `SemanticGroundingValidator.validate` 接收不可信 JSON 与由可信 Java 调用方组装的
 `GroundedEvaluationInput`，先检查原始 JSON token 类型，防止 record binding 把 `1.9`、`"1"` 或 numeric enum
 静默 coercion 成合法值，再复用 `StructuredOutputValidator` 完成封闭 record / enum binding。
@@ -361,9 +362,11 @@ M1-S8 的 production assembler 仍必须从 authenticated `UserContext` 出发�
 
 任一 claim 失败即整批 `Rejected`，不暴露部分 candidate；既有 completed Session 与 deterministic assessment
 保持不变。当前 slice 不调用 Model、不读 Credential、不写数据库、cache、event、Evidence、Memory、Weakness、
-Level 或 Mastery，也不提供 HTTP API。Critical Review 与 Architecture PASS；用户批准 5 个 Production Java files /
-629 行的实际 Scope；PostgreSQL 18.6 empty schema Flyway V1–V10、affected integration 50/50、wider server regression
-622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过均通过；Ownership `UNDERSTOOD`。真实调用链见
+Level 或 Mastery，也不提供 HTTP API。Critical Review 与 Architecture PASS；PostgreSQL 18.6 empty schema Flyway
+V1–V10、affected integration 50/50、wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过
+均通过；Ownership `UNDERSTOOD`，用户提交为 `7deb720`。随后批准的 non-behavioral extraction 把
+`RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前结构为 7 个 Production Java files / 643 行；
+delta Review 与本地 unit 55/55 PASS，按用户要求未重跑外部容器验证。真实调用链见
 `docs/flow/grounded-semantic-validation.md`。
 
 ## 8. Practice lifecycle and deterministic assessment
@@ -558,14 +561,13 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S6 COMPLETE (`82aced2`)
-Current Candidate: M1-S7 implementation / Review / PostgreSQL-Flyway-Integration / wider regression /
-  Behavior Flow PASS；uncommitted；Ownership `UNDERSTOOD`
+Production Baseline: M1-S7 COMPLETE (`7deb720`)
+Current Candidate: M1-S7 Rubric source extraction；delta Review / local unit PASS；uncommitted
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
 当前 Stop Point：M1-S7 Grounded Evaluator contract 已完成 approved implementation、Critical Review、
-PostgreSQL/Flyway/Integration verification、wider regression、Behavior Flow 同步与 Human Ownership，当前
-candidate 未 commit。下一动作只能由用户完成 Commit Decision；不自动 commit，也不开始 M1-S8。
+PostgreSQL/Flyway/Integration verification、wider regression、Behavior Flow、Human Ownership 与 baseline commit。
+当前只剩 Rubric source extraction candidate 的 Commit Decision；不自动 commit，也不开始 M1-S8。

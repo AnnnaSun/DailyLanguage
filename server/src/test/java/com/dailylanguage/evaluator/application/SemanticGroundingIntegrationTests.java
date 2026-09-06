@@ -80,7 +80,7 @@ class SemanticGroundingIntegrationTests {
 
     private final SemanticGroundingValidator validator = new SemanticGroundingValidator(
             new StructuredOutputValidator(JsonMapper.builder().build()),
-            new SemanticGroundingValidator.ClasspathRubricSource());
+            new ClasspathRubricSource());
 
     @Test
     void groundsModelClaimAgainstDurableOwnerScopedCompletionData() {
