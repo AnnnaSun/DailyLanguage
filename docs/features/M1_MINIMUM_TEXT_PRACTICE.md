@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S5 COMPLETE (`b6cde9d`)
-> Current candidate: M1-S6 implementation / Critical Review / PostgreSQL-Flyway-Integration verification PASS；uncommitted
-> Current gate: M1-S6 READY_TO_COMMIT
+> Production baseline: M1-S6 COMPLETE (`82aced2`)
+> Current candidate: M1-S7 Grounded Evaluator contract；uncommitted
+> Current gate: M1-S7 READY_TO_COMMIT
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -74,11 +74,10 @@ M0 已提供：
 - transient Credential boundary 与安全 metadata Trace。
 
 当前 committed Production baseline 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、
-M1-S4 owner-scoped planning API 与 M1-S5 PracticeSession start / response lifecycle。当前 uncommitted M1-S6
-candidate 已实现 completion 与 deterministic assessment，并通过 Critical Review 与 PostgreSQL/Flyway/Integration
-verification；Ownership 尚未完成。Evaluator 与 Evidence 尚未实现。后续必须继续按 slice 完成 Session-level
-evaluation boundary，再把已有 Model infrastructure 作为 bounded semantic capability 接入；`ModelCallJob` 不拥有
-Learning Workflow 或长期状态。
+M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle 与 M1-S6 deterministic
+completion / assessment。当前 uncommitted M1-S7 candidate 已实现 module-local Grounded Evaluator contract，完成
+Critical Review、PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership。Evaluator 的 Model
+调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -318,9 +317,9 @@ integration-test finding 均已关闭；PostgreSQL 18.6 / Flyway V1–V9、S5 in
 regression 与 wider server regression 均通过；Behavior Flow `CURRENT`，Ownership `UNDERSTOOD`，用户提交为
 `b6cde9d`。真实调用链见 `docs/flow/practice-session-lifecycle.md`。
 
-### 7.5 Implemented M1-S6 candidate boundary
+### 7.5 Implemented M1-S6 boundary
 
-M1-S6 当前 uncommitted candidate 已在既有 `practice` module 内接入 authenticated、CSRF-protected completion
+M1-S6 已在既有 `practice` module 内接入 authenticated、CSRF-protected completion
 HTTP API。`PracticeSessionApplicationService.complete` 先以 owner/profile scope 对 Session 执行
 `SELECT ... FOR UPDATE OF session`，并与 response submission 保持相同的 Session-row-first 锁序；随后校验
 Session `IN_PROGRESS`、Task `STARTED`，按 Task 保存的 exact `materialId + publishedVersion` 解析完整
@@ -342,6 +341,30 @@ case-sensitive exact comparison，产生 `MATCHED / NOT_MATCHED`；`SEMANTIC_ONL
 V1–V10、targeted integration 47/47 与 wider server regression 564 tests / 0 failures / 0 errors / 11 Redis 相关
 条件跳过均已验证；Behavior Flow 已同步，Ownership `UNDERSTOOD`。真实调用链见
 `docs/flow/practice-session-lifecycle.md`。
+
+### 7.6 Implemented M1-S7 candidate boundary
+
+M1-S7 当前 uncommitted candidate 在独立 `evaluator` package 内实现无副作用的 Grounded Evaluator contract。
+`SemanticGroundingValidator.validate` 接收不可信 JSON 与由可信 Java 调用方组装的
+`GroundedEvaluationInput`，先检查原始 JSON token 类型，防止 record binding 把 `1.9`、`"1"` 或 numeric enum
+静默 coercion 成合法值，再复用 `StructuredOutputValidator` 完成封闭 record / enum binding。
+
+Java 随后校验 Task、completed Session、DeterministicAssessment、exact material identity 与全部 learner responses
+属于同一个 user / `languageProfileId` / Session / material step 集合。该对象一致性检查不是 authorization proof；
+M1-S8 的 production assembler 仍必须从 authenticated `UserContext` 出发执行 owner-scoped durable reads。
+
+每条 claim 使用 `sourceTurnId + exactQuote + occurrenceIndex` 引用 learner 原文。定位为 case-sensitive、无 strip、
+无 Unicode normalization 的 literal match；occurrence 为 0-based 且包含重叠匹配，Java 计算 UTF-16
+`[startOffset, endOffset)` 并拒绝切开 surrogate pair。English classpath rubric
+`builtin-text-communication-rubric/v1` 当前只允许 `GRAMMAR / NATURALNESS / TASK_RESPONSE`。rubric 和 grounding
+只能证明引用来源、位置与 issue 类型边界合法，不能证明 diagnosis 语义正确或形成长期 Weakness。
+
+任一 claim 失败即整批 `Rejected`，不暴露部分 candidate；既有 completed Session 与 deterministic assessment
+保持不变。当前 slice 不调用 Model、不读 Credential、不写数据库、cache、event、Evidence、Memory、Weakness、
+Level 或 Mastery，也不提供 HTTP API。Critical Review 与 Architecture PASS；用户批准 5 个 Production Java files /
+629 行的实际 Scope；PostgreSQL 18.6 empty schema Flyway V1–V10、affected integration 50/50、wider server regression
+622 tests / 0 failures / 0 errors / 11 Redis 相关条件跳过均通过；Ownership `UNDERSTOOD`。真实调用链见
+`docs/flow/grounded-semantic-validation.md`。
 
 ## 8. Practice lifecycle and deterministic assessment
 
@@ -377,7 +400,7 @@ DeterministicAssessment
 Optional ValidatedSemanticCandidate
 ```
 
-LLM semantic issue 输出不直接拥有 numeric text span authority。推荐 typed claim 至少包含：
+LLM semantic issue 输出不直接拥有 numeric text span authority。M1-S7 已实现的 typed claim 包含：
 
 ```text
 sourceTurnId
@@ -398,8 +421,8 @@ Java 根据已保存 learner text 执行：
 6. 拒绝引用 support text、assistant text、其他 Session 或不存在 span 的 claim。
 
 invalid structure、unsupported claim、fake turn、quote mismatch 或 ambiguous occurrence 只令 semantic branch
-失败，不影响 deterministic result。English 与 Japanese 使用同一 schema / validator，但使用独立 versioned
-prompt / rubric resources。
+失败，不影响 deterministic result。当前只发布 English versioned rubric；Japanese 将在 M1-S10 使用同一
+schema / validator 与独立 versioned prompt / rubric resource 验证 language isolation。
 
 ## 10. ModelCallJob integration
 
@@ -535,14 +558,14 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S5 COMPLETE (`b6cde9d`)
-Current Candidate: M1-S6 implementation / Review / external verification / Behavior Flow PASS；uncommitted；
-  Ownership `UNDERSTOOD`
+Production Baseline: M1-S6 COMPLETE (`82aced2`)
+Current Candidate: M1-S7 implementation / Review / PostgreSQL-Flyway-Integration / wider regression /
+  Behavior Flow PASS；uncommitted；Ownership `UNDERSTOOD`
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S6 deterministic completion / assessment 已完成 approved implementation、Critical Review、
-PostgreSQL/Flyway/Integration verification、Behavior Flow 同步与 Human Ownership，当前 candidate 未 commit。
-下一动作只能由用户完成 Commit Decision；不自动 commit，也不开始 M1-S7。
+当前 Stop Point：M1-S7 Grounded Evaluator contract 已完成 approved implementation、Critical Review、
+PostgreSQL/Flyway/Integration verification、wider regression、Behavior Flow 同步与 Human Ownership，当前
+candidate 未 commit。下一动作只能由用户完成 Commit Decision；不自动 commit，也不开始 M1-S8。

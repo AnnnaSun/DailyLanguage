@@ -376,7 +376,7 @@ I understand Planner.
 | Conversation                  | A                 | UNASSESSED        | L3        | L5               |          |
 | Reading                       | A                 | UNASSESSED        | L3        | L4               |          |
 | Vocabulary / Vocabulary State | A                 | UNASSESSED        | L3        | L4               |          |
-| Evaluator                     | A                 | UNASSESSED        | L3        | L5               |          |
+| Evaluator                     | A                 | L3                | L3        | L5               | M1-S7 Ownership `UNDERSTOOD`：可追踪 JSON token guard → strict record binding → trusted input consistency → versioned rubric → learner-text occurrence / Java UTF-16 offsets → whole-batch `Validated / Rejected`；能解释 grounding 只证明引用与边界，不证明 diagnosis 正确或形成长期 Weakness；无 ModelCallJob、EvaluationRun、candidate persistence 或 M2 qualification 操作证据 |
 | Learning Memory               | A                 | UNASSESSED        | L4        | L5               |          |
 | Weakness / Skill State        | A                 | UNASSESSED        | L4        | L5               |          |
 | Review                        | A                 | UNASSESSED        | L3        | L4               |          |
@@ -395,7 +395,7 @@ I understand Planner.
 | --------------------------------- | ----------------- | ----------------- | --------- | ---------------- | -------- |
 | Model Call Job                    | A                 | L3                | L4        | L5               | M0-S9 Ownership 已能解释 create / submit / claim / Provider call 的阶段边界、Job TaskExecutor 与 Gateway ExecutorService 分离、execution / consumption state、workflowVersion stale、rowVersion conditional update / consume-once、capacity rejection、outcome unknown 与 transient Credential lifecycle；尚无 M1 Learning Workflow polling / confirmation、restart recovery 或 production capacity evidence |
 | Model Gateway                     | A                 | L2                | L4        | L5               | M0-S7D–S8D Ownership 确认 authenticated verification、fixed route、transient Credential、bounded executor、OpenAI-compatible call、Structured Output seam、terminal Trace 与 safe diagnostics 可追踪；无 Hosted TLS、Browser UI、live Provider、Application Workflow 或 BYOK End-to-End evidence |
-| Structured Output                 | A                 | L2                | L4        | L5               | M0-S8A/S8B 已能追踪 JsonObject transport、strict parse / record shape / enum / semantic validation 与 Valid / Invalid envelope；尚无 Planner / Evaluator / Content Workflow 集成或真实状态保护操作证据 |
+| Structured Output                 | A                 | L3                | L4        | L5               | M0-S8A/S8B 已能追踪 JsonObject transport、strict parse / record shape / enum / semantic validation 与 Valid / Invalid envelope；M1-S7 已能解释为何在 record binding 前检查原始 JSON scalar token，防止 `1.9 → 1`、string-to-int 与 numeric-enum coercion，并通过 Grounded Evaluator whole-batch rejection 保护 candidate boundary；尚无 ModelCallJob consumption 或持久状态保护操作证据 |
 | Tool Gateway                      | A                 | UNASSESSED        | L4        | L5               |          |
 | Context Manager                   | A                 | UNASSESSED        | L4        | L5               |          |
 | RAG / Retrieval                   | A                 | UNASSESSED        | L4        | L5               |          |
@@ -707,6 +707,7 @@ Human Touch 的目的：
 | M0-S7C Text Runtime Composition | 1 | UNDERSTOOD | None for current runtime-composition slice；无 live Provider / BYOK End-to-End evidence | 2026-08-31 |
 | M0-S7D BYOK Connection Verification | 3 | UNDERSTOOD | None for current Backend API slice；无 Hosted TLS / Browser UI / live Provider evidence | 2026-08-31 |
 | M1-S2 Deterministic Planner Core | UNKNOWN（旧记录未保留） | UNDERSTOOD | None for current module-local deterministic slice；无 persistence / API / Model enrichment evidence | 2026-09-03 |
+| M1-S7 Grounded Evaluator Contract | 3 | UNDERSTOOD | None for current module-local grounding slice；无 ModelCallJob、EvaluationRun、candidate persistence 或 M2 qualification evidence | 2026-09-06 |
 
 Result：
 
@@ -1018,7 +1019,7 @@ L5
 | ------------------------ | ---------- | ------------------- | -------- |
 | Planner                  | L3        | I2                  | 可解释 S2 deterministic filtering、stable fallback、list/resolve fail-closed 与 Java authority，以及 S3 trusted create gate、durable lifecycle 与 failure semantics；仍无 owner-scoped API、optional Model ranking 或完整 Learning Workflow evidence |
 | Conversation             | UNASSESSED | I0                  |          |
-| Evaluator                | UNASSESSED | I0                  |          |
+| Evaluator                | L3        | I2                  | 可解释 token coercion 防线、trusted input 与 authorization 区分、literal occurrence / Java offsets、rubric allowlist、whole-batch rejection 和 deterministic assessment failure isolation；尚无 ModelCallJob / persistence / late-result workflow evidence |
 | Learning Memory          | UNASSESSED | I0                  |          |
 | RAG                      | UNASSESSED | I0                  |          |
 | Context Manager          | UNASSESSED | I0                  |          |
