@@ -404,7 +404,8 @@ class EvaluationRunCreationServiceTests {
     private static EvaluationRun run() {
         return new EvaluationRun(
                 RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.PENDING,
-                EvaluationRunCreationService.WORKFLOW_VERSION, 0L, COMPLETED_AT, Optional.empty());
+                EvaluationRunCreationService.WORKFLOW_VERSION, 0L, COMPLETED_AT,
+                Optional.empty(), Optional.empty());
     }
 
     private static ModelCallJob evaluationJob() {

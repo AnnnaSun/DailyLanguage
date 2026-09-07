@@ -1,8 +1,8 @@
 # Grounded Semantic Validation Flow
 
-- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A）；S8A `READY_TO_COMMIT`
+- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A）
 - Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A` owner-scoped read entry
-- Last Verified: `2026-09-06`
+- Last Verified: `2026-09-07`
 - Entry: `SemanticGroundingValidator.validate`；`GroundedEvaluationInputReader.readOwned`（S8A）
 
 ## 1. Behavior Boundary
@@ -16,8 +16,9 @@ proof；M1-S8 production flow 必须从 authenticated `UserContext.userId` 出�
 读取 Task、Session、responses 与 deterministic assessment，再按 Task 的 exact material identity 解析 material。
 M1-S8A `GroundedEvaluationInputReader.readOwned` 已把该组装前提落实为生产读取入口（见第 6 节）；
 M1-S8B `EvaluationRunCreationService.createForReadyInput` 已把该输入原子转换为 durable
-`EvaluationRun` + `ModelCallJob`（见 `evaluation-run-creation.md`）；Evaluation outcome / candidate consumption
-（S8C）与 Model dispatch / submission（S8D）尚未实现。
+`EvaluationRun` + `ModelCallJob`（见 `evaluation-run-creation.md`）；M1-S8C 已在独立 read-write transaction
+内把绑定 Job 的 durable success result grounding 并原子保存为 terminal Run + candidate / safe rejection
+（见 `evaluation-result-consumption.md`）。Model dispatch / submission（S8D）尚未实现。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，
@@ -99,7 +100,8 @@ sequenceDiagram
 - fake turn、quote 不存在、ambiguous 或非法 occurrence、surrogate split、rubric 外 issue、invalid confidence 或
   size limit：返回对应 `RejectionReason`。
 - 任一 claim 失败即整批拒绝；先前已临时计算的 claim 不通过 result 暴露。
-- `Rejected` 不携带 learner text、完整 Model output 或 explanation；S7 没有持久化或日志 side effect。
+- `Rejected` 不携带 learner text、完整 Model output 或 explanation；本 validator 没有持久化或日志 side effect。
+  S8C consumption flow 只持久化安全 `RejectionReason`，不复制 rejected raw output。
 - rejection 不回滚、删除或覆盖既有 completed Practice 与 deterministic assessment。
 
 ## 6. Owner-Scoped Read Entry（M1-S8A）
@@ -140,7 +142,7 @@ Model diagnosis 正确，也不授权长期状态变化。S7 validator 的独立
   Profile 隔离、读取前后零 mutation、Reader → S7 Validator durable text offsets；测试数据回滚，临时容器已清理。
 - 首轮 integration 的 2 个 test-level findings 已关闭：移除重复 submit 的 Accepted 断言；JdbcTemplate 删除
   fixture 后在测试内清理 `SqlSessionTemplate` 一级缓存，零写入前后比较同样清缓存再读。未修改 Production
-  cache 配置；早期 environment-gated skipped 不作为 PASS。Critical / delta Review PASS，S8A READY_TO_COMMIT；
+  cache 配置；早期 environment-gated skipped 不作为 PASS。Critical / delta Review PASS，S8A 已提交为 `226b804`；
   按用户决定不单独 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
 - source extraction delta（2026-09-06）：`SemanticGroundingValidatorTests` 33/33、`ClasspathRubricSourceTests`
   22/22，本地合计 55/55 PASS；`SemanticGroundingIntegrationTests` 3 个因未设置 `RUN_DATABASE_TESTS` 而跳过，

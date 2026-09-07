@@ -21,27 +21,81 @@
             <arg column="row_version" javaType="_long"/>
             <arg column="created_at" javaType="java.time.OffsetDateTime"/>
             <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="grounding_rejection_reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedValidatedCandidateResult"
+               type="com.dailylanguage.evaluator.infrastructure.StoredValidatedCandidate">
+        <constructor>
+            <idArg column="evaluation_run_id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="session_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="material_id" javaType="java.lang.String"/>
+            <arg column="material_published_version" javaType="java.lang.String"/>
+            <arg column="rubric_reference" javaType="java.lang.String"/>
+            <arg column="target_language" javaType="java.lang.String"/>
+            <arg column="grounding_policy_version" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedValidatedClaimResult"
+               type="com.dailylanguage.evaluator.infrastructure.StoredValidatedClaim">
+        <constructor>
+            <arg column="claim_index" javaType="_int"/>
+            <arg column="source_turn_id" javaType="java.lang.String"/>
+            <arg column="exact_quote" javaType="java.lang.String"/>
+            <arg column="occurrence_index" javaType="_int"/>
+            <arg column="start_offset" javaType="_int"/>
+            <arg column="end_offset" javaType="_int"/>
+            <arg column="issue_type" javaType="java.lang.String"/>
+            <arg column="explanation" javaType="java.lang.String"/>
+            <arg column="confidence" javaType="_double"/>
         </constructor>
     </resultMap>
 
     <sql id="runColumns">
         run.id, run.session_id, run.model_call_job_id, run.status,
-        run.workflow_version, run.row_version, run.created_at, run.completed_at
+        run.workflow_version, run.row_version, run.created_at, run.completed_at,
+        run.grounding_rejection_reason
+    </sql>
+
+    <!-- ownership 不在 evaluation_run 中重复存储，owned read 经 session → learning_task 还原。 -->
+    <sql id="ownedRunFrom">
+        FROM evaluation_run run
+        JOIN practice_session session ON session.id = run.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        JOIN language_profile profile
+             ON profile.id = task.language_profile_id AND profile.user_id = task.user_id
+    </sql>
+
+    <sql id="ownedRunFilters">
+        task.user_id = #{trustedUserId, jdbcType=OTHER}
+        AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
     </sql>
 
     <select id="nextRunId" resultType="java.util.UUID">
         SELECT uuidv7()
     </select>
 
-    <!-- ownership 不在 evaluation_run 中重复存储，owned read 经 session → learning_task 还原。 -->
     <select id="findOwnedBySessionId" resultMap="storedEvaluationRunResult">
         SELECT <include refid="runColumns"/>
-        FROM evaluation_run run
-        JOIN practice_session session ON session.id = run.session_id
-        JOIN learning_task task ON task.id = session.task_id
+        <include refid="ownedRunFrom"/>
         WHERE run.session_id = #{sessionId, jdbcType=OTHER}
-          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
-          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND <include refid="ownedRunFilters"/>
+    </select>
+
+    <!-- 只锁定 evaluation_run 行：并发消费在此串行化，后到者读取 terminal outcome 并 replay。 -->
+    <select id="findOwnedBySessionIdForUpdate" resultMap="storedEvaluationRunResult">
+        SELECT <include refid="runColumns"/>
+        <include refid="ownedRunFrom"/>
+        WHERE run.session_id = #{sessionId, jdbcType=OTHER}
+          AND <include refid="ownedRunFilters"/>
+        FOR UPDATE OF run
     </select>
 
     <!-- INSERT … SELECT：insert 时在数据库内原子重校验该 Session 仍归属同一 owner/profile 的
@@ -69,6 +123,140 @@
           AND job.workflow_id = #{id, jdbcType=OTHER}
           AND job.workflow_step_id = #{workflowStepId, jdbcType=VARCHAR}
           AND job.workflow_version = #{workflowVersion, jdbcType=BIGINT}
-        RETURNING id, session_id, model_call_job_id, status, workflow_version, row_version, created_at, completed_at
+        RETURNING id, session_id, model_call_job_id, status, workflow_version, row_version,
+                  created_at, completed_at, grounding_rejection_reason
+    </select>
+
+    <!-- PENDING → terminal 的 CAS：status 与 row_version guard 由数据库原子裁决，零行由调用方以
+         异常 fail closed 并回滚同事务内已完成的 Job consumption（不出现 Job 已消费但 outcome 丢失）。 -->
+    <select id="tryFinalizeOwnedAndReturn" resultMap="storedEvaluationRunResult" affectData="true" flushCache="true">
+        UPDATE evaluation_run run
+        SET status = #{status, jdbcType=VARCHAR},
+            grounding_rejection_reason = #{rejectionReason, jdbcType=VARCHAR},
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1
+        FROM practice_session session
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE run.id = #{evaluationRunId, jdbcType=OTHER}
+          AND run.session_id = session.id
+          AND run.status = 'PENDING'
+          AND run.row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND EXISTS (
+              SELECT 1
+              FROM model_call_job job
+              WHERE job.id = run.model_call_job_id
+                AND job.user_id = #{trustedUserId, jdbcType=OTHER}
+                AND job.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+                AND job.model_purpose = 'EVALUATION'
+                AND job.model_operation = 'TEXT_GENERATION'
+                AND job.workflow_id = run.id
+                AND job.workflow_step_id = 'SEMANTIC_EVALUATION'
+                AND job.workflow_version = run.workflow_version
+                AND job.execution_status = 'SUCCEEDED'
+                AND job.consumption_status = 'CONSUMED'
+          )
+          AND (
+              (#{status, jdbcType=VARCHAR} = 'SUCCEEDED'
+                  AND #{rejectionReason, jdbcType=VARCHAR} IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM validated_semantic_candidate candidate
+                      WHERE candidate.evaluation_run_id = run.id
+                        AND candidate.session_id = run.session_id
+                  ))
+              OR (#{status, jdbcType=VARCHAR} = 'FAILED'
+                  AND #{rejectionReason, jdbcType=VARCHAR} IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM validated_semantic_candidate candidate
+                      WHERE candidate.evaluation_run_id = run.id
+                  ))
+          )
+        RETURNING <include refid="runColumns"/>
+    </select>
+
+    <!-- candidate header 在同一消费事务内、Job CONSUMED 之后、Run finalize 之前插入；
+         ownership 经 run → session → task 在数据库内重校验，composite FK 绑定 Run 的 session。 -->
+    <select id="insertValidatedCandidateAndReturn"
+            resultMap="storedValidatedCandidateResult" affectData="true" flushCache="true">
+        INSERT INTO validated_semantic_candidate (
+            evaluation_run_id, session_id, material_id, material_published_version,
+            rubric_reference, target_language, grounding_policy_version)
+        SELECT run.id, run.session_id,
+               #{materialId, jdbcType=VARCHAR}, #{materialPublishedVersion, jdbcType=VARCHAR},
+               #{rubricReference, jdbcType=VARCHAR}, #{targetLanguage, jdbcType=VARCHAR},
+               #{groundingPolicyVersion, jdbcType=VARCHAR}
+        <include refid="ownedRunFrom"/>
+        WHERE run.id = #{evaluationRunId, jdbcType=OTHER}
+          AND run.session_id = #{sessionId, jdbcType=OTHER}
+          AND run.status = 'PENDING'
+          AND <include refid="ownedRunFilters"/>
+          AND task.material_id = #{materialId, jdbcType=VARCHAR}
+          AND task.published_version = #{materialPublishedVersion, jdbcType=VARCHAR}
+          AND profile.language_code = #{targetLanguage, jdbcType=VARCHAR}
+          AND EXISTS (
+              SELECT 1
+              FROM model_call_job job
+              WHERE job.id = run.model_call_job_id
+                AND job.user_id = #{trustedUserId, jdbcType=OTHER}
+                AND job.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+                AND job.model_purpose = 'EVALUATION'
+                AND job.model_operation = 'TEXT_GENERATION'
+                AND job.workflow_id = run.id
+                AND job.workflow_step_id = 'SEMANTIC_EVALUATION'
+                AND job.workflow_version = run.workflow_version
+                AND job.execution_status = 'SUCCEEDED'
+                AND job.consumption_status = 'CONSUMED'
+          )
+        RETURNING evaluation_run_id, session_id, material_id, material_published_version,
+                  rubric_reference, target_language, grounding_policy_version, created_at
+    </select>
+
+    <!-- claim 引用的 source turn 由 (session_id, source_turn_id) → practice_response 的 FK 在数据库内
+         裁决；claim_index 保存 Validator 输出顺序，offsets / occurrence / confidence 只做结构性检查。 -->
+    <insert id="insertValidatedClaim" flushCache="true">
+        INSERT INTO validated_semantic_claim (
+            evaluation_run_id, session_id, claim_index, source_turn_id, exact_quote,
+            occurrence_index, start_offset, end_offset, issue_type, explanation, confidence)
+        SELECT candidate.evaluation_run_id, candidate.session_id,
+               #{claimIndex, jdbcType=INTEGER}, #{sourceTurnId, jdbcType=VARCHAR},
+               #{exactQuote, jdbcType=VARCHAR}, #{occurrenceIndex, jdbcType=INTEGER},
+               #{startOffset, jdbcType=INTEGER}, #{endOffset, jdbcType=INTEGER},
+               #{issueType, jdbcType=VARCHAR}, #{explanation, jdbcType=VARCHAR},
+               #{confidence, jdbcType=DOUBLE}
+        FROM validated_semantic_candidate candidate
+        JOIN practice_session session ON session.id = candidate.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE candidate.evaluation_run_id = #{evaluationRunId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </insert>
+
+    <select id="findOwnedCandidateByRunId" resultMap="storedValidatedCandidateResult">
+        SELECT candidate.evaluation_run_id, candidate.session_id, candidate.material_id,
+               candidate.material_published_version, candidate.rubric_reference,
+               candidate.target_language, candidate.grounding_policy_version, candidate.created_at
+        FROM validated_semantic_candidate candidate
+        JOIN practice_session session ON session.id = candidate.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE candidate.evaluation_run_id = #{evaluationRunId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <select id="findOwnedClaimsByRunId" resultMap="storedValidatedClaimResult">
+        SELECT claim.claim_index, claim.source_turn_id, claim.exact_quote, claim.occurrence_index,
+               claim.start_offset, claim.end_offset, claim.issue_type, claim.explanation, claim.confidence
+        FROM validated_semantic_claim claim
+        JOIN validated_semantic_candidate candidate
+             ON candidate.evaluation_run_id = claim.evaluation_run_id
+        JOIN practice_session session ON session.id = candidate.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE claim.evaluation_run_id = #{evaluationRunId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        ORDER BY claim.claim_index
     </select>
 </mapper>

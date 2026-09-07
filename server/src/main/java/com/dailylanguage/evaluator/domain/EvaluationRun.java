@@ -8,7 +8,9 @@ import java.util.UUID;
 /**
  * 已持久化 EvaluationRun 的 durable 快照。PostgreSQL 是 id、status 与 lifecycle timestamp 的
  * authority；本类型只还原数据库已裁决的行，不提供任何 transition 操作。ownership 不在此重复
- * 存储，经 session → learning_task 链路还原。S8B 生命周期封闭为 PENDING；完成状态由 S8C 引入。
+ * 存储，经 session → learning_task 链路还原。S8C 生命周期：PENDING（尚无 durable semantic
+ * outcome）→ SUCCEEDED（存在唯一 validated candidate）或 FAILED（Model success 已消费但
+ * grounding 被拒，只保存安全 RejectionReason）；Model execution failure 的 Run 终结由 S8E 负责。
  */
 public record EvaluationRun(
         UUID id,
@@ -18,7 +20,8 @@ public record EvaluationRun(
         long workflowVersion,
         long rowVersion,
         OffsetDateTime createdAt,
-        Optional<OffsetDateTime> completedAt) {
+        Optional<OffsetDateTime> completedAt,
+        Optional<SemanticGroundingResult.RejectionReason> groundingRejectionReason) {
 
     /** S8 Evaluation workflow 第一版；绑定 Job 必须持有同一 version。 */
     public static final long CURRENT_WORKFLOW_VERSION = 0L;
@@ -39,13 +42,37 @@ public record EvaluationRun(
         }
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         Objects.requireNonNull(completedAt, "completedAt must not be null");
-        if (status != Status.PENDING || completedAt.isPresent()) {
+        Objects.requireNonNull(groundingRejectionReason, "groundingRejectionReason must not be null");
+        if (completedAt.filter(value -> value.isBefore(createdAt)).isPresent()) {
+            throw new IllegalArgumentException("completedAt must not be before createdAt");
+        }
+        // 与 V12 的 ck_evaluation_run_outcome 一致：terminal pairing 由数据库封闭枚举。
+        switch (status) {
+            case PENDING -> requireOutcome(completedAt, groundingRejectionReason, false);
+            case SUCCEEDED -> {
+                requireOutcome(completedAt, groundingRejectionReason, true);
+            }
+            case FAILED -> {
+                if (completedAt.isEmpty() || groundingRejectionReason.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "FAILED evaluation run requires completedAt and a grounding rejection reason");
+                }
+            }
+        }
+    }
+
+    private static void requireOutcome(
+            Optional<OffsetDateTime> completedAt,
+            Optional<SemanticGroundingResult.RejectionReason> reason,
+            boolean requireCompletedAt) {
+        if (completedAt.isPresent() != requireCompletedAt || reason.isPresent()) {
             throw new IllegalArgumentException(
-                    "S8B only persists PENDING evaluation runs without completedAt");
+                    "evaluation run terminal facts must match status " + (requireCompletedAt
+                            ? "with completion" : "PENDING"));
         }
     }
 
     public enum Status {
-        PENDING
+        PENDING, SUCCEEDED, FAILED
     }
 }

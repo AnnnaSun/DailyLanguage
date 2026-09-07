@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.5
 > Approved: 2026-08-20  
-> Last updated: 2026-09-04 — M1-S5 documentation reconciliation
+> Last updated: 2026-09-07 — M1-S8C documentation reconciliation
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -146,7 +146,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — 整体设计方向 APPROVED；S8A COMPLETE (`226b804`)；S8B READY_TO_COMMIT；S8C–E 实施未批准 |
+| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — 整体设计方向 APPROVED；S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C READY_TO_COMMIT；S8D–E 实施未批准 |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
@@ -192,8 +192,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 并由用户确认已 merge。
 
 M1-S8 整体设计方向已批准，按 S8A trusted input 读取、S8B Run / Job 原子关联、S8C grounding outcome /
-candidate 原子消费、S8D prompt / route / transient dispatch、S8E API / reconciliation 拆分；S8A–S8B
-Current Slice Contract 已获实施授权，S8C–E 仍需各自 Scope 批准。
+candidate 原子消费、S8D prompt / route / transient dispatch、S8E API / reconciliation 拆分；S8A–S8C
+Current Slice Contract 已获实施授权，S8D–E 仍需各自 Scope 批准。
 
 S8A 已实现 `GroundedEvaluationInputReader.readOwned`，通过 authenticated caller 的 owner/profile-scoped
 读取与 exact material identity 组装 completed snapshot；零写入、不新增 schema / API 或 Model 调用。
@@ -210,7 +210,21 @@ version。重复或并发请求返回同一 Run/Job，任何创建失败整体 r
 Critical Review 的 4 个 findings 已关闭，delta Review PASS。2026-09-07 fresh Codex external verification：
 disposable PostgreSQL 18.6 empty schema Flyway V1–V11 11/11、S8B integration 8/8、affected ModelCallJob
 regression 103/103 PASS，0 failures / 0 errors / 0 skipped；临时数据库已删除，primary database 未使用。
-Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求，S8B 当前 `READY_TO_COMMIT`、未 commit。
+Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求。S8B 已提交为 `2d46df6`。
+
+S8C 已实现 `EvaluationResultConsumptionService.consumeForReadyInput`：owner/profile-scoped Run 行锁串行化同一 Evaluation
+consumer，完整核对 Ready / Run / Job identity，只读取绑定 Job 的 durable text result，经 Java grounding 后在同一
+read-write transaction 内执行 Job `NOT_READY → CONSUMED` CAS、normalized candidate/claims 或 safe rejection
+持久化，以及 Run `PENDING → SUCCEEDED | FAILED` CAS。terminal Run 重复调用读取 durable outcome；Model failure、
+`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED` 交给 S8E reconciliation。任一 outcome 写入失败会连同 Job
+consumption 回滚，不创建长期 Evidence 或修改 Memory / Weakness / Level / Mastery。
+
+S8C Critical Diff Review / Architecture PASS，无 blocking code finding；初始 LOC guardrail 超出已获用户明确接受。
+受影响 unit 106/106 PASS；disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12，S8C integration
+12/12 与 affected integration regression 43/43 PASS（0 failures / 0 errors / 0 skipped）；临时数据库已删除，
+primary database 未使用，未执行 Flyway repair 或 checksum 修改。Behavior Flow `CURRENT`
+（`docs/flow/evaluation-result-consumption.md`）；standalone Ownership 按批准节奏不要求，S8C 当前
+`READY_TO_COMMIT`、未 commit。未重跑 repository full server suite。
 
 ### M2 — Persistent Adaptation Loop
 

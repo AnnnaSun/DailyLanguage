@@ -13,9 +13,9 @@
 Evaluation。
 
 本 Flow 不负责：Model dispatch / queue submission（不调用 `TextGenerationJobStart` 或任何 submission
-boundary）、Prompt / Rubric / request 构造、BYOK Credential 接收或传递、Provider route 选择、结果消费、
-Semantic grounding、Evaluation candidate 持久化、EvaluationRun 完成状态（S8C）、HTTP API。不持久化
-Prompt、Rubric 内容、Model request、Credential 或 evaluation 结果。
+boundary）、Prompt / Rubric / request 构造、BYOK Credential 接收或传递、Provider route 选择或 HTTP API。
+结果消费、Semantic grounding、candidate 持久化与 EvaluationRun 完成状态已由 M1-S8C 的独立
+`EvaluationResultConsumptionService` 实现（见 `evaluation-result-consumption.md`），不属于本创建事务。
 
 ## 2. Main Call Chain
 
@@ -90,14 +90,16 @@ sequenceDiagram
 
 ## 4. State Transition
 
-S8B 生命周期封闭为单状态（`V11` CHECK）：
+S8B 创建入口仍只产生以下初始状态：
 
 ```text
 EvaluationRun: PENDING（created）；completed_at 必须为 NULL
 ModelCallJob:  CREATED（execution）/ NOT_READY（consumption）
 ```
 
-S8C 实现完成状态时再扩展 `status` / `completed_at` 约束；S8B 不预先声明尚未实现的生命周期。
+Flyway V11 在 S8B 创建时曾把生命周期封闭为 PENDING；当前 V12 已按 S8C 真实实现扩展为
+`PENDING → SUCCEEDED | FAILED`。terminal transition、Job consumption 与 candidate / rejection 的原子性见
+`evaluation-result-consumption.md`；本 Flow 的创建行为和 REQUIRES_NEW 提交边界保持不变。
 
 ## 5. Failure / Rejection Paths
 
