@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-> Current candidate: M1-S8A owner-scoped grounded evaluation input（`READY_TO_COMMIT`，未 commit）
-> Current gate: M1-S8 IN_PROGRESS — S8A `READY_TO_COMMIT`；S8B–E 实施未批准、未开始
+> Production baseline: M1-S8A COMPLETE（`226b804`，含 M1-S7 `7deb720` + `e93f624`）
+> Current candidate: M1-S8B EvaluationRun creation（Review / external verification PASS，`READY_TO_COMMIT`，未 commit）
+> Current gate: M1-S8 IN_PROGRESS — S8B `READY_TO_COMMIT`；S8C–E 未批准、未开始
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -75,12 +75,11 @@ M0 已提供：
 
 当前 committed Production baseline 已实现 M1-S2 deterministic Planner core、M1-S3 LearningTask persistence、
 M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle、M1-S6 deterministic
-completion / assessment 与 M1-S7 module-local Grounded Evaluator contract。M1-S7 已完成 Critical Review、
-PostgreSQL/Flyway/Integration、wider regression、Behavior Flow 与 Ownership，并提交为 `7deb720`；随后将
-`RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件的 non-behavioral extraction 已提交为 `e93f624`，并由
-用户确认已 merge。M1-S8A 已实现 owner-scoped `GroundedEvaluationInputReader` 读取入口（见 7.7，
-`READY_TO_COMMIT`，未 commit）。Evaluator 的 Model
-调用、EvaluationRun lifecycle、candidate persistence 与迟到结果消费仍属于 M1-S8B–E；长期 Evidence 从 M2 开始。
+completion / assessment、M1-S7 module-local Grounded Evaluator contract 与 M1-S8A owner-scoped
+`GroundedEvaluationInputReader` 读取入口（见 7.7；S8A 已提交为 `226b804`，其前 S7 为 `7deb720` +
+`e93f624`）。M1-S8B 已实现 EvaluationRun / ModelCallJob 原子创建入口（见 7.8，`READY_TO_COMMIT`，
+未 commit）。Evaluator 的 Model
+dispatch、结果消费、candidate persistence 与迟到结果处理仍属于 M1-S8C–E；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -373,7 +372,7 @@ delta Review 与本地 unit 55/55 PASS，按用户要求未重跑外部容器验
 
 ### 7.7 Implemented M1-S8A boundary
 
-M1-S8A（`READY_TO_COMMIT`，未 commit）在 `evaluator` package 内新增
+M1-S8A（已提交为 `226b804`）在 `evaluator` package 内新增
 `GroundedEvaluationInputReader.readOwned(languageProfileId, sessionId, userContext)` 与 sealed
 `GroundedEvaluationInputResult`，把 S7 integration test 手工组装 trusted input 的前提落实为生产读取边界：
 
@@ -395,7 +394,48 @@ Reader integration 5/5 与 S7 integration 3/3 PASS（0 failures / 0 errors / 0 s
 读取前后零 mutation 与 Reader → S7 Validator durable text offsets；disposable PostgreSQL 18.6 empty schema
 Flyway V1–V10 10/10 PASS，临时容器已清理。早期因未设置 RUN_DATABASE_TESTS 的 skipped 不作为通过证据。
 Critical Review / external verification / documentation reconciliation 已完成。S8A 不单独 Explain Back，正式
-Ownership Check 按用户决定留到 S8 完整闭环后；S8B–E 实施未批准、未开始。
+Ownership Check 按用户决定留到 S8 完整闭环后。
+
+### 7.8 Implemented M1-S8B boundary
+
+M1-S8B（Review / external verification PASS，`READY_TO_COMMIT`，未 commit）在 dispatch 之前原子建立 Evaluation workflow
+identity。`EvaluationRunCreationService.createForReadyInput(ready, userContext, resultExpiresAt)` 在
+`@Transactional(REQUIRES_NEW)` 独立事务内执行固定顺序：
+
+1. `Ready.userId` 与 `UserContext.userId` 一致性裁决（不一致即 `InconsistentInput`，不读取任何数据）；
+2. `findOwnedForUpdate` 锁定 owner-scoped Session（`FOR UPDATE OF session` 是唯一串行化点）；
+3. 锁定后再检查 COMPLETED 与 `session.taskId == ready.task.id`；
+4. 查询既有 Run：存在则校验关联 Job 的完整创建期 identity（workflowId=run.id、stepId
+   `SEMANTIC_EVALUATION`、version 0、purpose EVALUATION、operation TEXT_GENERATION、owner/profile 一致）；
+   缺失或不一致属于持久化不变量损坏，以不携带敏感信息的 `IllegalStateException` fail closed，不创建
+   替代 Job、不静默修复（不被上层当作普通输入拒绝）；完整则返回 `Existing(run, job)`；
+5. `SELECT uuidv7()` 先取得 Run id（`model_call_job.workflow_id` 必须精确等于它）；
+6. 创建 EVALUATION / TEXT_GENERATION Job（provider/model 空、CREATED / NOT_READY、expiresAt =
+   resultExpiresAt）；
+7. owner-scoped `INSERT … SELECT` 插入 `evaluation_run`：数据库内除 owner/profile/COMPLETED 外，还 JOIN
+   `model_call_job` 核对完整创建期 identity（owner/profile、purpose、operation、workflowId=runId、
+   stepId、version），任一不匹配零行并以异常 fail closed。
+
+事务成功返回即 Run + Job 已 durable 提交；任一步失败整体回滚，不留 orphan Job。重复 / 并发请求经 Session
+行锁串行化后返回同一 `Existing` 关联，不创建第二次 Evaluation；`UNIQUE (session_id)` 与
+`UNIQUE (model_call_job_id)` 是并发第二层约束（Flyway V11，S8B 生命周期封闭为 PENDING / completed_at
+NULL）。`evaluation_run` 不保存 user/profile，ownership 经 session → learning_task 还原。本 slice 不调用
+`TextGenerationJobStart` 或任何 submission / dispatch boundary，不持久化 Prompt / Rubric / request /
+Credential / evaluation 结果；`resultExpiresAt` 是内部可信参数，有效期配置由 S8D 决定。
+
+验证（2026-09-07）：`EvaluationRunCreationServiceTests` 14/14 与 affected unit regression 本地 PASS；
+`EvaluationRunCreationIntegrationTests` 8/8 在本地 docker compose 内临时 PostgreSQL 18.6 空库
+（`daily_language_s8b_check`，非开发库，已清理）PASS，覆盖 Flyway V1–V11 全量迁移、Run/Job UUIDv7 与
+workflow 字段、重复 / 并发（两线程恰一个 `Created` + 一个 `Existing`、各仅一行）、wrong owner / 同用户另一
+Profile / 未知 Session 不创建、IN_PROGRESS `NotCompleted`、Job 与 Run insert 失败整体回滚零 orphan，以及
+Repository 级 insert gate 直测（六类创建期 identity 偏差 Job——含 purpose / operation / foreign owner——全部
+被数据库拒绝零行，正确 identity 通过）；wider server regression 667 tests / 0 failures / 0 errors / 11 Redis
+条件跳过 PASS。Codex Critical Review 4 findings（insert gate 未验证 Job identity、Existing 漏检
+modelOperation、持久化损坏误分类为 `InconsistentInput`、固定过期日期）已全部修复，delta Review PASS。
+Codex fresh external verification 使用独立临时 PostgreSQL 18.6：empty schema Flyway V1–V11 11/11、S8B
+integration 8/8、affected ModelCallJob regression 103/103 PASS，0 failures / 0 errors / 0 skipped；验证后
+`evaluation_run` 零行，ModelCallJob fixture 随临时数据库整体删除，primary database 未使用。S8C–E（completion 状态、
+dispatch、结果消费、迟到结果）未批准、未开始。真实调用链见 `docs/flow/evaluation-run-creation.md`。
 
 ## 8. Practice lifecycle and deterministic assessment
 
@@ -589,14 +629,14 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-Current Candidate: M1-S8A owner-scoped grounded evaluation input（`READY_TO_COMMIT`，未 commit）
+Production Baseline: M1-S8A COMPLETE（`226b804`，含 M1-S7 `7deb720` + `e93f624`）
+Current Candidate: M1-S8B EvaluationRun creation（`READY_TO_COMMIT`，未 commit）
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S8A implementation、Critical / delta Review、external verification 与适用文档已完成（见 7.7），
-进入 `READY_TO_COMMIT`，等待用户 Commit Decision。S8A 不单独 Explain Back；每个子 slice 保留 Review / 验证，
-S8B / S8C 仅针对关键事务或并发理解缺口简短确认，正式 Ownership Check 留到 S8 完整闭环完成后。
-S8B–E 尚未获实施批准；不自动 commit 或开始下一 implementation slice。
+当前 Stop Point：M1-S8B implementation、Critical / delta Review、external verification 与适用文档已完成
+（见 7.8 与 `docs/flow/evaluation-run-creation.md`），进入 `READY_TO_COMMIT`，等待用户 Commit Decision。
+按已批准 ownership cadence，S8B 不单独完整 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
+S8C–E 尚未获实施批准；不自动 commit、push、merge 或开始下一 implementation slice。

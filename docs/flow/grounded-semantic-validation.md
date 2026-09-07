@@ -14,8 +14,10 @@ failure category 的 `Rejected`。
 S7 本身没有 HTTP、Model、Credential 或 database entry。`GroundedEvaluationInput` 的对象一致性不是 authorization
 proof；M1-S8 production flow 必须从 authenticated `UserContext.userId` 出发，通过 owner/profile-scoped Repository
 读取 Task、Session、responses 与 deterministic assessment，再按 Task 的 exact material identity 解析 material。
-M1-S8A `GroundedEvaluationInputReader.readOwned` 已把该组装前提落实为生产读取入口（见第 6 节）；ModelCallJob
-submission / consumption（S8B+）尚未实现。
+M1-S8A `GroundedEvaluationInputReader.readOwned` 已把该组装前提落实为生产读取入口（见第 6 节）；
+M1-S8B `EvaluationRunCreationService.createForReadyInput` 已把该输入原子转换为 durable
+`EvaluationRun` + `ModelCallJob`（见 `evaluation-run-creation.md`）；Evaluation outcome / candidate consumption
+（S8C）与 Model dispatch / submission（S8D）尚未实现。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，

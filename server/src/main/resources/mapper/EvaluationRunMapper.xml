@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.evaluator.infrastructure.EvaluationRunMapper">
+
+    <resultMap id="storedEvaluationRunResult"
+               type="com.dailylanguage.evaluator.infrastructure.StoredEvaluationRun">
+        <constructor>
+            <idArg column="id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="session_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="model_call_job_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="workflow_version" javaType="_long"/>
+            <arg column="row_version" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="runColumns">
+        run.id, run.session_id, run.model_call_job_id, run.status,
+        run.workflow_version, run.row_version, run.created_at, run.completed_at
+    </sql>
+
+    <select id="nextRunId" resultType="java.util.UUID">
+        SELECT uuidv7()
+    </select>
+
+    <!-- ownership 不在 evaluation_run 中重复存储，owned read 经 session → learning_task 还原。 -->
+    <select id="findOwnedBySessionId" resultMap="storedEvaluationRunResult">
+        SELECT <include refid="runColumns"/>
+        FROM evaluation_run run
+        JOIN practice_session session ON session.id = run.session_id
+        JOIN learning_task task ON task.id = session.task_id
+        WHERE run.session_id = #{sessionId, jdbcType=OTHER}
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <!-- INSERT … SELECT：insert 时在数据库内原子重校验该 Session 仍归属同一 owner/profile 的
+         Task 且为 COMPLETED，并 JOIN model_call_job 核对完整创建期 identity——owner/profile、
+         EVALUATION / TEXT_GENERATION、workflow_id = run id、workflow_step_id 与 workflow_version。
+         任一不匹配产生零行，由调用方以异常 fail closed 并回滚同事务内已创建的 Job；
+         UNIQUE(session_id) 是并发下的第二层 guard（正常路径已由 Session 行锁串行化）。 -->
+    <select id="insertOwnedAndReturn" resultMap="storedEvaluationRunResult" affectData="true" flushCache="true">
+        INSERT INTO evaluation_run (id, session_id, model_call_job_id, workflow_version)
+        SELECT #{id, jdbcType=OTHER},
+               session.id,
+               #{modelCallJobId, jdbcType=OTHER},
+               #{workflowVersion, jdbcType=BIGINT}
+        FROM practice_session session
+        JOIN learning_task task ON task.id = session.task_id
+        JOIN model_call_job job ON job.id = #{modelCallJobId, jdbcType=OTHER}
+        WHERE session.id = #{sessionId, jdbcType=OTHER}
+          AND session.status = 'COMPLETED'
+          AND task.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND task.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND job.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND job.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND job.model_purpose = #{modelPurpose, jdbcType=VARCHAR}
+          AND job.model_operation = #{modelOperation, jdbcType=VARCHAR}
+          AND job.workflow_id = #{id, jdbcType=OTHER}
+          AND job.workflow_step_id = #{workflowStepId, jdbcType=VARCHAR}
+          AND job.workflow_version = #{workflowVersion, jdbcType=BIGINT}
+        RETURNING id, session_id, model_call_job_id, status, workflow_version, row_version, created_at, completed_at
+    </select>
+</mapper>
