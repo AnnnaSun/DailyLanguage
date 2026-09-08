@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dailylanguage.modelcalljob.application.TextGenerationJobDispatch.DispatchCommand;
+import com.dailylanguage.modelcalljob.application.TextGenerationJobDispatch.DispatchResult;
 import com.dailylanguage.modelcalljob.application.TextGenerationJobSubmission.SubmissionOutcome;
 import com.dailylanguage.modelcalljob.domain.ModelCallJob;
 import com.dailylanguage.modelcalljob.domain.NewModelCallJob;
@@ -24,14 +26,14 @@ import com.dailylanguage.modelgateway.text.TextGenerationRequest;
 public class TextGenerationJobStart {
 
     private final ModelCallJobRepository modelCallJobRepository;
-    private final TextGenerationJobSubmission submission;
+    private final TextGenerationJobDispatch dispatch;
 
     public TextGenerationJobStart(
             ModelCallJobRepository modelCallJobRepository,
-            TextGenerationJobSubmission submission) {
+            TextGenerationJobDispatch dispatch) {
         this.modelCallJobRepository = Objects.requireNonNull(
                 modelCallJobRepository, "modelCallJobRepository must not be null");
-        this.submission = Objects.requireNonNull(submission, "submission must not be null");
+        this.dispatch = Objects.requireNonNull(dispatch, "dispatch must not be null");
     }
 
     /**
@@ -52,23 +54,9 @@ public class TextGenerationJobStart {
                 command.workflowVersion(),
                 command.expiresAt());
         ModelCallJob createdJob = modelCallJobRepository.create(newJob);
-        TextGenerationJobWorkItem workItem = new TextGenerationJobWorkItem(
-                createdJob.id(),
-                createdJob.userId(),
-                createdJob.rowVersion(),
-                command.request(),
-                command.credential());
-        SubmissionOutcome outcome = Objects.requireNonNull(
-                submission.submit(workItem), "submission outcome must not be null");
-
-        if (outcome == SubmissionOutcome.CAPACITY_UNAVAILABLE) {
-            Optional<ModelCallJob> rejectedJob = modelCallJobRepository.tryRecordSubmissionRejection(
-                    createdJob.id(), createdJob.userId(), createdJob.rowVersion());
-            if (rejectedJob.isEmpty()) {
-                throw new IllegalStateException("model call job submission rejection was not recorded");
-            }
-        }
-        return new StartResult(createdJob.id(), outcome);
+        DispatchResult dispatchResult = dispatch.dispatchCreated(
+                new DispatchCommand(createdJob, command.request(), command.credential()));
+        return new StartResult(dispatchResult.jobId(), dispatchResult.submissionOutcome());
     }
 
     public record StartCommand(

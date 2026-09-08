@@ -22,6 +22,8 @@ spring:
 
 app:
   registration-enabled: ${REGISTRATION_ENABLED:false}
+  evaluator:
+    result-ttl: ${EVALUATOR_RESULT_TTL:7d}
   security:
     password-hashing:
       max-concurrent: ${PASSWORD_HASH_MAX_CONCURRENT:1}

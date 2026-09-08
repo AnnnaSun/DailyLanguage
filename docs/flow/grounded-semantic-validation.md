@@ -1,8 +1,8 @@
 # Grounded Semantic Validation Flow
 
-- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A）
-- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A` owner-scoped read entry
-- Last Verified: `2026-09-07`
+- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A–D）
+- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A–D` production workflow integration
+- Last Verified: `2026-09-08`
 - Entry: `SemanticGroundingValidator.validate`；`GroundedEvaluationInputReader.readOwned`（S8A）
 
 ## 1. Behavior Boundary
@@ -18,7 +18,8 @@ M1-S8A `GroundedEvaluationInputReader.readOwned` 已把该组装前提落实为�
 M1-S8B `EvaluationRunCreationService.createForReadyInput` 已把该输入原子转换为 durable
 `EvaluationRun` + `ModelCallJob`（见 `evaluation-run-creation.md`）；M1-S8C 已在独立 read-write transaction
 内把绑定 Job 的 durable success result grounding 并原子保存为 terminal Run + candidate / safe rejection
-（见 `evaluation-result-consumption.md`）。Model dispatch / submission（S8D）尚未实现。
+（见 `evaluation-result-consumption.md`）。M1-S8D 已实现 versioned prompt/request、固定 `EVALUATION` route、
+durable commit 后的 transient dispatch 与重复请求不重新提交（见 `evaluation-model-dispatch.md`）。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，

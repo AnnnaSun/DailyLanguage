@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.7
+> Version: 1.9
 > Approved: 2026-08-21
-> Last updated: 2026-09-03 — M1 Minimum Text Practice Architecture
+> Last updated: 2026-09-07 — Guided Language Learning V1 scope and phase allocation
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -162,6 +162,22 @@ V1 的成功不以功能数量为中心，而以以下能力为中心：
 - Hosted 与 Self-hosted 共用同一套核心业务逻辑；
 - Model 调用保持 provider-agnostic 与 BYOK-first。
 
+### 3.6 Guided Language Learning
+
+已批准将最小“输入、理解、辅助使用、独立迁移与后续复习”教学闭环纳入 V1 P0，复用 Content、Planner、
+Practice、Evaluator、Learning Memory 与 Review，不新增顶层 Learning module 或第二套能力状态。
+输入包括可理解的语言材料与必要的简短解释；用户可直接尝试或选择“先教我”，理解任务不必强制输出。
+首次学习的必要语法说明属于教学支架，不需要等到重复犯错；Grammar Repair 仍服务于已出现的问题。
+看过、理解检查成功、辅助完成与独立使用必须区分，不能因教学完成直接宣告 Mastery。
+
+最小验收：用户围绕一个沟通目标，在系统内接触新表达、理解用途、借助提示练习，再尝试减少辅助后的
+使用；系统可区分这些表现，并支持后续复习。完整零基础课程体系仍不在 V1 范围。
+
+详细设计和已批准的 M1–M6 分配见 [`GUIDED_LANGUAGE_LEARNING.md`](../features/GUIDED_LANGUAGE_LEARNING.md)。
+M1-S8 收完后先进入最小文本教学 slice 的设计；M1 交付教学与最小辅助条件记录，M2 接入聚合与适应，
+M3 扩展材料生产，M4 完成选择、迁移与复习体验，M5 扩展音频，M6 验证。Phase exit criteria 已同步；
+当前 M1-S8 Contract 不变，后续 Current Slice Contract、具体 API / schema 和起始能力细节仍需单独批准。
+
 ## 4. Approved Architecture Baseline
 
 ### 4.1 Long-term State Authority
@@ -248,6 +264,8 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - BYOK transient credential handling；
 - PostgreSQL-backed Model Call Job、late-result capture 与 versioned consume；
 - Provider-free Built-in Text Practice baseline；
+- Guided Language Learning 最小教学闭环：输入、理解、辅助使用、减少辅助后的迁移与后续复习；
+  辅助条件必须可追溯，不能把教学完成或模仿成功等同于独立掌握；
 - `en + zh-CN` 第一条 walking skeleton 与 `ja + zh-CN` 第二语言 validation pack 的 immutable source
   lineage / provenance；
 - `TargetPracticeCore + SupportScaffold` 的 versioned Built-in Content composition；

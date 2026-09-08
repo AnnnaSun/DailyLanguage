@@ -15,7 +15,8 @@
 `SUCCEEDED`；grounding 拒绝时只保存安全的 `RejectionReason`，把 Run 标记为 `FAILED`。两条路径都与
 Job `NOT_READY → CONSUMED` 原子提交。terminal Run 的重复调用只读取 durable outcome，不重新 grounding。
 
-本 Flow 不负责 Model request / prompt 构造、route、Credential、submission 或 dispatch（M1-S8D），也不负责
+本 Flow 不负责 Model request / prompt 构造、route、Credential、submission 或 dispatch（M1-S8D，见
+`evaluation-model-dispatch.md`），也不负责
 Model failure、expired / stale result 的最终 reconciliation 或 HTTP API（M1-S8E）。它不创建长期 Evidence，
 不修改 Memory、Weakness、Level 或 Mastery；validated candidate 仍是 Session-level diagnosis candidate。
 

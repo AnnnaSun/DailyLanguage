@@ -23,6 +23,8 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.dailylanguage.modelcalljob.application.TextGenerationJobDispatch.DispatchCommand;
+import com.dailylanguage.modelcalljob.application.TextGenerationJobDispatch.DispatchResult;
 import com.dailylanguage.modelcalljob.application.TextGenerationJobStart.StartCommand;
 import com.dailylanguage.modelcalljob.application.TextGenerationJobSubmission.SubmissionOutcome;
 import com.dailylanguage.modelcalljob.domain.ModelCallJob;
@@ -39,20 +41,21 @@ import com.dailylanguage.modelgateway.text.TextOutputSpecification;
 class TextGenerationJobStartTransactionTests {
 
     private final ModelCallJobRepository modelCallJobRepository = mock(ModelCallJobRepository.class);
-    private final TextGenerationJobSubmission submission = mock(TextGenerationJobSubmission.class);
+    private final TextGenerationJobDispatch dispatch = mock(TextGenerationJobDispatch.class);
     private final TestTransactionManager transactionManager = new TestTransactionManager();
     private final TextGenerationJobStart jobStart = transactionalProxy(
-            new TextGenerationJobStart(modelCallJobRepository, submission), transactionManager);
+            new TextGenerationJobStart(modelCallJobRepository, dispatch), transactionManager);
 
     @Test
     void startsWithoutOpeningATransaction() {
         StartCommand command = command();
+        ModelCallJob createdJob = createdJob(command);
         when(modelCallJobRepository.create(any(NewModelCallJob.class))).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return createdJob(command);
+            return createdJob;
         });
-        when(submission.submit(any(TextGenerationJobWorkItem.class)))
-                .thenReturn(SubmissionOutcome.ACCEPTED);
+        when(dispatch.dispatchCreated(any(DispatchCommand.class)))
+                .thenReturn(new DispatchResult(createdJob.id(), SubmissionOutcome.ACCEPTED));
 
         jobStart.start(command);
     }
@@ -64,7 +67,7 @@ class TextGenerationJobStartTransactionTests {
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(
                 ignored -> jobStart.start(command())))
                 .isInstanceOf(IllegalTransactionStateException.class);
-        verifyNoInteractions(modelCallJobRepository, submission);
+        verifyNoInteractions(modelCallJobRepository, dispatch);
     }
 
     private static TextGenerationJobStart transactionalProxy(
@@ -84,36 +87,20 @@ class TextGenerationJobStartTransactionTests {
                 List.of(new TextMessage(TextMessage.Role.USER, "Plan today's practice.")),
                 TextOutputSpecification.plainText());
         return new StartCommand(
-                UUID.randomUUID(),
-                Optional.empty(),
-                UUID.randomUUID(),
-                "GENERATE_TASK",
-                0L,
-                OffsetDateTime.now().plusHours(1),
-                request,
+                UUID.randomUUID(), Optional.empty(), UUID.randomUUID(), "GENERATE_TASK", 0L,
+                OffsetDateTime.now().plusHours(1), request,
                 new TransientProviderCredential(providerId, "not-sent-to-provider"));
     }
 
     private static ModelCallJob createdJob(StartCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now();
         return new ModelCallJob(
-                UUID.randomUUID(),
-                command.userId(),
-                command.languageProfileId(),
-                command.request().purpose(),
-                ModelOperation.TEXT_GENERATION,
-                Optional.empty(),
-                Optional.empty(),
-                command.workflowId(),
-                command.workflowStepId(),
-                command.workflowVersion(),
-                ModelCallJob.ExecutionStatus.CREATED,
-                ModelCallJob.ConsumptionStatus.NOT_READY,
-                Optional.empty(),
-                0L,
-                createdAt,
-                Optional.empty(),
-                command.expiresAt());
+                UUID.randomUUID(), command.userId(), command.languageProfileId(),
+                command.request().purpose(), ModelOperation.TEXT_GENERATION,
+                Optional.empty(), Optional.empty(), command.workflowId(), command.workflowStepId(),
+                command.workflowVersion(), ModelCallJob.ExecutionStatus.CREATED,
+                ModelCallJob.ConsumptionStatus.NOT_READY, Optional.empty(), 0L,
+                createdAt, Optional.empty(), command.expiresAt());
     }
 
     private static final class TestTransactionManager extends AbstractPlatformTransactionManager {
@@ -135,12 +122,12 @@ class TextGenerationJobStartTransactionTests {
 
         @Override
         protected void doCommit(DefaultTransactionStatus status) {
-            // 测试事务不绑定真实 resource，无需提交动作。
+            // Test transaction 不绑定真实 resource，无需提交动作。
         }
 
         @Override
         protected void doRollback(DefaultTransactionStatus status) {
-            // 测试事务不绑定真实 resource，无需回滚动作。
+            // Test transaction 不绑定真实 resource，无需回滚动作。
         }
     }
 }

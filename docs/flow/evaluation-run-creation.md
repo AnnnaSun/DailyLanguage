@@ -14,6 +14,7 @@ Evaluation。
 
 本 Flow 不负责：Model dispatch / queue submission（不调用 `TextGenerationJobStart` 或任何 submission
 boundary）、Prompt / Rubric / request 构造、BYOK Credential 接收或传递、Provider route 选择或 HTTP API。
+这些 dispatch 职责已由 M1-S8D 实现，见 `evaluation-model-dispatch.md`。
 结果消费、Semantic grounding、candidate 持久化与 EvaluationRun 完成状态已由 M1-S8C 的独立
 `EvaluationResultConsumptionService` 实现（见 `evaluation-result-consumption.md`），不属于本创建事务。
 

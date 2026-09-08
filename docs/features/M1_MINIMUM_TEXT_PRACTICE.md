@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S8B COMPLETE（`2d46df6`，其前 S8A 为 `226b804`）
-> Current candidate: M1-S8C durable grounding outcome / candidate consumption（Review / external verification / documentation PASS，`READY_TO_COMMIT`，未 commit）
-> Current gate: M1-S8 IN_PROGRESS — S8C `READY_TO_COMMIT`；S8D–E 未批准、未开始
+> Production baseline: M1-S8C COMPLETE（`de29ada`；S8B 为 `2d46df6`，S8A 为 `226b804`）
+> Current candidate: M1-S8D versioned Evaluator request / route / transient dispatch（Critical Review / external verification / documentation PASS，`READY_TO_COMMIT`，未 commit）
+> Current gate: M1-S8 IN_PROGRESS — S8D `READY_TO_COMMIT`；S8E 未批准、未开始
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -77,10 +77,10 @@ M0 已提供：
 M1-S4 owner-scoped planning API、M1-S5 PracticeSession start / response lifecycle、M1-S6 deterministic
 completion / assessment、M1-S7 module-local Grounded Evaluator contract 与 M1-S8A owner-scoped
 `GroundedEvaluationInputReader` 读取入口（见 7.7；S8A 已提交为 `226b804`，其前 S7 为 `7deb720` +
-`e93f624`）。M1-S8B EvaluationRun / ModelCallJob 原子创建入口已提交为 `2d46df6`（见 7.8）。M1-S8C
-已实现 durable result grounding、candidate / safe rejection persistence 与 Job/Run 原子 terminal transition（见
-7.9，`READY_TO_COMMIT`，未 commit）。Evaluator 的 Model dispatch 与迟到结果 reconciliation 仍属于
-M1-S8D–E；长期 Evidence 从 M2 开始。
+`e93f624`）。M1-S8B EvaluationRun / ModelCallJob 原子创建入口已提交为 `2d46df6`（见 7.8）；M1-S8C
+durable result grounding、candidate / safe rejection persistence 与 Job/Run 原子 terminal transition 已提交为
+`de29ada`（见 7.9）。M1-S8D 已实现 versioned prompt/request、EVALUATION route 与 transient dispatch（见 7.10，
+`READY_TO_COMMIT`，未 commit）。HTTP API 与迟到/失败 reconciliation 仍属于 M1-S8E；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -440,7 +440,7 @@ integration 8/8、affected ModelCallJob regression 103/103 PASS，0 failures / 0
 
 ### 7.9 Implemented M1-S8C boundary
 
-M1-S8C（Critical Diff Review / Architecture / external verification PASS，`READY_TO_COMMIT`，未 commit）实现
+M1-S8C（Critical Diff Review / Architecture / external verification PASS，COMPLETE `de29ada`）实现
 `EvaluationResultConsumptionService.consumeForReadyInput(ready, userContext)`。入口在单一 read-write transaction
 内固定执行：
 
@@ -471,8 +471,40 @@ Flyway V1–V12 12/12，S8C integration 12/12、affected integration regression 
 candidate-before-consume gate、claim failure rollback 与 invariant corruption。两个临时数据库已删除，primary database
 未使用，未执行 Flyway repair 或 checksum 修改。Production/test compilation、Mapper XML parse 与 whitespace checks
 PASS；未重跑 repository full server suite。初始 LOC guardrail 超出已由用户明确接受；Review 无 blocking code finding。
-真实调用链见 `docs/flow/evaluation-result-consumption.md`。S8D prompt / route / transient dispatch 与 S8E API /
+真实调用链见 `docs/flow/evaluation-result-consumption.md`。S8D prompt / route / transient dispatch 已实现；S8E API /
 reconciliation 尚未批准、未实现。
+
+### 7.10 Implemented M1-S8D boundary
+
+M1-S8D（Critical Diff Review / Architecture / external verification PASS，`READY_TO_COMMIT`，未 commit）实现
+`EvaluationDispatchService.dispatchForReadyInput(ready, userContext, credential)`。入口先调用
+`EvaluationTextRequestFactory`，把 workflow version 0 显式映射到 classpath prompt v1 与 exact target-language
+rubric，生成 `ModelPurpose.EVALUATION + JsonObject` provider-neutral request。
+
+request 只包含 target language、difficulty、scenario、Task primary goal、communication objective、target text、
+step id/kind/prompt、learner `sourceTurnId + learnerText`、deterministic step result 与 rubric definitions。它不包含
+user/profile/session UUID、Credential、timestamp、support scaffold、accepted answer 或长期 learner state。Prompt
+把 USER JSON 限定为数据，并声明只有 learner text 可以作为 claim 引用来源；实际 schema、quote、occurrence、offset
+和 rubric allowlist 仍由 S7 Java grounding 裁决。
+
+`EvaluationDispatchService` 使用 `@Transactional(NEVER)`；request 可用后计算 UTC now + configured TTL（默认 7d），
+调用 S8B `REQUIRES_NEW` 创建/读取 durable Run/Job。只有 `Created` 会调用共享
+`TextGenerationJobDispatch.dispatchCreated`；`Existing` 返回同一 durable Run/Job，不重新提交 Provider call。共享
+dispatch 验证 CREATED/NOT_READY、TEXT_GENERATION 与 purpose identity，通过既有 bounded TaskExecutor / Worker
+传播 memory-only request/Credential；capacity unavailable CAS Job 为 `SUBMISSION_REJECTED`，unknown submission
+exception 原样传播，不做可能重复调用的补偿。Model Gateway 新增固定 EVALUATION route，默认 model
+`deepseek-v4-flash`、execution timeout 30s。
+
+验证（2026-09-08）：fresh targeted unit/config regression 29/29 PASS；disposable PostgreSQL 18.6 empty schema
+Flyway V1–V12 12/12，`EvaluationDispatchIntegrationTests` 1/1 PASS，验证 Worker 在 Provider call 前能读取已提交
+Run/Job、异步结果可由 S8C 消费、repeat dispatch 只调用一次 Provider、route 与 TTL 生效。Affected verification
+reports 243/243 PASS；full server regression 700 tests / 0 failures / 0 errors / 159 environment-conditional skips
+（实际执行 541）。Integration 使用受控 `TextGenerationPort` mock，未访问 live Provider；临时数据库已删除，
+primary database 未使用，PostgreSQL / Redis 恢复停止。真实调用链见
+`docs/flow/evaluation-model-dispatch.md`；共享 Job 链路见 `docs/flow/text-generation-job-start.md`。
+
+已批准且仍保留的限制：durable commit 后、memory submission 前若进程终止，Job 可能停留在 `CREATED`；S8D
+不自动 retry。Model failure、expiry、stale/depleted result 与遗留 CREATED Job 的 API / reconciliation 由 S8E 设计。
 
 ## 8. Practice lifecycle and deterministic assessment
 
@@ -618,10 +650,16 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 | M1-S6 | Deterministic completion | Session completion 与 deterministic assessment 原子保存 | A / Review |
 | M1-S7 | Grounded Evaluator contract | fake turn、bad quote、ambiguous span 与 unsupported claim 被拒绝 | A / Review |
 | M1-S8 | Evaluator ModelCallJob integration | deterministic result 不受 Model failure；迟到结果按 version 消费或 stale | A / Review |
+| M1-S8T | Minimum guided text learning | 示范、解释、理解检查、辅助使用及必要辅助条件记录；具体合同待批准 | A / Review |
 | M1-S9 | Optional Planner enrichment | Model 只能选择合法 candidate；失败回到同一 deterministic path | A / Review |
 | M1-S10 | Japanese validation pack | `ja + zh-CN` 使用同一 workflow，cross-language fallback / pollution 被拒绝 | A / Review |
 | M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | B / Review |
 | M1-S12 | M1 integrated closeout | E2E、DB、security、Eval、Trace、client build 与 docs evidence 满足 exit criteria | Phase Closeout |
+
+2026-09-07 Scope Decision：S8T 在完整 S8 结束后、S9 前设计并交付；标识独立于 S8A–E，保留既有编号。
+教学目标与证据边界见 [`GUIDED_LANGUAGE_LEARNING.md`](GUIDED_LANGUAGE_LEARNING.md)。本增量不改写
+S1–S8 的历史实现合同；新材料结构、API、schema、评价兼容性及支持的起始能力需在 S8T Current Slice
+Contract 中明确并批准，必要时拆分。S11 最小 UX 应支持该教学场景，S12 按更新后的 Phase criteria 验收。
 
 ## 15. Verification strategy
 
@@ -666,14 +704,14 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S8B COMPLETE（`2d46df6`，其前 S8A 为 `226b804`）
-Current Candidate: M1-S8C result consumption（`READY_TO_COMMIT`，未 commit）
+Production Baseline: M1-S8C COMPLETE（`de29ada`；S8B 为 `2d46df6`，S8A 为 `226b804`）
+Current Candidate: M1-S8D Evaluator Model dispatch（`READY_TO_COMMIT`，未 commit）
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S8C implementation、Critical Diff Review、external verification 与适用文档已完成
-（见 7.9 与 `docs/flow/evaluation-result-consumption.md`），进入 `READY_TO_COMMIT`，等待用户 Commit Decision。
-按已批准 ownership cadence，S8C 不单独完整 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
-S8D–E 尚未获实施批准；不自动 commit、push、merge 或开始下一 implementation slice。
+当前 Stop Point：M1-S8D implementation、Critical Diff Review、external verification 与适用文档已完成
+（见 7.10 与 `docs/flow/evaluation-model-dispatch.md`），进入 `READY_TO_COMMIT`，等待用户 Commit Decision。
+按已批准 ownership cadence，S8D 不单独完整 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
+S8E 尚未获实施批准；不自动 commit、push、merge 或开始下一 implementation slice。
