@@ -117,7 +117,8 @@ class EvaluationResultConsumptionServiceTests {
         stubPendingRunWithSucceededJob(VALID_CLAIM_JSON);
         EvaluationRun finalized = succeededRun();
         when(evaluationRunRepository.tryFinalizeOwned(
-                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED, Optional.empty(), 0L))
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED,
+                Optional.empty(), Optional.empty(), 0L))
                 .thenReturn(finalized);
 
         ConsumptionResult result = realValidatorService.consumeForReadyInput(
@@ -126,7 +127,8 @@ class EvaluationResultConsumptionServiceTests {
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             DurableOutcome outcome = consumed.outcome();
             assertThat(outcome.run()).isEqualTo(finalized);
-            ValidatedSemanticCandidate candidate = ((Validated) outcome.groundingResult()).candidate();
+            ValidatedSemanticCandidate candidate =
+                    ((Validated) outcome.groundingResult().orElseThrow()).candidate();
             assertThat(candidate.sessionId()).isEqualTo(SESSION_ID);
             assertThat(candidate.materialIdentity())
                     .isEqualTo(new MaterialIdentity("en-builtin-cafe-request", "v1"));
@@ -147,21 +149,24 @@ class EvaluationResultConsumptionServiceTests {
         order.verify(evaluationRunRepository)
                 .insertValidatedClaim(eq(RUN_ID), eq(USER_ID), eq(PROFILE_ID), eq(0), any());
         order.verify(evaluationRunRepository).tryFinalizeOwned(
-                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED, Optional.empty(), 0L);
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED,
+                Optional.empty(), Optional.empty(), 0L);
     }
 
     @Test
     void zeroClaimCandidatePersistsHeaderWithoutClaims() {
         stubPendingRunWithSucceededJob(ZERO_CLAIM_JSON);
         when(evaluationRunRepository.tryFinalizeOwned(
-                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED, Optional.empty(), 0L))
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED,
+                Optional.empty(), Optional.empty(), 0L))
                 .thenReturn(succeededRun());
 
         ConsumptionResult result = realValidatorService.consumeForReadyInput(
                 ready(), new UserContext(USER_ID));
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed ->
-                assertThat(((Validated) consumed.outcome().groundingResult()).candidate().claims()).isEmpty());
+                assertThat(((Validated) consumed.outcome().groundingResult().orElseThrow())
+                        .candidate().claims()).isEmpty());
         // 零 claim 也保存 header：区分“已评估且零 claim”与“尚未评估”。
         verify(evaluationRunRepository).insertValidatedCandidate(eq(RUN_ID), eq(USER_ID), eq(PROFILE_ID), any());
         verify(evaluationRunRepository, never())
@@ -175,6 +180,7 @@ class EvaluationResultConsumptionServiceTests {
         stubPendingRunWithSucceededJob(REJECTED_CLAIM_JSON);
         when(evaluationRunRepository.tryFinalizeOwned(
                 RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.FAILED,
+                Optional.of(EvaluationRun.FailureReason.GROUNDING_REJECTED),
                 Optional.of(RejectionReason.QUOTE_MISMATCH), 0L))
                 .thenReturn(failedRun(RejectionReason.QUOTE_MISMATCH));
 
@@ -183,7 +189,7 @@ class EvaluationResultConsumptionServiceTests {
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             assertThat(consumed.outcome().run().status()).isEqualTo(EvaluationRun.Status.FAILED);
-            assertThat(((Rejected) consumed.outcome().groundingResult()).reason())
+            assertThat(((Rejected) consumed.outcome().groundingResult().orElseThrow()).reason())
                     .isEqualTo(RejectionReason.QUOTE_MISMATCH);
         });
         verify(modelCallJobRepository).tryConsumeSucceededResult(JOB_ID, USER_ID, 0L, 0L);
@@ -208,7 +214,8 @@ class EvaluationResultConsumptionServiceTests {
                 ready(), new UserContext(USER_ID));
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Existing.class, existing ->
-                assertThat(((Validated) existing.outcome().groundingResult()).candidate()).isEqualTo(candidate));
+                assertThat(((Validated) existing.outcome().groundingResult().orElseThrow())
+                        .candidate()).isEqualTo(candidate));
         verifyNoInteractions(validator, modelCallJobRepository);
     }
 
@@ -221,14 +228,28 @@ class EvaluationResultConsumptionServiceTests {
                 ready(), new UserContext(USER_ID));
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Existing.class, existing -> {
-            assertThat(((Rejected) existing.outcome().groundingResult()).reason())
+            assertThat(((Rejected) existing.outcome().groundingResult().orElseThrow()).reason())
                     .isEqualTo(RejectionReason.UNSUPPORTED_ISSUE);
         });
         verifyNoInteractions(validator, modelCallJobRepository);
         verify(evaluationRunRepository, never()).findOwnedCandidateByRunId(any(), any(), any());
     }
 
-    // --- Pending / DeferredToReconciliation ---
+    @Test
+    void terminalModelFailureReplaysWithoutGroundingResult() {
+        EvaluationRun failedRun = modelFailedRun(EvaluationRun.FailureReason.MODEL_CALL_FAILED);
+        when(evaluationRunRepository.findOwnedBySessionIdForUpdate(SESSION_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(failedRun));
+
+        ConsumptionResult result = mockValidatorService.consumeForReadyInput(
+                ready(), new UserContext(USER_ID));
+
+        assertThat(result).isEqualTo(new ConsumptionResult.Existing(
+                new DurableOutcome(failedRun, Optional.empty())));
+        verifyNoInteractions(validator, modelCallJobRepository);
+    }
+
+    // --- Pending / terminal reconciliation ---
 
     @Test
     void createdOrRunningJobIsPending() {
@@ -246,7 +267,7 @@ class EvaluationResultConsumptionServiceTests {
     }
 
     @Test
-    void terminalModelFailureDefersToReconciliation() {
+    void terminalModelFailureFinalizesRun() {
         for (ModelCallJob.ExecutionStatus failed : List.of(
                 ModelCallJob.ExecutionStatus.FAILED,
                 ModelCallJob.ExecutionStatus.TIMED_OUT,
@@ -254,40 +275,66 @@ class EvaluationResultConsumptionServiceTests {
                 ModelCallJob.ExecutionStatus.SUBMISSION_REJECTED)) {
             Mockito.reset(evaluationRunRepository, modelCallJobRepository);
             stubPendingRun(job(failed, ModelCallJob.ConsumptionStatus.NOT_READY, 1L));
+            EvaluationRun finalized = modelFailedRun(EvaluationRun.FailureReason.MODEL_CALL_FAILED);
+            when(evaluationRunRepository.tryFinalizeOwned(
+                    RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.FAILED,
+                    Optional.of(EvaluationRun.FailureReason.MODEL_CALL_FAILED), Optional.empty(), 0L))
+                    .thenReturn(finalized);
 
             assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
                     .as("execution status %s", failed)
-                    .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
+                    .isEqualTo(new ConsumptionResult.Consumed(
+                            new DurableOutcome(finalized, Optional.empty())));
         }
         verifyNoInteractions(validator);
     }
 
     @Test
-    void expiredOrDepletedResultDefersToReconciliation() {
+    void depletedResultFinalizesRun() {
         for (ModelCallJob.ConsumptionStatus depleted : List.of(
+                ModelCallJob.ConsumptionStatus.PENDING_CONFIRMATION,
                 ModelCallJob.ConsumptionStatus.EXPIRED,
                 ModelCallJob.ConsumptionStatus.STALE,
                 ModelCallJob.ConsumptionStatus.DISCARDED)) {
             Mockito.reset(evaluationRunRepository, modelCallJobRepository);
             stubPendingRun(job(ModelCallJob.ExecutionStatus.SUCCEEDED, depleted, 1L));
+            EvaluationRun finalized = modelFailedRun(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
+            when(evaluationRunRepository.tryFinalizeOwned(
+                    RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.FAILED,
+                    Optional.of(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE), Optional.empty(), 0L))
+                    .thenReturn(finalized);
             assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
                     .as("consumption status %s", depleted)
-                    .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
+                    .isEqualTo(new ConsumptionResult.Consumed(
+                            new DurableOutcome(finalized, Optional.empty())));
         }
+    }
 
-        Mockito.reset(evaluationRunRepository, modelCallJobRepository);
-        // NOT_READY 但数据库 CAS 拒绝：重读同一 durable row 后归类为 DB expiry。
-        stubPendingRun(job(ModelCallJob.ExecutionStatus.SUCCEEDED,
-                ModelCallJob.ConsumptionStatus.NOT_READY, 1L, OffsetDateTime.now().minusHours(1)));
-        when(modelCallJobRepository.findTextGenerationResultByJobIdAndUserId(JOB_ID, USER_ID))
-                .thenReturn(Optional.of(new TextGenerationResponse(
-                        new ProviderId("deepseek"), new ModelId("deepseek-chat"),
-                        ZERO_CLAIM_JSON, FinishReason.COMPLETED, Optional.empty())));
-        when(modelCallJobRepository.tryConsumeSucceededResult(JOB_ID, USER_ID, 0L, 1L))
-                .thenReturn(Optional.empty());
-        assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
-                .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
-        verify(evaluationRunRepository, never()).tryFinalizeOwned(any(), any(), any(), any(), any(), anyLong());
+    @Test
+    void olderWorkflowResultIsMarkedStaleBeforeGrounding() {
+        EvaluationResultConsumptionService newerVersionService =
+                new EvaluationResultConsumptionService(
+                        evaluationRunRepository, modelCallJobRepository, validator, 1L);
+        ModelCallJob readyJob = job(
+                ModelCallJob.ExecutionStatus.SUCCEEDED,
+                ModelCallJob.ConsumptionStatus.NOT_READY, 0L);
+        stubPendingRun(readyJob);
+        when(modelCallJobRepository.tryMarkSucceededResultStale(JOB_ID, USER_ID, 1L, 0L))
+                .thenReturn(Optional.of(job(
+                        ModelCallJob.ExecutionStatus.SUCCEEDED,
+                        ModelCallJob.ConsumptionStatus.STALE, 1L)));
+        EvaluationRun finalized = modelFailedRun(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
+        when(evaluationRunRepository.tryFinalizeOwned(
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.FAILED,
+                Optional.of(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE), Optional.empty(), 0L))
+                .thenReturn(finalized);
+
+        assertThat(newerVersionService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
+                .isEqualTo(new ConsumptionResult.Consumed(
+                        new DurableOutcome(finalized, Optional.empty())));
+        verifyNoInteractions(validator);
+        verify(modelCallJobRepository, never())
+                .findTextGenerationResultByJobIdAndUserId(any(), any());
     }
 
     // --- 持久化不变量损坏：fail closed ---
@@ -354,15 +401,25 @@ class EvaluationResultConsumptionServiceTests {
     }
 
     @Test
-    void consumptionCasRejectedByDatabaseExpiryDefersWithoutOutcomePersistence() {
+    void consumptionCasRejectedByDatabaseExpiryExpiresJobAndFinalizesRun() {
         stubPendingRunWithSucceededJob(VALID_CLAIM_JSON);
         when(modelCallJobRepository.tryConsumeSucceededResult(JOB_ID, USER_ID, 0L, 0L))
                 .thenReturn(Optional.empty());
+        when(modelCallJobRepository.tryExpireSucceededResult(JOB_ID, USER_ID, 0L))
+                .thenReturn(Optional.of(job(
+                        ModelCallJob.ExecutionStatus.SUCCEEDED,
+                        ModelCallJob.ConsumptionStatus.EXPIRED, 1L)));
+        EvaluationRun finalized = modelFailedRun(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
+        when(evaluationRunRepository.tryFinalizeOwned(
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.FAILED,
+                Optional.of(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE), Optional.empty(), 0L))
+                .thenReturn(finalized);
 
         assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
-                .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
+                .isEqualTo(new ConsumptionResult.Consumed(
+                        new DurableOutcome(finalized, Optional.empty())));
         verify(evaluationRunRepository, never()).insertValidatedCandidate(any(), any(), any(), any());
-        verify(evaluationRunRepository, never()).tryFinalizeOwned(any(), any(), any(), any(), any(), anyLong());
+        verify(modelCallJobRepository).tryExpireSucceededResult(JOB_ID, USER_ID, 0L);
     }
 
     @Test
@@ -397,7 +454,8 @@ class EvaluationResultConsumptionServiceTests {
                 realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("claim insert failed");
-        verify(evaluationRunRepository, never()).tryFinalizeOwned(any(), any(), any(), any(), any(), anyLong());
+        verify(evaluationRunRepository, never())
+                .tryFinalizeOwned(any(), any(), any(), any(), any(), any(), anyLong());
     }
 
     @Test
@@ -405,7 +463,8 @@ class EvaluationResultConsumptionServiceTests {
         stubPendingRunWithSucceededJob(VALID_CLAIM_JSON);
         // repository 是 CAS 零行 -> ISE 的归属者；service 必须原样传播并放弃本次 outcome。
         when(evaluationRunRepository.tryFinalizeOwned(
-                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED, Optional.empty(), 0L))
+                RUN_ID, USER_ID, PROFILE_ID, EvaluationRun.Status.SUCCEEDED,
+                Optional.empty(), Optional.empty(), 0L))
                 .thenThrow(new IllegalStateException(
                         "evaluation run finalize transition was not recorded"));
 
@@ -493,17 +552,23 @@ class EvaluationResultConsumptionServiceTests {
 
     private static EvaluationRun pendingRun() {
         return new EvaluationRun(RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.PENDING,
-                0L, 0L, CREATED_AT, Optional.empty(), Optional.empty());
+                0L, 0L, CREATED_AT, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static EvaluationRun succeededRun() {
         return new EvaluationRun(RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.SUCCEEDED,
-                0L, 1L, CREATED_AT, Optional.of(COMPLETED_AT), Optional.empty());
+                0L, 1L, CREATED_AT, Optional.of(COMPLETED_AT), Optional.empty(), Optional.empty());
     }
 
     private static EvaluationRun failedRun(RejectionReason reason) {
         return new EvaluationRun(RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.FAILED,
-                0L, 1L, CREATED_AT, Optional.of(COMPLETED_AT), Optional.of(reason));
+                0L, 1L, CREATED_AT, Optional.of(COMPLETED_AT),
+                Optional.of(EvaluationRun.FailureReason.GROUNDING_REJECTED), Optional.of(reason));
+    }
+
+    private static EvaluationRun modelFailedRun(EvaluationRun.FailureReason reason) {
+        return new EvaluationRun(RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.FAILED,
+                0L, 1L, CREATED_AT, Optional.of(COMPLETED_AT), Optional.of(reason), Optional.empty());
     }
 
     private static ModelCallJob job(

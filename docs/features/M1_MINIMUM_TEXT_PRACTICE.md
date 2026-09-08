@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S8C COMPLETE（`de29ada`；S8B 为 `2d46df6`，S8A 为 `226b804`）
-> Current candidate: M1-S8D versioned Evaluator request / route / transient dispatch（Critical Review / external verification / documentation PASS，`READY_TO_COMMIT`，未 commit）
-> Current gate: M1-S8 IN_PROGRESS — S8D `READY_TO_COMMIT`；S8E 未批准、未开始
+> Production baseline: M1-S8D COMPLETE（`8228d64`；S8C 为 `de29ada`，S8B 为 `2d46df6`，S8A 为 `226b804`）
+> Current candidate: M1-S8E-R reconciliation kernel（Critical Review / PostgreSQL-Flyway-Integration / documentation PASS，`READY_TO_COMMIT`，未 commit）
+> Current gate: M1-S8 IN_PROGRESS — S8D COMPLETE (`8228d64`)；S8E-R `READY_TO_COMMIT`；S8E-API 未获实施授权
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -79,8 +79,9 @@ completion / assessment、M1-S7 module-local Grounded Evaluator contract 与 M1-
 `GroundedEvaluationInputReader` 读取入口（见 7.7；S8A 已提交为 `226b804`，其前 S7 为 `7deb720` +
 `e93f624`）。M1-S8B EvaluationRun / ModelCallJob 原子创建入口已提交为 `2d46df6`（见 7.8）；M1-S8C
 durable result grounding、candidate / safe rejection persistence 与 Job/Run 原子 terminal transition 已提交为
-`de29ada`（见 7.9）。M1-S8D 已实现 versioned prompt/request、EVALUATION route 与 transient dispatch（见 7.10，
-`READY_TO_COMMIT`，未 commit）。HTTP API 与迟到/失败 reconciliation 仍属于 M1-S8E；长期 Evidence 从 M2 开始。
+`de29ada`（见 7.9）。M1-S8D 已提交 versioned prompt/request、EVALUATION route 与 transient dispatch（见 7.10，
+`8228d64`）。S8E-R 已实现 terminal failure 与 unavailable result reconciliation（见 7.11，`READY_TO_COMMIT`，
+未 commit）；HTTP API、scheduler 与 automatic retry 未实现。长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -455,9 +456,9 @@ M1-S8C（Critical Diff Review / Architecture / external verification PASS，COMP
 
 Job consumption、candidate/claims 或 rejection、Run terminal transition 在同一 transaction 提交。claim insert、
 candidate gate 或 Run finalize 任一步失败都整体回滚，Job 保持 `NOT_READY`，Run 保持 `PENDING`。Run 行锁串行化
-相同 Evaluation consumer；通用 Job consumer 的竞争由 Job CAS 后重读 durable row 分类。`CREATED / RUNNING`
-返回 `Pending`；Model execution failure、`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED` 或数据库判定过期
-返回 `DeferredToReconciliation`，由 S8E 处理；无法解释的 identity/CAS 不一致以不携带敏感数据的异常 fail closed。
+相同 Evaluation consumer；通用 Job consumer 的竞争由 Job CAS 后重读 durable row 分类。S8C 交付时，
+`CREATED / RUNNING` 返回 `Pending`，其他 terminal/depleted state 返回 `DeferredToReconciliation`；当前代码已由
+S8E-R 归约这些 terminal/depleted state，见 7.11。无法解释的 identity/CAS 不一致继续 fail closed。
 
 Flyway V12 扩展 `evaluation_run` terminal lifecycle 并新增 normalized
 `validated_semantic_candidate / validated_semantic_claim`。composite FK 保证 candidate Session 等于 Run Session，
@@ -471,12 +472,12 @@ Flyway V1–V12 12/12，S8C integration 12/12、affected integration regression 
 candidate-before-consume gate、claim failure rollback 与 invariant corruption。两个临时数据库已删除，primary database
 未使用，未执行 Flyway repair 或 checksum 修改。Production/test compilation、Mapper XML parse 与 whitespace checks
 PASS；未重跑 repository full server suite。初始 LOC guardrail 超出已由用户明确接受；Review 无 blocking code finding。
-真实调用链见 `docs/flow/evaluation-result-consumption.md`。S8D prompt / route / transient dispatch 已实现；S8E API /
-reconciliation 尚未批准、未实现。
+真实调用链见 `docs/flow/evaluation-result-consumption.md`。S8D prompt / route / transient dispatch 已实现；S8E-R
+已在相同入口补齐 Model failure 与 unavailable result reconciliation，见 7.11；S8E-API 尚未实现。
 
 ### 7.10 Implemented M1-S8D boundary
 
-M1-S8D（Critical Diff Review / Architecture / external verification PASS，`READY_TO_COMMIT`，未 commit）实现
+M1-S8D（Critical Diff Review / Architecture / external verification PASS，COMPLETE `8228d64`）实现
 `EvaluationDispatchService.dispatchForReadyInput(ready, userContext, credential)`。入口先调用
 `EvaluationTextRequestFactory`，把 workflow version 0 显式映射到 classpath prompt v1 与 exact target-language
 rubric，生成 `ModelPurpose.EVALUATION + JsonObject` provider-neutral request。
@@ -504,7 +505,43 @@ primary database 未使用，PostgreSQL / Redis 恢复停止。真实调用链�
 `docs/flow/evaluation-model-dispatch.md`；共享 Job 链路见 `docs/flow/text-generation-job-start.md`。
 
 已批准且仍保留的限制：durable commit 后、memory submission 前若进程终止，Job 可能停留在 `CREATED`；S8D
-不自动 retry。Model failure、expiry、stale/depleted result 与遗留 CREATED Job 的 API / reconciliation 由 S8E 设计。
+不自动 retry。S8E-R 已能在 trusted caller 重新进入 consumption flow 时归约 terminal Model failure、expiry 与
+stale/depleted result；遗留 `CREATED / RUNNING` Job 仍保持 `Pending`，自动扫描、HTTP status 与 retry 不在 S8E-R。
+
+### 7.11 Implemented M1-S8E-R boundary
+
+M1-S8E-R（Critical Diff Review / Architecture / PostgreSQL-Flyway-Integration PASS，`READY_TO_COMMIT`，未 commit）
+在既有 `EvaluationResultConsumptionService.consumeForReadyInput` 内实现 workflow-owned reconciliation kernel，未新增
+HTTP entry、scheduler、retry 或 Provider call：
+
+1. owner/profile-scoped Run 行锁、Ready/Run/Job full identity gate 与 terminal replay 继续复用 S8C；
+2. `CREATED / RUNNING` Job 返回 `Pending`，不猜测 execution outcome；
+3. `FAILED / TIMED_OUT / OUTCOME_UNKNOWN / SUBMISSION_REJECTED` 把 Run 终结为
+   `FAILED + MODEL_CALL_FAILED`；Job 保存具体 execution status；
+4. `PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED`、旧 workflow result 或数据库判定已过期的 result 把 Run
+   终结为 `FAILED + MODEL_RESULT_UNAVAILABLE`；
+5. current workflow 的 `SUCCEEDED / NOT_READY` 仍进入 S8C grounding + consume；旧 workflow 在读取/grounding raw
+   result 前通过 Job CAS 标记 `STALE`；
+6. Job consumption/expiry/stale 与 Run terminal mutation 位于同一 transaction；无法解释的 identity、rowVersion 或
+   state race 抛出不携带敏感数据的异常并回滚；
+7. terminal model failure replay 返回 durable Run 与空 grounding result，不重新调用 Validator 或 Provider。
+
+`EvaluationRun.FailureReason` 是 closed workflow-level category：`GROUNDING_REJECTED` 必须与安全
+`groundingRejectionReason` 成对；`MODEL_CALL_FAILED / MODEL_RESULT_UNAVAILABLE` 必须没有 grounding reason。
+Flyway V13 在 PostgreSQL 中保存相同约束，回填 V12 已有 `FAILED` Run 为 `GROUNDING_REJECTED`，并增加
+`(created_at, id) WHERE status='PENDING'` partial index，为后续受控查询保留数据库访问路径。具体 Model failure/status
+仍只保存在绑定 `ModelCallJob`，不复制 raw output、Prompt、Credential 或 private context。
+
+验证（2026-09-08）：final targeted 35/35 PASS；implementation-stage full server regression 703 tests / 0 failures / 0 errors /
+160 environment-conditional skips（实际执行 543）。Fresh disposable PostgreSQL 18.6 empty schema 从 V1 应用 Flyway
+V1–V13 13/13；Evaluation result consumption、Run creation、dispatch 与 ModelCallJob consumption integration 合计
+28/28 PASS。独立 V12→V13 upgrade probe 在 V12 与升级后各 10/10 PASS，历史 grounding `FAILED` Run 保留
+`QUOTE_MISMATCH` 并正确回填 `GROUNDING_REJECTED`；V13 constraints 与 partial index 已查询确认。临时容器与数据库
+已删除，primary database 未使用，既有 PostgreSQL / Redis 保持 healthy。真实调用链见
+`docs/flow/evaluation-result-consumption.md`。
+
+S8E-R 只提供可复用的幂等 reconciliation kernel。S8E-API、background scheduler、automatic retry、遗留
+`CREATED / RUNNING` recovery 与 HTTP response mapping 均未实现、未获 implementation approval。
 
 ## 8. Practice lifecycle and deterministic assessment
 
@@ -704,14 +741,14 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S8C COMPLETE（`de29ada`；S8B 为 `2d46df6`，S8A 为 `226b804`）
-Current Candidate: M1-S8D Evaluator Model dispatch（`READY_TO_COMMIT`，未 commit）
+Production Baseline: M1-S8D COMPLETE（`8228d64`；S8C 为 `de29ada`，S8B 为 `2d46df6`，S8A 为 `226b804`）
+Current Candidate: M1-S8E-R reconciliation kernel（`READY_TO_COMMIT`，未 commit）
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S8D implementation、Critical Diff Review、external verification 与适用文档已完成
-（见 7.10 与 `docs/flow/evaluation-model-dispatch.md`），进入 `READY_TO_COMMIT`，等待用户 Commit Decision。
-按已批准 ownership cadence，S8D 不单独完整 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
-S8E 尚未获实施批准；不自动 commit、push、merge 或开始下一 implementation slice。
+当前 Stop Point：M1-S8E-R implementation、Critical Diff Review、external verification 与适用文档已完成
+（见 7.11 与 `docs/flow/evaluation-result-consumption.md`），进入 `READY_TO_COMMIT`，等待用户 Commit Decision。
+按已批准 ownership cadence，S8E-R 不单独完整 Explain Back，正式 Ownership Check 留到 S8 完整闭环后。
+S8E-API 尚未获 implementation approval；不自动 commit、push、merge 或开始下一 implementation slice。

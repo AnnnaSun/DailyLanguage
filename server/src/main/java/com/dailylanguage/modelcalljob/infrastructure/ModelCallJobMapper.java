@@ -51,4 +51,9 @@ interface ModelCallJobMapper {
             @Param("userId") UUID userId,
             @Param("currentWorkflowVersion") long currentWorkflowVersion,
             @Param("expectedRowVersion") long expectedRowVersion);
+
+    Optional<StoredModelCallJob> tryExpireSucceededResult(
+            @Param("jobId") UUID jobId,
+            @Param("userId") UUID userId,
+            @Param("expectedRowVersion") long expectedRowVersion);
 }

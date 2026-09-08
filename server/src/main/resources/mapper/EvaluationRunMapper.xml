@@ -21,6 +21,7 @@
             <arg column="row_version" javaType="_long"/>
             <arg column="created_at" javaType="java.time.OffsetDateTime"/>
             <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="failure_reason" javaType="java.lang.String"/>
             <arg column="grounding_rejection_reason" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
@@ -61,7 +62,7 @@
     <sql id="runColumns">
         run.id, run.session_id, run.model_call_job_id, run.status,
         run.workflow_version, run.row_version, run.created_at, run.completed_at,
-        run.grounding_rejection_reason
+        run.failure_reason, run.grounding_rejection_reason
     </sql>
 
     <!-- ownership 不在 evaluation_run 中重复存储，owned read 经 session → learning_task 还原。 -->
@@ -124,7 +125,7 @@
           AND job.workflow_step_id = #{workflowStepId, jdbcType=VARCHAR}
           AND job.workflow_version = #{workflowVersion, jdbcType=BIGINT}
         RETURNING id, session_id, model_call_job_id, status, workflow_version, row_version,
-                  created_at, completed_at, grounding_rejection_reason
+                  created_at, completed_at, failure_reason, grounding_rejection_reason
     </select>
 
     <!-- PENDING → terminal 的 CAS：status 与 row_version guard 由数据库原子裁决，零行由调用方以
@@ -132,6 +133,7 @@
     <select id="tryFinalizeOwnedAndReturn" resultMap="storedEvaluationRunResult" affectData="true" flushCache="true">
         UPDATE evaluation_run run
         SET status = #{status, jdbcType=VARCHAR},
+            failure_reason = #{failureReason, jdbcType=VARCHAR},
             grounding_rejection_reason = #{rejectionReason, jdbcType=VARCHAR},
             completed_at = CURRENT_TIMESTAMP,
             row_version = row_version + 1
@@ -154,12 +156,18 @@
                 AND job.workflow_id = run.id
                 AND job.workflow_step_id = 'SEMANTIC_EVALUATION'
                 AND job.workflow_version = run.workflow_version
-                AND job.execution_status = 'SUCCEEDED'
-                AND job.consumption_status = 'CONSUMED'
           )
           AND (
               (#{status, jdbcType=VARCHAR} = 'SUCCEEDED'
+                  AND #{failureReason, jdbcType=VARCHAR} IS NULL
                   AND #{rejectionReason, jdbcType=VARCHAR} IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM model_call_job job
+                      WHERE job.id = run.model_call_job_id
+                        AND job.execution_status = 'SUCCEEDED'
+                        AND job.consumption_status = 'CONSUMED'
+                  )
                   AND EXISTS (
                       SELECT 1
                       FROM validated_semantic_candidate candidate
@@ -167,11 +175,48 @@
                         AND candidate.session_id = run.session_id
                   ))
               OR (#{status, jdbcType=VARCHAR} = 'FAILED'
+                  AND #{failureReason, jdbcType=VARCHAR} = 'GROUNDING_REJECTED'
                   AND #{rejectionReason, jdbcType=VARCHAR} IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM model_call_job job
+                      WHERE job.id = run.model_call_job_id
+                        AND job.execution_status = 'SUCCEEDED'
+                        AND job.consumption_status = 'CONSUMED'
+                  )
                   AND NOT EXISTS (
                       SELECT 1
                       FROM validated_semantic_candidate candidate
                       WHERE candidate.evaluation_run_id = run.id
+                  ))
+              OR (#{status, jdbcType=VARCHAR} = 'FAILED'
+                  AND #{failureReason, jdbcType=VARCHAR} = 'MODEL_CALL_FAILED'
+                  AND #{rejectionReason, jdbcType=VARCHAR} IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM validated_semantic_candidate candidate
+                      WHERE candidate.evaluation_run_id = run.id
+                  )
+                  AND EXISTS (
+                      SELECT 1
+                      FROM model_call_job job
+                      WHERE job.id = run.model_call_job_id
+                        AND job.execution_status IN (
+                            'FAILED', 'TIMED_OUT', 'OUTCOME_UNKNOWN', 'SUBMISSION_REJECTED')
+                  ))
+              OR (#{status, jdbcType=VARCHAR} = 'FAILED'
+                  AND #{failureReason, jdbcType=VARCHAR} = 'MODEL_RESULT_UNAVAILABLE'
+                  AND #{rejectionReason, jdbcType=VARCHAR} IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM validated_semantic_candidate candidate
+                      WHERE candidate.evaluation_run_id = run.id
+                  )
+                  AND EXISTS (
+                      SELECT 1
+                      FROM model_call_job job
+                      WHERE job.id = run.model_call_job_id
+                        AND job.execution_status = 'SUCCEEDED'
+                        AND job.consumption_status IN (
+                            'PENDING_CONFIRMATION', 'EXPIRED', 'STALE', 'DISCARDED')
                   ))
           )
         RETURNING <include refid="runColumns"/>

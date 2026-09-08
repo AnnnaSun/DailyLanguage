@@ -179,6 +179,20 @@ public class ModelCallJobRepository {
                 .map(ModelCallJobRepository::toDomain);
     }
 
+    /** PostgreSQL CURRENT_TIMESTAMP 裁决已成功结果是否过期；不接受 JVM 时间作为 authority。 */
+    public Optional<ModelCallJob> tryExpireSucceededResult(
+            UUID jobId,
+            UUID userId,
+            long expectedRowVersion) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(userId, "userId must not be null");
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        return modelCallJobMapper.tryExpireSucceededResult(jobId, userId, expectedRowVersion)
+                .map(ModelCallJobRepository::toDomain);
+    }
+
     private static ModelCallJob toDomain(StoredModelCallJob job) {
         ModelCallJob.ExecutionStatus executionStatus = ModelCallJob.ExecutionStatus.valueOf(job.executionStatus());
         return new ModelCallJob(

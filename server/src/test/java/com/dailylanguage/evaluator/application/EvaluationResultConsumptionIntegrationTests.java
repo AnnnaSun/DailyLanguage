@@ -58,7 +58,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 
 /**
- * 用真实 PostgreSQL durable 数据验证 S8C：绑定 Job 的 SUCCEEDED raw result 在同一事务内被
+ * 用真实 PostgreSQL durable 数据验证 S8C/S8E：绑定 Job 的 SUCCEEDED raw result 在同一事务内被
  * grounding、消费并落为 Run 终态 + normalized candidate / claim；Job CONSUMED 与 business
  * outcome 原子提交，失败整体回滚；terminal Run replay 不重复评估。fixture 数据必须先于服务调用
  * 提交，AfterEach 按 FK 依赖顺序清理。
@@ -172,13 +172,14 @@ class EvaluationResultConsumptionIntegrationTests {
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",
-                String.class)).isEqualTo("12");
+                String.class)).isEqualTo("13");
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             DurableOutcome outcome = consumed.outcome();
             assertThat(outcome.run().status()).isEqualTo(EvaluationRun.Status.SUCCEEDED);
             assertThat(outcome.run().completedAt()).isPresent();
             assertThat(outcome.run().rowVersion()).isEqualTo(1L);
-            ValidatedSemanticCandidate candidate = ((Validated) outcome.groundingResult()).candidate();
+            ValidatedSemanticCandidate candidate =
+                    ((Validated) outcome.groundingResult().orElseThrow()).candidate();
             assertThat(candidate.sessionId()).isEqualTo(prepared.sessionId);
             GroundedClaim claim = candidate.claims().getFirst();
             assertThat(claim.startOffset()).isEqualTo(ANSWER_TO_GO_TEXT.indexOf("Thank you"));
@@ -217,7 +218,8 @@ class EvaluationResultConsumptionIntegrationTests {
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             assertThat(consumed.outcome().run().status()).isEqualTo(EvaluationRun.Status.SUCCEEDED);
-            assertThat(((Validated) consumed.outcome().groundingResult()).candidate().claims()).isEmpty();
+            assertThat(((Validated) consumed.outcome().groundingResult().orElseThrow())
+                    .candidate().claims()).isEmpty();
         });
         assertThat(candidateHeaderCount(prepared.runId)).isEqualTo(1);
         assertThat(claimCount(prepared.runId)).isZero();
@@ -231,8 +233,10 @@ class EvaluationResultConsumptionIntegrationTests {
 
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             assertThat(consumed.outcome().run().status()).isEqualTo(EvaluationRun.Status.FAILED);
-            assertThat(((Rejected) consumed.outcome().groundingResult()).reason())
+            assertThat(((Rejected) consumed.outcome().groundingResult().orElseThrow()).reason())
                     .isEqualTo(RejectionReason.QUOTE_MISMATCH);
+            assertThat(consumed.outcome().run().failureReason())
+                    .contains(EvaluationRun.FailureReason.GROUNDING_REJECTED);
         });
         sqlSession.clearCache();
         assertThat(jdbcTemplate.queryForObject(
@@ -307,7 +311,7 @@ class EvaluationResultConsumptionIntegrationTests {
     }
 
     @Test
-    void modelFailureAndExpiredResultDeferToReconciliation() {
+    void modelFailureFinalizesOnlySemanticBranch() {
         Prepared prepared = prepareCreatedEvaluation();
         ModelCallJob started = modelCallJobRepository.tryStartExecution(
                 prepared.jobId, prepared.ownerId, 0L).orElseThrow();
@@ -317,11 +321,24 @@ class EvaluationResultConsumptionIntegrationTests {
                         Optional.empty(), Optional.empty(), Optional.empty()))
                 .orElseThrow();
         assertThat(failed.executionStatus()).isEqualTo(ModelCallJob.ExecutionStatus.FAILED);
-        assertThat(consumptionService.consumeForReadyInput(prepared.ready, prepared.user))
-                .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
-        assertThat(runStatus(prepared.runId)).isEqualTo("PENDING");
+        ConsumptionResult result = consumptionService.consumeForReadyInput(prepared.ready, prepared.user);
 
+        assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
+            assertThat(consumed.outcome().run().status()).isEqualTo(EvaluationRun.Status.FAILED);
+            assertThat(consumed.outcome().run().failureReason())
+                    .contains(EvaluationRun.FailureReason.MODEL_CALL_FAILED);
+            assertThat(consumed.outcome().groundingResult()).isEmpty();
+        });
+        assertThat(runStatus(prepared.runId)).isEqualTo("FAILED");
+        assertThat(runFailureReason(prepared.runId)).isEqualTo("MODEL_CALL_FAILED");
+        assertThat(consumptionRow(prepared.jobId)).isEqualTo("NOT_READY");
+        assertThat(candidateHeaderCount(prepared.runId)).isZero();
+    }
+
+    @Test
+    void expiredSucceededResultIsMarkedExpiredAndFinalizesRun() {
         Prepared expired = prepareSucceededEvaluation(VALID_CLAIM_JSON);
+
         jdbcTemplate.update("""
                 UPDATE model_call_job
                 SET created_at = CURRENT_TIMESTAMP - INTERVAL '3 seconds',
@@ -330,9 +347,18 @@ class EvaluationResultConsumptionIntegrationTests {
                 WHERE id = ?
                 """, expired.jobId);
         sqlSession.clearCache();
-        assertThat(consumptionService.consumeForReadyInput(expired.ready, expired.user))
-                .isEqualTo(new ConsumptionResult.DeferredToReconciliation());
-        assertThat(runStatus(expired.runId)).isEqualTo("PENDING");
+        ConsumptionResult result = consumptionService.consumeForReadyInput(expired.ready, expired.user);
+
+        assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
+            assertThat(consumed.outcome().run().status()).isEqualTo(EvaluationRun.Status.FAILED);
+            assertThat(consumed.outcome().run().failureReason())
+                    .contains(EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
+            assertThat(consumed.outcome().groundingResult()).isEmpty();
+        });
+        assertThat(runStatus(expired.runId)).isEqualTo("FAILED");
+        assertThat(runFailureReason(expired.runId)).isEqualTo("MODEL_RESULT_UNAVAILABLE");
+        assertThat(consumptionRow(expired.jobId)).isEqualTo("EXPIRED");
+        assertThat(candidateHeaderCount(expired.runId)).isZero();
     }
 
     @Test
@@ -471,6 +497,12 @@ class EvaluationResultConsumptionIntegrationTests {
         sqlSession.clearCache();
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM evaluation_run WHERE id = ?", String.class, runId);
+    }
+
+    private String runFailureReason(UUID runId) {
+        sqlSession.clearCache();
+        return jdbcTemplate.queryForObject(
+                "SELECT failure_reason FROM evaluation_run WHERE id = ?", String.class, runId);
     }
 
     private String consumptionRow(UUID jobId) {

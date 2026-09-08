@@ -58,7 +58,7 @@ final class EvaluationDispatchTestFixtures {
         return new EvaluationRun(
                 RUN_ID, SESSION_ID, JOB_ID, EvaluationRun.Status.PENDING,
                 EvaluationRun.CURRENT_WORKFLOW_VERSION, 0L, CREATED_AT,
-                Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     static ModelCallJob createdJob() {

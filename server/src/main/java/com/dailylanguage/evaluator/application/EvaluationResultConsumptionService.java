@@ -31,9 +31,10 @@ import com.dailylanguage.security.domain.UserContext;
  * 完成 Job NOT_READY → CONSUMED（现有 consumption CAS）、validated candidate / safe rejection
  * 持久化与 Run PENDING → terminal CAS——CONSUMED 与 business outcome 要么同时提交，要么同时回滚，
  * 不出现 Job 已消费但 outcome 丢失。terminal Run 直接读取 durable outcome replay，不重新
- * grounding。pending / expired / Model failure 用 typed result 表达，不用异常；Job 缺失、
+ * grounding。CREATED / RUNNING 保持 Pending；Model failure、expired、stale 或 discarded result
+ * 只终止 Model branch，不影响 deterministic outcome。Job 缺失、
  * identity 不一致、raw result 缺失或无法解释的 CAS 冲突是持久化不变量损坏，以异常 fail closed
- * 并整体回滚，不创建替代数据、不调用 tryMarkSucceededResultStale（reconciliation 属于 S8E）。
+ * 并整体回滚，不创建替代数据、不重新调用 Provider。
  */
 @Service
 public class EvaluationResultConsumptionService {
@@ -41,14 +42,16 @@ public class EvaluationResultConsumptionService {
     private final EvaluationRunRepository evaluationRunRepository;
     private final ModelCallJobRepository modelCallJobRepository;
     private final SemanticGroundingValidator semanticGroundingValidator;
+    private final long currentWorkflowVersion;
 
     @Autowired
     public EvaluationResultConsumptionService(
             EvaluationRunRepository evaluationRunRepository,
             ModelCallJobRepository modelCallJobRepository) {
         this(evaluationRunRepository, modelCallJobRepository, new SemanticGroundingValidator(
-                new StructuredOutputValidator(JsonMapper.builder().build()),
-                new ClasspathRubricSource()));
+                        new StructuredOutputValidator(JsonMapper.builder().build()),
+                        new ClasspathRubricSource()),
+                EvaluationRun.CURRENT_WORKFLOW_VERSION);
     }
 
     /** 供测试替换 validator 的 seam；Production 构造使用真实 classpath rubric。 */
@@ -56,12 +59,26 @@ public class EvaluationResultConsumptionService {
             EvaluationRunRepository evaluationRunRepository,
             ModelCallJobRepository modelCallJobRepository,
             SemanticGroundingValidator semanticGroundingValidator) {
+        this(evaluationRunRepository, modelCallJobRepository, semanticGroundingValidator,
+                EvaluationRun.CURRENT_WORKFLOW_VERSION);
+    }
+
+    /** 供旧 workflow-version reconciliation 测试替换 current version。 */
+    EvaluationResultConsumptionService(
+            EvaluationRunRepository evaluationRunRepository,
+            ModelCallJobRepository modelCallJobRepository,
+            SemanticGroundingValidator semanticGroundingValidator,
+            long currentWorkflowVersion) {
         this.evaluationRunRepository =
                 Objects.requireNonNull(evaluationRunRepository, "evaluationRunRepository must not be null");
         this.modelCallJobRepository =
                 Objects.requireNonNull(modelCallJobRepository, "modelCallJobRepository must not be null");
         this.semanticGroundingValidator =
                 Objects.requireNonNull(semanticGroundingValidator, "semanticGroundingValidator must not be null");
+        if (currentWorkflowVersion < 0) {
+            throw new IllegalArgumentException("currentWorkflowVersion must not be negative");
+        }
+        this.currentWorkflowVersion = currentWorkflowVersion;
     }
 
     /**
@@ -107,7 +124,8 @@ public class EvaluationResultConsumptionService {
                 return new ConsumptionResult.Pending();
             }
             case FAILED, TIMED_OUT, OUTCOME_UNKNOWN, SUBMISSION_REJECTED -> {
-                return new ConsumptionResult.DeferredToReconciliation();
+                return finalizeModelFailure(
+                        run, userId, languageProfileId, EvaluationRun.FailureReason.MODEL_CALL_FAILED);
             }
             case SUCCEEDED -> {
             }
@@ -116,10 +134,27 @@ public class EvaluationResultConsumptionService {
             case CONSUMED -> throw new IllegalStateException(
                     "evaluation job is already consumed while its run is still pending");
             case PENDING_CONFIRMATION, EXPIRED, STALE, DISCARDED -> {
-                return new ConsumptionResult.DeferredToReconciliation();
+                return finalizeModelFailure(
+                        run, userId, languageProfileId,
+                        EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
             }
             case NOT_READY -> {
             }
+        }
+
+        if (run.workflowVersion() > currentWorkflowVersion) {
+            throw new IllegalStateException(
+                    "evaluation run workflow version is newer than the current application version");
+        }
+        if (run.workflowVersion() < currentWorkflowVersion) {
+            Optional<ModelCallJob> staleJob = modelCallJobRepository.tryMarkSucceededResultStale(
+                    job.id(), userId, currentWorkflowVersion, job.rowVersion());
+            if (staleJob.isPresent()) {
+                return finalizeModelFailure(
+                        run, userId, languageProfileId,
+                        EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
+            }
+            return classifyFailedConsumptionCas(job, run, userId, languageProfileId);
         }
 
         String generatedJson = modelCallJobRepository
@@ -147,15 +182,17 @@ public class EvaluationResultConsumptionService {
             }
             EvaluationRun finalizedRun = evaluationRunRepository.tryFinalizeOwned(
                     run.id(), userId, languageProfileId, EvaluationRun.Status.SUCCEEDED,
-                    Optional.empty(), run.rowVersion());
+                    Optional.empty(), Optional.empty(), run.rowVersion());
             return new ConsumptionResult.Consumed(
-                    new DurableOutcome(finalizedRun, grounding));
+                    new DurableOutcome(finalizedRun, Optional.of(grounding)));
         }
         RejectionReason reason = ((SemanticGroundingResult.Rejected) grounding).reason();
         EvaluationRun finalizedRun = evaluationRunRepository.tryFinalizeOwned(
                 run.id(), userId, languageProfileId, EvaluationRun.Status.FAILED,
+                Optional.of(EvaluationRun.FailureReason.GROUNDING_REJECTED),
                 Optional.of(reason), run.rowVersion());
-        return new ConsumptionResult.Consumed(new DurableOutcome(finalizedRun, grounding));
+        return new ConsumptionResult.Consumed(
+                new DurableOutcome(finalizedRun, Optional.of(grounding)));
     }
 
     /** Ready 是内部 trusted snapshot，但不是本次 mutation 的 authorization proof，仍需绑定当前 Run identity。 */
@@ -177,7 +214,8 @@ public class EvaluationResultConsumptionService {
     /**
      * consumption CAS 使用 PostgreSQL CURRENT_TIMESTAMP 裁决 expiry，不能用 JVM 时间提前猜测。
      * Run 行锁只串行化本 Workflow consumer，通用 Job consumer 仍可能并发改变 consumption status；
-     * 因此 CAS 失败后重读 durable Job：保持原状态表示数据库已判定过期，depleted 状态交给 S8E，
+     * 因此 CAS 失败后重读 durable Job：保持原状态时尝试由数据库标记 EXPIRED，其他 depleted 状态
+     * 直接结束 Model branch，
      * CONSUMED + PENDING Run 或 identity 漂移则是跨边界不变量损坏。
      */
     private ConsumptionResult classifyFailedConsumptionCas(
@@ -200,14 +238,35 @@ public class EvaluationResultConsumptionService {
                     throw new IllegalStateException(
                             "evaluation job row version changed without a consumption transition");
                 }
-                // SQL CAS 的其余 predicates 已由当前 durable row 重新确认，唯一未暴露条件是 DB expiry。
-                yield new ConsumptionResult.DeferredToReconciliation();
+                Optional<ModelCallJob> expiredJob = modelCallJobRepository.tryExpireSucceededResult(
+                        currentJob.id(), userId, currentJob.rowVersion());
+                if (expiredJob.isEmpty()) {
+                    throw new IllegalStateException(
+                            "evaluation result transition failed without expiry or a durable state change");
+                }
+                yield finalizeModelFailure(
+                        run, userId, languageProfileId,
+                        EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
             }
             case PENDING_CONFIRMATION, EXPIRED, STALE, DISCARDED ->
-                    new ConsumptionResult.DeferredToReconciliation();
+                    finalizeModelFailure(
+                            run, userId, languageProfileId,
+                            EvaluationRun.FailureReason.MODEL_RESULT_UNAVAILABLE);
             case CONSUMED -> throw new IllegalStateException(
                     "evaluation job was consumed without a matching evaluation outcome");
         };
+    }
+
+    private ConsumptionResult.Consumed finalizeModelFailure(
+            EvaluationRun run,
+            UUID userId,
+            UUID languageProfileId,
+            EvaluationRun.FailureReason failureReason) {
+        EvaluationRun finalizedRun = evaluationRunRepository.tryFinalizeOwned(
+                run.id(), userId, languageProfileId, EvaluationRun.Status.FAILED,
+                Optional.of(failureReason), Optional.empty(), run.rowVersion());
+        return new ConsumptionResult.Consumed(
+                new DurableOutcome(finalizedRun, Optional.empty()));
     }
 
     /** terminal replay：只读取 durable outcome；header 缺失属于不变量损坏。 */
@@ -217,12 +276,18 @@ public class EvaluationResultConsumptionService {
                     .findOwnedCandidateByRunId(run.id(), userId, languageProfileId)
                     .orElseThrow(() -> new IllegalStateException(
                             "succeeded evaluation run is missing its validated semantic candidate"));
-            return new DurableOutcome(run, new SemanticGroundingResult.Validated(candidate));
+            return new DurableOutcome(
+                    run, Optional.of(new SemanticGroundingResult.Validated(candidate)));
         }
-        RejectionReason reason = run.groundingRejectionReason().orElseThrow(() ->
-                new IllegalStateException(
-                        "failed evaluation run is missing its grounding rejection reason"));
-        return new DurableOutcome(run, new SemanticGroundingResult.Rejected(reason));
+        EvaluationRun.FailureReason failureReason = run.failureReason().orElseThrow(() ->
+                new IllegalStateException("failed evaluation run is missing its failure reason"));
+        if (failureReason != EvaluationRun.FailureReason.GROUNDING_REJECTED) {
+            return new DurableOutcome(run, Optional.empty());
+        }
+        RejectionReason groundingReason = run.groundingRejectionReason().orElseThrow(() ->
+                new IllegalStateException("grounding-rejected evaluation run is missing its rejection reason"));
+        return new DurableOutcome(
+                run, Optional.of(new SemanticGroundingResult.Rejected(groundingReason)));
     }
 
     /** 与 S8B 创建期一致的完整 identity 校验；任何偏差都是持久化不变量损坏。 */
@@ -238,16 +303,21 @@ public class EvaluationResultConsumptionService {
                 && job.languageProfileId().equals(Optional.of(languageProfileId));
     }
 
-    /** terminal Run 与 typed grounding result 的 durable 配对；不使用 nullable candidate / reason。 */
-    public record DurableOutcome(EvaluationRun run, SemanticGroundingResult groundingResult) {
+    /** Model branch failure 没有 grounding result；其稳定原因保存在 EvaluationRun.failureReason。 */
+    public record DurableOutcome(EvaluationRun run, Optional<SemanticGroundingResult> groundingResult) {
 
         public DurableOutcome {
             Objects.requireNonNull(run, "run must not be null");
             Objects.requireNonNull(groundingResult, "groundingResult must not be null");
-            boolean matches = run.status() == EvaluationRun.Status.SUCCEEDED
-                    && groundingResult instanceof SemanticGroundingResult.Validated
-                    || run.status() == EvaluationRun.Status.FAILED
-                    && groundingResult instanceof SemanticGroundingResult.Rejected;
+            boolean matches = (run.status() == EvaluationRun.Status.SUCCEEDED
+                    && groundingResult.orElse(null) instanceof SemanticGroundingResult.Validated)
+                    || (run.status() == EvaluationRun.Status.FAILED
+                    && run.failureReason().orElse(null) == EvaluationRun.FailureReason.GROUNDING_REJECTED
+                    && groundingResult.orElse(null) instanceof SemanticGroundingResult.Rejected)
+                    || (run.status() == EvaluationRun.Status.FAILED
+                    && run.failureReason().filter(reason ->
+                            reason != EvaluationRun.FailureReason.GROUNDING_REJECTED).isPresent()
+                    && groundingResult.isEmpty());
             if (!matches) {
                 throw new IllegalArgumentException("outcome must match terminal run status");
             }
@@ -273,10 +343,6 @@ public class EvaluationResultConsumptionService {
 
         /** 绑定 Job 仍为 CREATED / RUNNING，尚无可消费的 durable result。 */
         record Pending() implements ConsumptionResult {
-        }
-
-        /** Job terminal failure 或成功结果已过期；处置属于 S8E reconciliation。 */
-        record DeferredToReconciliation() implements ConsumptionResult {
         }
 
         /** owner/profile 范围内不存在该 Session 的 Run。 */

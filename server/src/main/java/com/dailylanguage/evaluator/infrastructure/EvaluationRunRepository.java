@@ -102,18 +102,30 @@ public class EvaluationRunRepository {
             UUID trustedUserId,
             UUID languageProfileId,
             EvaluationRun.Status status,
+            Optional<EvaluationRun.FailureReason> failureReason,
             Optional<RejectionReason> groundingRejectionReason,
             long expectedRowVersion) {
         Objects.requireNonNull(evaluationRunId, "evaluationRunId must not be null");
         validateOwnedArguments(evaluationRunId, trustedUserId, languageProfileId);
         Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(failureReason, "failureReason must not be null");
         Objects.requireNonNull(groundingRejectionReason, "groundingRejectionReason must not be null");
         if (status == EvaluationRun.Status.PENDING) {
             throw new IllegalArgumentException("evaluation run can only finalize to a terminal status");
         }
-        if ((status == EvaluationRun.Status.SUCCEEDED) != groundingRejectionReason.isEmpty()) {
+        if (status == EvaluationRun.Status.SUCCEEDED
+                && (failureReason.isPresent() || groundingRejectionReason.isPresent())) {
             throw new IllegalArgumentException(
-                    "grounding rejection reason must match the evaluation terminal status");
+                    "successful evaluation run cannot have a failure reason");
+        }
+        if (status == EvaluationRun.Status.FAILED) {
+            EvaluationRun.FailureReason requiredFailure = failureReason.orElseThrow(() ->
+                    new IllegalArgumentException("failed evaluation run requires a failure reason"));
+            if ((requiredFailure == EvaluationRun.FailureReason.GROUNDING_REJECTED)
+                    != groundingRejectionReason.isPresent()) {
+                throw new IllegalArgumentException(
+                        "grounding rejection reason must match the evaluation failure reason");
+            }
         }
         if (expectedRowVersion < 0) {
             throw new IllegalArgumentException("expectedRowVersion must not be negative");
@@ -124,6 +136,7 @@ public class EvaluationRunRepository {
                         trustedUserId,
                         languageProfileId,
                         status.name(),
+                        failureReason.map(EvaluationRun.FailureReason::name).orElse(null),
                         groundingRejectionReason.map(RejectionReason::name).orElse(null),
                         expectedRowVersion));
         if (finalized == null) {
@@ -230,6 +243,7 @@ public class EvaluationRunRepository {
                 run.rowVersion(),
                 run.createdAt(),
                 Optional.ofNullable(run.completedAt()),
+                Optional.ofNullable(run.failureReason()).map(EvaluationRun.FailureReason::valueOf),
                 Optional.ofNullable(run.groundingRejectionReason()).map(RejectionReason::valueOf));
     }
 
@@ -274,6 +288,7 @@ record StoredEvaluationRun(
         long rowVersion,
         OffsetDateTime createdAt,
         OffsetDateTime completedAt,
+        String failureReason,
         String groundingRejectionReason) {
 }
 
@@ -282,6 +297,7 @@ record FinalizeEvaluationRunRow(
         UUID trustedUserId,
         UUID languageProfileId,
         String status,
+        String failureReason,
         String rejectionReason,
         long expectedRowVersion) {
 }

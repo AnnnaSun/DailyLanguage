@@ -198,7 +198,8 @@ V1 站内提示不等于 Module 34 Push Notification / Learning Recall。Push、
 M1-S8D 已把 Evaluator 接到该 lifecycle：S8B 在 `REQUIRES_NEW` transaction 内原子创建
 `EvaluationRun + ModelCallJob`，提交后由 `TextGenerationJobDispatch` 复用既有 typed submission / Worker；
 只有新建关联会 dispatch，重复请求返回 durable Existing 状态。versioned request 与 transient Credential
-只在内存调用链传播，不成为 durable Job payload。HTTP status / reconciliation 仍属于 M1-S8E。
+只在内存调用链传播，不成为 durable Job payload。S8E-R 已在 Evaluation-owned consumption entry 归约 terminal
+failure 与 unavailable result；HTTP status、background discovery/recovery 与 automatic retry 未实现。
 
 ## 9. Explicit non-goals
 

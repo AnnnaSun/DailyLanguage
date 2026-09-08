@@ -207,5 +207,5 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | PracticeSession Lifecycle | IMPLEMENTED | M1-S5 / M1-S6 | [`practice-session-lifecycle.md`](practice-session-lifecycle.md) |
 | Grounded Semantic Validation | IMPLEMENTED | M1-S7 / M1-S8A | [`grounded-semantic-validation.md`](grounded-semantic-validation.md) |
 | EvaluationRun Creation | IMPLEMENTED | M1-S8A / M1-S8B | [`evaluation-run-creation.md`](evaluation-run-creation.md) |
-| Evaluation Result Consumption | IMPLEMENTED | M1-S8C | [`evaluation-result-consumption.md`](evaluation-result-consumption.md) |
+| Evaluation Result Consumption and Reconciliation | IMPLEMENTED | M1-S8C / M1-S8E-R | [`evaluation-result-consumption.md`](evaluation-result-consumption.md) |
 | Evaluation Model Dispatch | IMPLEMENTED | M1-S8D | [`evaluation-model-dispatch.md`](evaluation-model-dispatch.md) |

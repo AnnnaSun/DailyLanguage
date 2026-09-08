@@ -1,7 +1,7 @@
 # Grounded Semantic Validation Flow
 
-- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A–D）
-- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A–D` production workflow integration
+- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A–E-R）
+- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A–E-R` production workflow integration
 - Last Verified: `2026-09-08`
 - Entry: `SemanticGroundingValidator.validate`；`GroundedEvaluationInputReader.readOwned`（S8A）
 

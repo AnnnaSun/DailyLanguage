@@ -14,7 +14,8 @@
 S8D 负责 Evaluator prompt / request、`EVALUATION` route、7 天 result TTL 和 transient Credential dispatch。
 它不提供 HTTP API，不自动 retry 或 reconciliation，也不修改 completed Practice、deterministic assessment、
 Memory、Weakness、Level 或 Mastery。S8C 仍负责把成功 Job 的 durable result grounding 并原子消费；Model
-failure、过期结果与遗留 `CREATED` Job 的最终解释留给 S8E。
+failure 与过期/stale/depleted result 已由 S8E-R 在 consumption entry 归约；遗留 `CREATED / RUNNING` Job 的自动
+发现、HTTP status 与 recovery 仍留给 S8E-API 或后续明确批准的 reliability scope。
 
 ## 2. Main Call Chain
 
@@ -99,8 +100,8 @@ OpenAI-compatible adapter、`deepseek-v4-flash` 与 30 秒 execution timeout。
 - executor capacity rejection：Provider 未调用；Job 必须成功 CAS 为 `SUBMISSION_REJECTED` 后才返回结果。
 - rejection CAS 丢失：抛出安全 `IllegalStateException`，不把未确认状态报告为成功。
 - submission 抛出未知异常：异常原样传播，不猜测 Executor 是否接纳，不执行可能重复调用 Provider 的补偿。
-- 进程在 durable commit 后、内存 submission 前终止：Job 可能停留在 `CREATED`。S8D 不自动 retry；S8E 负责
-  status / reconciliation 设计。
+- 进程在 durable commit 后、内存 submission 前终止：Job 可能停留在 `CREATED`。S8D/S8E-R 不自动 retry；
+  status、自动发现与 recovery 尚未实现。
 - Model 执行或 semantic output 失败不删除 completed Practice，也不污染长期学习状态。
 
 ## 6. Verification Evidence

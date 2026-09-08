@@ -1,24 +1,28 @@
-# Evaluation Result Consumption Flow
+# Evaluation Result Consumption and Reconciliation Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M1-S8C`
-- Last Verified: `2026-09-07`
+- Feature / Slice: `M1-S8C / M1-S8E-R`
+- Last Verified: `2026-09-08`
 - Entry: `EvaluationResultConsumptionService.consumeForReadyInput`
 
 ## 1. Behavior Boundary
 
-本 Flow 描述已经实现的 Evaluation result consumption：把 S8A 组装的 owner-scoped completed
-`GroundedEvaluationInputResult.Ready`、S8B 建立的 `EvaluationRun + ModelCallJob`，以及该 Job 已 durable
-保存的 `SUCCEEDED` text result，在一个 read-write transaction 内转换成 terminal Evaluation outcome。
+本 Flow 描述已经实现的 Evaluation result consumption 与 workflow-owned reconciliation kernel：把 S8A 组装的
+owner-scoped completed `GroundedEvaluationInputResult.Ready`、S8B 建立的 `EvaluationRun + ModelCallJob`，以及
+Job 的 durable execution/result 状态，在一个 read-write transaction 内转换成 terminal Evaluation outcome。
 
-成功 grounding 时保存唯一 `ValidatedSemanticCandidate` header 与有序 claims，并把 Run 标记为
-`SUCCEEDED`；grounding 拒绝时只保存安全的 `RejectionReason`，把 Run 标记为 `FAILED`。两条路径都与
-Job `NOT_READY → CONSUMED` 原子提交。terminal Run 的重复调用只读取 durable outcome，不重新 grounding。
+current workflow 的 `SUCCEEDED / NOT_READY` result 继续由 S8C 执行 Java grounding：成功时保存唯一
+`ValidatedSemanticCandidate` header 与有序 claims，并把 Run 标记为 `SUCCEEDED`；grounding 拒绝时保存安全
+`RejectionReason`，把 Run 标记为 `FAILED + GROUNDING_REJECTED`。两条路径都与 Job
+`NOT_READY → CONSUMED` 原子提交。
+
+S8E-R 归约 terminal Model execution failure、expired、stale 或其他不可再消费 result，只把 Run 的 semantic branch
+终结为 `FAILED`，不修改 completed Practice、`DeterministicAssessment` 或长期 learner state。`CREATED / RUNNING`
+仍返回 `Pending`，不猜测 outcome、不自动 retry。terminal Run 重复调用只读取 durable outcome，不重新 grounding。
 
 本 Flow 不负责 Model request / prompt 构造、route、Credential、submission 或 dispatch（M1-S8D，见
-`evaluation-model-dispatch.md`），也不负责
-Model failure、expired / stale result 的最终 reconciliation 或 HTTP API（M1-S8E）。它不创建长期 Evidence，
-不修改 Memory、Weakness、Level 或 Mastery；validated candidate 仍是 Session-level diagnosis candidate。
+`evaluation-model-dispatch.md`），也不提供 HTTP API、background scheduler、automatic retry 或遗留
+`CREATED / RUNNING` recovery。它不创建长期 Evidence，不修改 Memory、Weakness、Level 或 Mastery。
 
 ## 2. Main Call Chain
 
@@ -37,31 +41,38 @@ sequenceDiagram
     alt Run 不存在或 Ready identity 不一致
         Service-->>Caller: NotFound / InconsistentInput
     else Run 已 terminal
-        Service->>RunRepo: read durable candidate + claims or safe reason
+        Service->>RunRepo: read durable candidate/rejection or failure category
         Service-->>Caller: Existing(durable outcome)
     else Run PENDING
         Service->>JobRepo: findByIdAndUserId(boundJobId, authenticated user)
         Service->>Service: verify workflow / owner / profile / purpose / operation
-        alt CREATED / RUNNING
+        alt Job CREATED / RUNNING
             Service-->>Caller: Pending
-        else failure / depleted result
-            Service-->>Caller: DeferredToReconciliation
-        else SUCCEEDED + NOT_READY
+        else Job terminal execution failure
+            Service->>RunRepo: CAS Run → FAILED + MODEL_CALL_FAILED
+            Service-->>Caller: Consumed(durable outcome without grounding)
+        else Job SUCCEEDED + depleted result
+            Service->>RunRepo: CAS Run → FAILED + MODEL_RESULT_UNAVAILABLE
+            Service-->>Caller: Consumed(durable outcome without grounding)
+        else Job SUCCEEDED + NOT_READY + old workflow
+            Service->>JobRepo: CAS NOT_READY → STALE
+            Service->>RunRepo: CAS Run → FAILED + MODEL_RESULT_UNAVAILABLE
+            Service-->>Caller: Consumed(durable outcome without grounding)
+        else Job SUCCEEDED + NOT_READY + current workflow
             Service->>JobRepo: read durable text generation result
             Service->>Validator: validate(raw JSON, trusted input)
             Validator-->>Service: Validated(candidate) / Rejected(reason)
             Service->>JobRepo: CAS NOT_READY → CONSUMED
-            alt CAS rejected by DB expiry/depleted state
-                Service-->>Caller: DeferredToReconciliation
-            else CAS consumed
-                alt Validated
-                    Service->>RunRepo: insert candidate header + ordered claims
-                    Service->>RunRepo: CAS Run PENDING → SUCCEEDED
-                else Rejected
-                    Service->>RunRepo: CAS Run PENDING → FAILED + safe reason
-                end
-                Service-->>Caller: Consumed(durable outcome)
+            alt CAS rejected by PostgreSQL expiry
+                Service->>JobRepo: reread and CAS NOT_READY → EXPIRED
+                Service->>RunRepo: CAS Run → FAILED + MODEL_RESULT_UNAVAILABLE
+            else CAS consumed + Validated
+                Service->>RunRepo: insert candidate header + ordered claims
+                Service->>RunRepo: CAS Run → SUCCEEDED
+            else CAS consumed + Rejected
+                Service->>RunRepo: CAS Run → FAILED + GROUNDING_REJECTED + reason
             end
+            Service-->>Caller: Consumed(durable outcome)
         end
     end
 ```
@@ -70,73 +81,76 @@ sequenceDiagram
 
 - **Caller identity**：只取 `UserContext.userId`；Ready 中的 userId 只做一致性比较，不提供授权。
 - **Ownership / language isolation**：Run lock、candidate insert、claim insert、terminal read 与 finalize 都通过
-  `run / candidate → session → learning_task` 重校验 trusted owner 与 exact `languageProfileId`；owned Run/candidate
-  gate 在需要核对 target language 时继续关联 `language_profile`。
+  `run / candidate → session → learning_task` 重校验 trusted owner 与 exact `languageProfileId`；Job 同时绑定
+  owner/profile、purpose、operation、workflow id/step/version。
 - **Model result authority**：只读取 Run 绑定 Job 的 PostgreSQL result row；不接受调用方提供 raw JSON 或 jobId。
 - **Semantic authority**：不可信 Model JSON 只能由 `SemanticGroundingValidator` 转为 `Validated / Rejected`；
-  quote occurrence、UTF-16 offsets、rubric issue allowlist 与 trusted snapshot consistency 由 Java 裁决。
-- **Persistence authority**：PostgreSQL CAS 与 constraints 决定 Job consumption、Run terminal lifecycle、candidate
-  provenance 和 claim/source-response FK；应用层不能用返回对象代替 durable state。
-- **Privacy boundary**：candidate 保存 grounding 所需的 exact learner quote 与 Model explanation；安全 rejection 只保存
-  category。Credential、完整 Prompt、完整 Model raw output 与 provider request 不写入 candidate/Run，也不写日志。
+  quote occurrence、UTF-16 offsets、rubric allowlist 与 trusted snapshot consistency 由 Java 裁决。
+- **Failure authority**：Job 保存具体 execution/consumption status；`EvaluationRun.failureReason` 只保存稳定的
+  workflow-level category。Java domain invariant 与 PostgreSQL V13 constraints 使用同一 closed pairing。
+- **Time / persistence authority**：PostgreSQL `CURRENT_TIMESTAMP`、rowVersion CAS、FK 和 check constraints 决定
+  expiry、Job consumption 与 Run terminal lifecycle；JVM 时间或返回对象不能替代 durable state。
+- **Privacy boundary**：candidate 保存 grounding 所需的 exact learner quote 与 Model explanation；Run failure 只保存
+  safe category。Credential、完整 Prompt、完整 Model raw output 与 provider request 不写入 Run，也不写安全日志。
 
 ## 4. State Transition and Persistence
 
-Flyway V12 把 `evaluation_run` 生命周期扩展为：
+Flyway V13 在 V12 outcome 上增加 `failure_reason`：
 
 ```text
-PENDING
-  ├─ Validated → SUCCEEDED + completed_at + one candidate header + 0..20 claims
-  └─ Rejected  → FAILED    + completed_at + grounding_rejection_reason
+EvaluationRun PENDING
+  ├─ Validated current result
+  │    └─ SUCCEEDED + completed_at + candidate header + 0..20 claims
+  ├─ Grounding rejected
+  │    └─ FAILED + GROUNDING_REJECTED + grounding_rejection_reason
+  ├─ Model execution terminal failure
+  │    └─ FAILED + MODEL_CALL_FAILED
+  └─ Result expired / stale / depleted
+       └─ FAILED + MODEL_RESULT_UNAVAILABLE
 ```
 
-消费成功时同一 transaction 内固定执行：
+`GROUNDING_REJECTED` 必须带 safe `grounding_rejection_reason`；`MODEL_CALL_FAILED` 与
+`MODEL_RESULT_UNAVAILABLE` 必须不带 grounding reason。V13 将已有 V12 `FAILED` Run 回填为
+`GROUNDING_REJECTED`，保留原 rejection reason，并建立 `(created_at, id) WHERE status='PENDING'` partial index。
 
-```text
-ModelCallJob: SUCCEEDED / NOT_READY
-    → CAS SUCCEEDED / CONSUMED
-    → candidate + claims（Validated）或 safe rejection（Rejected）
-    → EvaluationRun PENDING / rowVersion=N
-       CAS → SUCCEEDED|FAILED / rowVersion=N+1
-```
+所有 Run outcome 都在同一 Spring transaction 内完成。normal grounding path 的 Job `CONSUMED`、candidate/claims 或
+safe rejection 与 Run terminal transition 同时提交；old/expired path 的 Job `STALE / EXPIRED` 与 Run failure 同时
+提交；已经 terminal 的 Model execution state 是本 transaction 只读的 durable 前置事实。任一步异常会回滚本
+transaction 的全部 mutation。
 
-任一步抛出异常，Spring transaction 回滚全部写入，Job 恢复为 `NOT_READY`，Run 保持 `PENDING`，candidate/claims
-不留下部分数据。`validated_semantic_candidate` 的 composite FK 保证 header 的 Session 等于 Run Session；
-`validated_semantic_claim` 通过 `(session_id, source_turn_id)` 引用该 Session 已接受的 `practice_response`。
-
-Run 行锁是相同 Evaluation consumer 的串行化点：首个调用提交 terminal outcome 后，后到调用读取同一 durable
-outcome 并返回 `Existing`。其他通用 Job consumer 不受 Run 锁控制，因此 Job consumption 仍使用 `rowVersion`、
-workflow version、状态与 PostgreSQL `CURRENT_TIMESTAMP` expiry gate 的 CAS。
+Run 行锁串行化同一 Evaluation consumer。通用 Job consumer 不受 Run lock 控制，因此 Job mutation 继续使用
+execution status、consumption status、workflow version、rowVersion 与 database time CAS。CAS 失败后必须重读 durable
+Job；identity 漂移、无合法 state transition 或 `CONSUMED + PENDING Run` 均 fail closed。
 
 ## 5. Failure / Rejection Paths
 
 - `NotFound`：owner/profile 范围内不存在 Ready Session 对应的 Run。
 - `InconsistentInput`：Ready caller、Run、Session 或 Task identity 不一致；不读取绑定 Job。
-- `Pending`：绑定 Job 仍为 `CREATED / RUNNING`。
-- `DeferredToReconciliation`：Model execution failure、`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED`，或
-  PostgreSQL 判定 `NOT_READY` result 已过期；S8C 不替 S8E 执行 reconciliation。
-- `Rejected(reason)`：Model execution 已成功且 result 被消费，但 semantic output 未通过 grounding；Run durable
-  终结为 `FAILED`，不保存 raw output 或部分 candidate。
+- `Pending`：绑定 Job 仍为 `CREATED / RUNNING`；当前 kernel 不自动恢复或 retry。
+- `GROUNDING_REJECTED`：Model execution 成功且 result 已消费，但 semantic output 未通过 Java grounding；只保存安全
+  reason，不保存 raw output 或部分 candidate。
+- `MODEL_CALL_FAILED`：Job 为 `FAILED / TIMED_OUT / OUTCOME_UNKNOWN / SUBMISSION_REJECTED`；具体状态留在 Job。
+- `MODEL_RESULT_UNAVAILABLE`：Job result 为 `PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED`，或 old/current
+  result 经 CAS 被裁决为 stale/expired。
 - `IllegalStateException`：绑定 Job 缺失/identity 漂移、成功 Job 缺 result、Job 已 `CONSUMED` 但 Run 仍
-  `PENDING`、terminal Run 缺少 durable outcome，或无法解释的 CAS/finalize 冲突。这些属于持久化不变量损坏，
-  fail closed 并回滚本次 transaction。
-- Model failure 或 invalid output 不删除、回滚或覆盖 completed Practice 与 `DeterministicAssessment`，也不污染长期状态。
+  `PENDING`、terminal Run 缺 durable outcome，或无法解释的 CAS/finalize 冲突；fail closed 并回滚。
+- 任一 Model/grounding failure 都不删除、回滚或覆盖 completed Practice 与 `DeterministicAssessment`，也不污染长期状态。
 
 ## 6. Verification Evidence
 
-- S8C unit（2026-09-07）：`EvaluationResultConsumptionServiceTests` 19/19 PASS；affected unit regression
-  `EvaluationRunCreationServiceTests` 14/14、`GroundedEvaluationInputReaderTests` 18/18、
-  `SemanticGroundingValidatorTests` 33/33、`ClasspathRubricSourceTests` 22/22，合计 106/106 PASS。
-- S8C integration：`EvaluationResultConsumptionIntegrationTests` 12/12 PASS，覆盖 validated / zero-claim /
-  rejected outcome、terminal replay、并发单次消费、pending/deferred、owner/profile isolation、candidate-before-consume
-  DB gate、claim failure transaction rollback 与 durable invariant corruption。
-- Fresh external verification：独立 disposable PostgreSQL 18.6 空库从 Flyway V1–V12 12/12 应用；S8C 12/12、
-  S8B 8/8、S8A Reader 5/5、S7 grounding 3/3、ModelCallJob consumption 6/6、ModelCallJob text success 9/9，
-  affected integration regression 合计 43/43 PASS（0 failures / 0 errors / 0 skipped）。两个临时数据库均已删除，
-  primary database 未作为测试目标，未执行 Flyway repair 或 checksum 修改。
-- Production / test compilation PASS；Mapper XML parse PASS；`git diff --check` 与 untracked whitespace check PASS。
-- Critical Diff Review：Scope MATCH（超出初始 LOC guardrail 已由用户明确接受）；Code Review / Architecture PASS，
-  no blocking findings。未重跑 repository full server suite。
+- S8C baseline（2026-09-07）：service 19/19、affected unit 106/106；PostgreSQL 18.6 empty schema Flyway
+  V1–V12 12/12，result consumption 12/12、affected integration 43/43 PASS。
+- S8E-R local（2026-09-08）：final targeted 35/35 PASS；implementation-stage full server 703 tests / 0 failures / 0 errors /
+  160 environment-conditional skips（实际执行 543）；Mapper SQL safety 2/2；`git diff --check` PASS。
+- S8E-R external（2026-09-08）：disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13；Evaluation result
+  consumption、Run creation、dispatch、ModelCallJob consumption integration 合计 28/28 PASS，0 failures / 0 errors /
+  0 skipped。
+- Upgrade verification：独立数据库先迁移到 V12 并建立历史 grounding `FAILED` Run，再升级 V13；V12 与 V13
+  probe 各 10/10 PASS，历史行得到 `GROUNDING_REJECTED` 且保留 `QUOTE_MISMATCH`。V13 constraints 与 partial index
+  已通过 PostgreSQL catalog 查询确认。
+- 临时容器/数据库均已删除，primary database 未作为测试目标；既有 PostgreSQL / Redis 保持 healthy。未执行
+  Flyway repair、checksum 修改或 live Provider call。
+- Critical Diff Review：Scope MATCH；Code Review / Architecture PASS；no blocking findings。
 
 ## 7. Source References
 
@@ -148,7 +162,9 @@ workflow version、状态与 PostgreSQL `CURRENT_TIMESTAMP` expiry gate 的 CAS�
 - `server/src/main/java/com/dailylanguage/evaluator/infrastructure/EvaluationRunMapper.java`
 - `server/src/main/resources/mapper/EvaluationRunMapper.xml`
 - `server/src/main/resources/db/migration/V12__add_evaluation_run_outcome.sql`
+- `server/src/main/resources/db/migration/V13__add_evaluation_run_failure_reason.sql`
 - `server/src/main/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobRepository.java`
 - `server/src/main/resources/mapper/ModelCallJobMapper.xml`
 - `server/src/test/java/com/dailylanguage/evaluator/application/EvaluationResultConsumptionServiceTests.java`
 - `server/src/test/java/com/dailylanguage/evaluator/application/EvaluationResultConsumptionIntegrationTests.java`
+- `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobConsumptionRepositoryIntegrationTests.java`

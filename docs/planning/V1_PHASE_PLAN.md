@@ -151,7 +151,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — 整体设计方向 APPROVED；S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D READY_TO_COMMIT；S8E 实施未批准 |
+| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D COMPLETE (`8228d64`)；S8E-R READY_TO_COMMIT；S8E-API 实施未批准 |
 | M1-S8T | Minimum guided text learning | PLANNED — 在完整 M1-S8 后、M1-S9 前；交付范围已批准，Current Slice Contract 未批准 |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
@@ -204,8 +204,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 并由用户确认已 merge。
 
 M1-S8 整体设计方向已批准，按 S8A trusted input 读取、S8B Run / Job 原子关联、S8C grounding outcome /
-candidate 原子消费、S8D prompt / route / transient dispatch、S8E API / reconciliation 拆分；S8A–S8D
-Current Slice Contract 已获实施授权并完成适用 Review / verification，S8E 仍需单独 Scope 批准。
+candidate 原子消费、S8D prompt / route / transient dispatch、S8E reconciliation / API 拆分；S8A–S8E
+Current Slice Contract 已批准。S8E-R reconciliation kernel 已完成，S8E-API 仍需单独 implementation approval。
 
 S8A 已实现 `GroundedEvaluationInputReader.readOwned`，通过 authenticated caller 的 owner/profile-scoped
 读取与 exact material identity 组装 completed snapshot；零写入、不新增 schema / API 或 Model 调用。
@@ -228,8 +228,9 @@ S8C 已实现 `EvaluationResultConsumptionService.consumeForReadyInput`：owner/
 consumer，完整核对 Ready / Run / Job identity，只读取绑定 Job 的 durable text result，经 Java grounding 后在同一
 read-write transaction 内执行 Job `NOT_READY → CONSUMED` CAS、normalized candidate/claims 或 safe rejection
 持久化，以及 Run `PENDING → SUCCEEDED | FAILED` CAS。terminal Run 重复调用读取 durable outcome；Model failure、
-`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED` 交给 S8E reconciliation。任一 outcome 写入失败会连同 Job
-consumption 回滚，不创建长期 Evidence 或修改 Memory / Weakness / Level / Mastery。
+`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED` 在 S8C 交付时留给后续 reconciliation；当前已由 S8E-R
+归约，见下文。任一 outcome 写入失败会连同 Job consumption 回滚，不创建长期 Evidence 或修改 Memory /
+Weakness / Level / Mastery。
 
 S8C Critical Diff Review / Architecture PASS，无 blocking code finding；初始 LOC guardrail 超出已获用户明确接受。
 受影响 unit 106/106 PASS；disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12，S8C integration
@@ -254,8 +255,24 @@ disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12，Evaluation dispa
 verification reports 243/243 PASS；full server regression 700 tests / 0 failures / 0 errors / 159 environment-conditional
 skips（实际执行 541）。Integration 使用 mock `TextGenerationPort`，未访问 live Provider；临时数据库已删除，
 primary database 未使用，PostgreSQL / Redis 恢复停止。Behavior Flow `CURRENT`
-（`docs/flow/evaluation-model-dispatch.md`）；standalone Ownership 按批准节奏不要求。S8D 当前
-`READY_TO_COMMIT`、未 commit；S8E 未批准。
+（`docs/flow/evaluation-model-dispatch.md`）；standalone Ownership 按批准节奏不要求。S8D 已提交为 `8228d64`。
+
+S8E-R 已扩展 `EvaluationResultConsumptionService.consumeForReadyInput` 的 workflow-owned reconciliation：
+`CREATED / RUNNING` 继续返回 `Pending`；`FAILED / TIMED_OUT / OUTCOME_UNKNOWN / SUBMISSION_REJECTED` 将 Run
+终结为 `FAILED + MODEL_CALL_FAILED`；成功 Job 的 `PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED`、旧
+workflow result 或 PostgreSQL 判定过期的 result 终结为 `FAILED + MODEL_RESULT_UNAVAILABLE`。grounding rejection
+继续保存 `GROUNDING_REJECTED + RejectionReason`。terminal replay 只读 durable outcome，不重新 grounding 或调用
+Provider。所有状态转换继续绑定 owner/profile、Run/Job workflow identity、rowVersion 与单一 transaction；Model
+branch failure 不修改 completed Practice、deterministic assessment 或长期 learner state，也不授权 automatic retry。
+
+Flyway V13 新增 closed `failure_reason`、更新 terminal outcome pairing constraint，并为 `PENDING` Run reconciliation
+建立 partial index。Critical Diff Review / Architecture PASS，无 blocking finding；final targeted 35/35，
+implementation-stage full server 703 tests / 0 failures / 0 errors / 160 conditional skips。2026-09-08 fresh external
+verification：disposable PostgreSQL
+18.6 empty schema Flyway V1–V13 13/13、相关 integration 28/28；V12→V13 upgrade probe 在 V12 与升级后各 10/10，
+历史 grounding `FAILED` Run 正确回填 `GROUNDING_REJECTED`。临时容器/数据库已删除，primary database 未使用，
+existing PostgreSQL / Redis 保持 healthy。Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求。
+S8E-R 当前 `READY_TO_COMMIT`、未 commit；S8E-API、scheduler 与 automatic retry 未实现、未获实施授权。
 
 ### M2 — Persistent Adaptation Loop
 
