@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.5
+> Version: 1.6
 > Approved: 2026-08-20  
-> Last updated: 2026-09-04 — M1-S5 documentation reconciliation
+> Last updated: 2026-09-09 — M1-S8E-API documentation closeout
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -99,10 +99,15 @@ M1 Built-in Text Practice walking skeleton
 **Goal**
 
 让用户在一个 Language Profile 下完成一次最小 text practice，并得到 Session-level evaluation。
+同时交付一个最小文本教学场景，让用户先接触和理解新表达，再借助辅助使用。
 
 **Done Criteria**
 
 - Planner 生成最小 LearningTask；
+- 至少一个 `en + zh-CN` 文本教学场景支持示范、简短解释、理解检查与辅助使用；
+  经 M1-S11 最小 UX 可由用户实际完成，不以仅存在内容字段或 API 作为交付证明；
+- 教学任务保留 material identity/version 与必要辅助条件，区分提供、请求/打开和 UNKNOWN；
+  Session-level 结果不得把辅助完成解释成独立使用，缺失辅助记录不得默认为无辅助；
 - 用户完成 text conversation / writing practice；
 - Practice 产生 trusted event 可确定的 deterministic assessment；
 - Model 可用时 Evaluator 生成经过 validation 的 semantic diagnosis；
@@ -146,11 +151,18 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | SCOPE_NOT_APPROVED |
+| M1-S8 | Evaluator ModelCallJob integration | READY_TO_COMMIT — S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D COMPLETE (`8228d64`)；S8E-R COMPLETE (`bf02aed`)；S8E-API implementation/review/external/docs/ownership PASS，未 commit |
+| M1-S8T | Minimum guided text learning | PLANNED — 在完整 M1-S8 后、M1-S9 前；交付范围已批准，Current Slice Contract 未批准 |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
+
+2026-09-07 批准的教学增量见 [`GUIDED_LANGUAGE_LEARNING.md`](../features/GUIDED_LANGUAGE_LEARNING.md)。
+`M1-S8T` 是独立教学 slice 标识，不属于 S8A–E，也不重编号既有 S9–S12。
+S8T 先明确最小材料、交互与辅助条件记录合同，避免 M2 无法解释历史表现；长期聚合仍在 M2。
+M1-S11 同时承接该场景的最小可用界面，M4 才补齐完整学习选择与迁移体验。
+如实现超过认知预算，在 Current Slice Contract 阶段拆成可 Review 子 slice，不一次实现整个教学体系。
 
 M1-S2 已完成 provider-free deterministic candidate filtering、stable fallback、final material re-resolution
 validation 与 typed `Planned / Unavailable` result；Planner 不拥有 persistence、Model invocation、Session 或
@@ -189,7 +201,97 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 `UNDERSTOOD`。随后批准的 non-behavioral delta 将 `RubricSource` 与 `ClasspathRubricSource` 迁移到独立文件，当前
 结构为 7 个 Production Java files / 643 行；delta Review 与本地 unit 55/55 PASS，database integration 3 个因
 未设置 `RUN_DATABASE_TESTS` 而跳过，按用户要求未重跑外部容器验证。source extraction 已提交为 `e93f624`，
-并由用户确认已 merge；M1-S8 未批准。
+并由用户确认已 merge。
+
+M1-S8 整体设计方向已批准，按 S8A trusted input 读取、S8B Run / Job 原子关联、S8C grounding outcome /
+candidate 原子消费、S8D prompt / route / transient dispatch、S8E reconciliation / API 拆分；S8A–S8E
+Current Slice Contract 已批准。S8E-R reconciliation kernel 已提交为 `bf02aed`；S8E-API 已完成 implementation、
+Critical Review、external verification 与 documentation；完整 S8 Ownership 已按批准节奏统一完成。
+
+S8A 已实现 `GroundedEvaluationInputReader.readOwned`，通过 authenticated caller 的 owner/profile-scoped
+读取与 exact material identity 组装 completed snapshot；零写入、不新增 schema / API 或 Model 调用。
+Critical / delta Review PASS；Codex unit regression 73/73 PASS；2026-09-06 正常配置下 Reader integration
+5/5 与 S7 integration 3/3 PASS（无失败、错误或跳过）；disposable PostgreSQL 18.6 empty schema Flyway
+V1–V10 10/10 PASS。重复提交断言与 fixture 删除后的 MyBatis 一级缓存问题均已在测试内修复，临时容器已清理。
+S8A 文档已收口并提交为 `226b804`。用户批准每个子 slice 保留 Review / verification，S8A 不单独
+Explain Back；S8B / S8C 仅针对重要理解缺口简短确认，正式 Ownership Check 留到 S8 完整闭环后统一进行。
+
+S8B 已实现 `EvaluationRunCreationService.createForReadyInput`：在 `REQUIRES_NEW` 事务内先锁定 owner-scoped
+completed Session，再原子创建唯一 `PENDING` EvaluationRun 与 EVALUATION / TEXT_GENERATION ModelCallJob；
+`workflowId = evaluationRunId`，数据库 insert gate JOIN Job 核对 owner/profile、purpose、operation、step 与
+version。重复或并发请求返回同一 Run/Job，任何创建失败整体 rollback、零 orphan；本 slice 不 dispatch Model。
+Critical Review 的 4 个 findings 已关闭，delta Review PASS。2026-09-07 fresh Codex external verification：
+disposable PostgreSQL 18.6 empty schema Flyway V1–V11 11/11、S8B integration 8/8、affected ModelCallJob
+regression 103/103 PASS，0 failures / 0 errors / 0 skipped；临时数据库已删除，primary database 未使用。
+Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求。S8B 已提交为 `2d46df6`。
+
+S8C 已实现 `EvaluationResultConsumptionService.consumeForReadyInput`：owner/profile-scoped Run 行锁串行化同一 Evaluation
+consumer，完整核对 Ready / Run / Job identity，只读取绑定 Job 的 durable text result，经 Java grounding 后在同一
+read-write transaction 内执行 Job `NOT_READY → CONSUMED` CAS、normalized candidate/claims 或 safe rejection
+持久化，以及 Run `PENDING → SUCCEEDED | FAILED` CAS。terminal Run 重复调用读取 durable outcome；Model failure、
+`PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED` 在 S8C 交付时留给后续 reconciliation；当前已由 S8E-R
+归约，见下文。任一 outcome 写入失败会连同 Job consumption 回滚，不创建长期 Evidence 或修改 Memory /
+Weakness / Level / Mastery。
+
+S8C Critical Diff Review / Architecture PASS，无 blocking code finding；初始 LOC guardrail 超出已获用户明确接受。
+受影响 unit 106/106 PASS；disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12，S8C integration
+12/12 与 affected integration regression 43/43 PASS（0 failures / 0 errors / 0 skipped）；临时数据库已删除，
+primary database 未使用，未执行 Flyway repair 或 checksum 修改。Behavior Flow `CURRENT`
+（`docs/flow/evaluation-result-consumption.md`）；standalone Ownership 按批准节奏不要求。S8C 已提交为
+`de29ada`；当时未重跑的 repository full server suite 已在 S8D verification 中覆盖。
+
+S8D 已实现 `EvaluationDispatchService.dispatchForReadyInput` 与 versioned `EvaluationTextRequestFactory`：workflow
+version 0 显式选择 classpath prompt v1 和 exact target-language rubric，把 trusted completed snapshot 投影为
+provider-neutral EVALUATION / JsonObject request。request 只包含 task/material/response/deterministic result/rubric
+所需字段，不包含 user/profile/session UUID、Credential、support scaffold、accepted answer 或长期 learner state。
+
+入口使用 `@Transactional(NEVER)`；先由 S8B `REQUIRES_NEW` 创建并提交唯一 Run/Job，再只对 `Created` 结果调用
+共享 `TextGenerationJobDispatch`。该组件验证 Job 的 CREATED/NOT_READY、TEXT_GENERATION 与 purpose identity，
+通过既有 bounded submission / Worker 把 memory-only request/Credential 交给 Model Gateway；`Existing` 只返回
+durable state，不重复调用 Provider。capacity rejection CAS 为 `SUBMISSION_REJECTED`；unknown submission exception
+不做可能重复调用的补偿。默认 result TTL 7d，EVALUATION fixed route 默认 model `deepseek-v4-flash`、timeout 30s。
+
+S8D Critical Diff Review / Architecture PASS，无 blocking finding。Fresh targeted unit/config regression 29/29 PASS；
+disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12，Evaluation dispatch integration 1/1 PASS；affected
+verification reports 243/243 PASS；full server regression 700 tests / 0 failures / 0 errors / 159 environment-conditional
+skips（实际执行 541）。Integration 使用 mock `TextGenerationPort`，未访问 live Provider；临时数据库已删除，
+primary database 未使用，PostgreSQL / Redis 恢复停止。Behavior Flow `CURRENT`
+（`docs/flow/evaluation-model-dispatch.md`）；standalone Ownership 按批准节奏不要求。S8D 已提交为 `8228d64`。
+
+S8E-R 已扩展 `EvaluationResultConsumptionService.consumeForReadyInput` 的 workflow-owned reconciliation：
+`CREATED / RUNNING` 继续返回 `Pending`；`FAILED / TIMED_OUT / OUTCOME_UNKNOWN / SUBMISSION_REJECTED` 将 Run
+终结为 `FAILED + MODEL_CALL_FAILED`；成功 Job 的 `PENDING_CONFIRMATION / EXPIRED / STALE / DISCARDED`、旧
+workflow result 或 PostgreSQL 判定过期的 result 终结为 `FAILED + MODEL_RESULT_UNAVAILABLE`。grounding rejection
+继续保存 `GROUNDING_REJECTED + RejectionReason`。terminal replay 只读 durable outcome，不重新 grounding 或调用
+Provider。所有状态转换继续绑定 owner/profile、Run/Job workflow identity、rowVersion 与单一 transaction；Model
+branch failure 不修改 completed Practice、deterministic assessment 或长期 learner state，也不授权 automatic retry。
+
+Flyway V13 新增 closed `failure_reason`、更新 terminal outcome pairing constraint，并为 `PENDING` Run reconciliation
+建立 partial index。Critical Diff Review / Architecture PASS，无 blocking finding；final targeted 35/35，
+implementation-stage full server 703 tests / 0 failures / 0 errors / 160 conditional skips。2026-09-08 fresh external
+verification：disposable PostgreSQL
+18.6 empty schema Flyway V1–V13 13/13、相关 integration 28/28；V12→V13 upgrade probe 在 V12 与升级后各 10/10，
+历史 grounding `FAILED` Run 正确回填 `GROUNDING_REJECTED`。临时容器/数据库已删除，primary database 未使用，
+existing PostgreSQL / Redis 保持 healthy。Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求。
+S8E-R 已提交为 `bf02aed`。
+
+S8E-API 已实现 `EvaluationController` 与 `PracticeSessionEvaluationService`，提供两个 authenticated + CSRF PUT
+入口。Trigger 先执行 owner/profile-scoped completed snapshot read，再验证 `providerId`、transient Credential 与
+fixed EVALUATION route，调用 S8D dispatch 后立即进入 S8E-R consumption；`PENDING` 返回 `202 Accepted` 与
+reconciliation `Location`，durable `SUCCEEDED / FAILED` 返回 `200 OK`。显式 reconciliation 不接收 Credential、
+Provider、Job id 或 raw Model output，也不触发新 dispatch，只推进或 replay 同一 Run。
+
+外层 orchestration 使用 `@Transactional(NEVER)`，保留 Reader readOnly、S8B `REQUIRES_NEW`、transaction-free
+dispatch 与 S8C/S8E-R read-write transaction。Response 不暴露 userId、Job id、workflow/row version、Credential、
+Prompt 或 raw output；Model 仍只产生 candidate，Java 保持 owner gate、grounding、state transition 与 persistence
+authority。Critical Diff Review / Architecture PASS，无 blocking finding；local full server 727 tests / 0 failures /
+0 errors / 162 conditional skips。2026-09-09 disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13，S8
+evaluator integration 31/31 PASS；临时容器已删除，primary database 未使用，live Provider NOT_RUN。Behavior Flow
+`CURRENT`（`docs/flow/evaluation-api-orchestration.md`）。scheduler、automatic retry、遗留 CREATED/RUNNING
+recovery、SSE/WebSocket 与 M2 qualification 未实现。2026-09-09 完整 S8 Ownership Check PASS：用户能够区分
+`ModelCallJob` 的 execution/consumption 状态与 `EvaluationRun` 业务 outcome，并正确解释 Provider execution
+成功仍可能因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`。Understanding `UNDERSTOOD`，
+Human Touch `NOT_REQUIRED`；当前 Gate 为 M1-S8 `READY_TO_COMMIT`。
 
 ### M2 — Persistent Adaptation Loop
 
@@ -200,6 +302,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 **Done Criteria**
 
 - 正确与错误 Evidence 都被记录；
+- 教学过程的接触记录、理解表现、辅助使用和独立使用有明确资格边界；
+  接触记录不直接算能力成功，UNKNOWN 不提升为独立成功，下一次规划可使用合格证据调整学习需要与支架；
 - Aggregated Memory 综合 recency、frequency、confidence、scenario 与 independence；
 - Weakness / Skill State 由 Java 规则执行确定性 transition；
 - Aggregation、Weakness lifecycle 与 Profile projection 可以基于已有 Qualified Evidence
@@ -223,6 +327,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 **Done Criteria**
 
 - Reading / imported content 可以生成 LearningTask 与 Evidence；
+- 新教学材料按任务需要包含示范、简短解释、理解问题与关联练习，经过版本化内容验证；
+  检索到资料不等于教材发布成功，理解型任务不强制增加输出环节；
 - Retrieval 具备 language isolation、provenance 与基础 relevance metadata；
 - 建立最小 Public Source Catalog、typed read-only text reference operation 和 query minimization；
 - 至少接入一个经过批准的 dictionary / lexical reference source 与一个 curated corpus source；
@@ -249,6 +355,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 **Done Criteria**
 
 - Milestone Check 使用明确 rubric 和 evidence sufficiency；
+- 接通“先教我 / 直接尝试”、减少辅助后的迁移与后续复习，完成至少一个沟通目标的端到端教学验收；
+  用户可以跳过教学或返回辅助，相关行为不能被解释为掌握或长期 Weakness；
 - Review System 与 Planner 职责分离；
 - 用户可以 Skip、Replace、Easier、Harder、Change Topic 或 Replan；
 - Grammar Repair 回到真实使用场景验证 transfer；
@@ -263,6 +371,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 **Done Criteria**
 
 - Listening / turn-based Voice 复用 Language Profile、Planner、Evaluator 与 Memory 边界；
+- 教学流程扩展至音频输入、听力理解与适用的听说任务；保留重听、文本提示等辅助条件，
+  文本表现不能直接转为听力或发音证据；
 - 经过验证的固定音频可以作为 Built-in Listening material；浏览器或设备 TTS 仅作为可选 UX，
   不成为 audio authenticity、评分或 Evidence authority；
 - Built-in audio 保留 source、license、version、locale / accent 与 quality provenance；Pronunciation Reference
@@ -280,6 +390,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 **Done Criteria**
 
 - 关键路径具备 targeted regression eval；
+- 教学流程及辅助条件解释具备回归验证，覆盖辅助成功、UNKNOWN 与独立表现的区别；
+  通过实际使用记录减少辅助后的迁移与后续表现，明确样本局限，不将工程测试通过当作普遍学习有效性证明；
 - secret leakage、language isolation 与 state mutation boundary 有自动化验证；
 - timeout、retry、idempotency 与 failure recovery 按实际 Tool 风险覆盖；
 - Provider / Model 的 quality、latency、token 与 cost 结果可比较；

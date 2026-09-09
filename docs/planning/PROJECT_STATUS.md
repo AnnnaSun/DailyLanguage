@@ -1,17 +1,75 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-06
+> Last updated: 2026-09-09
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
-> Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
-> Current candidate: NONE；M1-S8 尚未批准
+> Current Gate: M1-S8 READY_TO_COMMIT
+> Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
+> Current candidate: M1-S8E-API；implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation PASS；未 commit
 
 ## Approved Decisions
 
+- 2026-09-07：用户批准 Guided Language Learning 纳入 V1 P0 及 M1–M6 分配；正式 Scope 为 v1.9，
+  Phase Plan 为 v1.6。完整 M1-S8 后、S9 前增加 `M1-S8T` 最小文本教学，包含必要辅助条件记录，
+  S11 承接最小 UX；M2 聚合适应、M3 内容生产、M4 完整迁移复习、M5 音频、M6 验证。
+  详细设计见 `docs/features/GUIDED_LANGUAGE_LEARNING.md`；Phase exit criteria 已更新。
+  S8T 为 `PLANNED / CONTRACT_NOT_APPROVED`，本次未实现；该 Scope Decision 不改变 M1-S8 Contract。
+
+- M1-S8 整体设计方向 D1–D4、S8A–S8D 与 S8E Current Slice Contract 已批准：显式触发可选 evaluation、Run / Job 原子关联后
+  在事务外 dispatch、业务 outcome 与 Job consumption 原子完成、首版限制重复评估并区分迟到与 expiry。
+  S8A 已提交为 `226b804`，S8B 已提交为 `2d46df6`，S8C 已提交为 `de29ada`，S8D 已提交为
+  `8228d64`，S8E-R 已提交为 `bf02aed`。S8E 按 reconciliation kernel 与 HTTP orchestration 拆分；S8E-API
+  Current Slice Contract 已批准并完成 implementation、Critical Review、external verification 与 documentation。
+- M1-S8 Ownership 节奏已批准：每个子 slice 保留 Critical Review 与相关验证；S8A 不单独 Explain Back，
+  S8B–S8E 只在关键事务或并发边界存在理解缺口时简短确认；正式 Ownership Check 留到 S8 完整闭环完成。
+- M1-S8A 已完成 implementation、Critical / delta Review 与适用验证：新增 owner-scoped Reader，零写入、无新
+  schema / API / Model 调用；Codex unit regression 73/73 PASS；正常配置下 Reader integration 5/5 与 S7
+  integration 3/3 PASS（0 failures / 0 errors / 0 skipped），disposable PostgreSQL 18.6 empty schema Flyway
+  V1–V10 10/10 PASS。两处 integration-test findings 已关闭；临时容器已清理。已提交为 `226b804`。
+- M1-S8B 已完成 EvaluationRun / ModelCallJob 原子关联：`REQUIRES_NEW` 内按 Session-row-first 锁序创建唯一
+  `PENDING` Run 与 EVALUATION Job，数据库 insert gate 核对完整 Job identity；重复/并发返回同一关联，失败整体
+  rollback、零 orphan。Critical Review 的 4 个 findings 已关闭，delta Review PASS；fresh Codex external
+  verification 使用 disposable PostgreSQL 18.6，从 empty schema 应用 Flyway V1–V11，S8B integration 8/8、
+  affected ModelCallJob regression 103/103 PASS（0 failures / 0 errors / 0 skipped）。临时数据库已删除，
+  未使用 primary database。已提交为 `2d46df6`。
+- M1-S8C 已完成 durable result consumption：Run 行锁串行化相同 Evaluation consumer，Ready / Run / Job 完整
+  identity gate 后只读取绑定 Job 的 durable text result，经 Java grounding，在同一 read-write transaction 内原子执行
+  Job `NOT_READY → CONSUMED`、normalized candidate/claims 或 safe rejection，以及 Run
+  `PENDING → SUCCEEDED | FAILED`；terminal replay 不重新 grounding。S8C 当时留下的 Model failure / depleted
+  result 已由 S8E-R reconciliation kernel 归约。
+  Critical Diff Review / Architecture PASS，无 blocking finding；affected unit 106/106 PASS；disposable PostgreSQL
+  18.6 empty schema Flyway V1–V12 12/12、S8C integration 12/12、affected integration regression 43/43 PASS，
+  0 failures / 0 errors / 0 skipped。临时数据库已删除，primary database 未使用；Behavior Flow `CURRENT`。
+- M1-S8D 已完成 Evaluator Model dispatch：workflow version 0 显式选择 classpath prompt v1 与 exact rubric，构造
+  provider-neutral EVALUATION / JsonObject request；S8B `REQUIRES_NEW` 返回 durable Run/Job 后，只对 `Created`
+  通过共享 `TextGenerationJobDispatch` 提交 memory-only request/Credential，`Existing` 不重复调用 Provider。
+  默认 result TTL 7d，固定 EVALUATION route 30s；capacity rejection 记录 durable terminal status，未知 submission
+  exception 不猜测补偿。Critical Diff Review / Architecture PASS，无 blocking finding；fresh targeted 29/29 PASS；
+  disposable PostgreSQL 18.6 empty schema Flyway V1–V12 12/12、dispatch integration 1/1、affected reports
+  243/243 PASS；full server regression 700 tests / 0 failures / 0 errors / 159 conditional skips。临时数据库已删除，
+  primary database 未使用，PostgreSQL / Redis 恢复停止；live Provider 未验证；Behavior Flow `CURRENT`。已提交为
+  `8228d64`。
+- M1-S8E-R 已完成 reconciliation kernel：`EvaluationRun.failureReason` 区分 grounding rejection、Model execution
+  failure 与不可再消费的 Model result；同一 owner/profile-scoped transaction 内，terminal ModelCallJob 或
+  expired/stale/depleted result 只终结 semantic branch，`CREATED / RUNNING` 继续 `Pending`。旧 workflow result
+  在 grounding 前标记 `STALE`，expiry 由 PostgreSQL `CURRENT_TIMESTAMP` 裁决；不自动 retry，不修改 Practice、
+  deterministic assessment 或长期 learner state。Critical Diff Review / Architecture PASS，无 blocking finding；
+  final targeted 35/35，implementation-stage full server regression 703 tests / 0 failures / 0 errors /
+  160 conditional skips。Fresh disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13，相关 integration
+  28/28；V12→V13 upgrade probe 两次各 10/10，
+  历史 grounding `FAILED` Run 正确回填 `GROUNDING_REJECTED`。临时容器/数据库已删除，primary database 未使用且
+  PostgreSQL / Redis 保持 healthy；Behavior Flow `CURRENT`。S8E-R 已提交为 `bf02aed`。
+- M1-S8E-API 已完成两个 owner-scoped mutation endpoint：trigger 接收 `providerId` 与 transient Credential，按固定
+  EVALUATION route dispatch 后立即 reconcile；reconciliation 不接收 Credential、Provider、Job id 或 raw input，
+  只推进或 replay 同一 durable Run。`PENDING` 返回 `202 + Location`，durable `SUCCEEDED / FAILED` 返回 `200`；
+  stable error mapping、authentication、CSRF、language-profile isolation 与 secret-safe response 已验证。Critical Diff
+  Review / Architecture PASS，无 blocking finding；local targeted 43 executed + 2 database-conditional skips，full server
+  727 tests / 0 failures / 0 errors / 162 conditional skips（实际执行 565）。Fresh disposable PostgreSQL 18.6 empty
+  schema Flyway V1–V13 13/13；S8 evaluator integration 31/31 PASS。临时容器已删除，primary database 未使用，
+  live Provider NOT_RUN；Behavior Flow `CURRENT`。scheduler、automatic retry 与遗留 CREATED/RUNNING recovery 未实现。
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
-- V1 Scope v1.7 已纳入 Engineering Evidence Track、Model Call Job 与 M1 Minimum Text Practice Design，正式范围记录在
+- V1 Scope v1.9 已纳入 Engineering Evidence Track、Model Call Job、M1 Minimum Text Practice 与 Guided Language Learning，正式范围记录在
   `docs/product/V1_SCOPE.md`；
 - Phase Gate 与 M0 slices 记录在 `docs/planning/V1_PHASE_PLAN.md`。
 - Engineering Evidence Track 已批准：M1 Grounded Evaluator、M2 versioned Memory / replay、M3 RAG +
@@ -253,21 +311,21 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S7 COMPLETE；M1-S8 SCOPE_NOT_APPROVED
+Gate: M1-S8 READY_TO_COMMIT
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
-Behavior Flow: CURRENT (`docs/flow/grounded-semantic-validation.md`)
+Behavior Flow: CURRENT (`docs/flow/evaluation-api-orchestration.md`；S8A–S8E-R flows remain current)
 M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
 M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
-Current extraction verification: FRESH PASS — relevant unit 55/55；database integration 3 SKIPPED because
+S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database integration 3 SKIPPED because
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
-Compose infrastructure: PostgreSQL / Redis healthy
-Documentation reconciliation: COMPLETE for M1-S7 Rubric source extraction
-Primary local database: MIGRATED / VERIFIED (existing V7 -> Flyway V10; integration fixtures remain)
+Compose infrastructure: S8E-API disposable PostgreSQL removed after verification
+Documentation reconciliation: COMPLETE for M1-S8E-API
+Primary local database: NOT USED for S8E-API verification；current migration level not rechecked
 M0 integrated closeout: PASS
-Production baseline: M1-S7 COMPLETE (`7deb720` + source extraction `e93f624`)
+Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -329,23 +387,89 @@ M1-S7 current structure: 7 Production Java files / 643 lines after approved non-
 M1-S7 baseline commit: COMPLETE (`7deb720`)
 M1-S7 Rubric source extraction: COMPLETE (`e93f624`)；DELTA REVIEW PASS；local unit 55/55 PASS；
   merge confirmed by user
-M1-S8+ implementation scope: NOT_APPROVED
+M1-S8 overall design direction: APPROVED；implementation COMPLETE；Ownership UNDERSTOOD
+M1-S8A Current Slice Contract: APPROVED
+M1-S8A implementation / Critical Review / delta Review: PASS；COMPLETE (`226b804`)
+M1-S8A unit verification: PRIOR PASS — Reader 18/18 + S7 validator 33/33 + rubric 22/22 = 73/73
+M1-S8A external verification: PASS (2026-09-06) — disposable PostgreSQL 18.6；empty schema Flyway V1–V10 10/10；
+  Reader integration 5/5 + S7 integration 3/3；0 failures / 0 errors / 0 skipped；normal MyBatis cache settings
+M1-S8A test findings: CLOSED — duplicate submit assertion；JdbcTemplate fixture deletion / MyBatis local cache
+M1-S8A Behavior Flow: CURRENT
+M1-S8A standalone Ownership Check: NOT_REQUIRED by user decision；formal check deferred to completed S8 loop
+M1-S8B Current Slice Contract: APPROVED
+M1-S8B implementation / Critical Review / delta Review: PASS；COMPLETE (`2d46df6`)
+M1-S8B external verification: PASS (2026-09-07) — disposable PostgreSQL 18.6；empty schema Flyway V1–V11 11/11；
+  EvaluationRunCreationIntegrationTests 8/8 + affected ModelCallJob regression 103/103；
+  0 failures / 0 errors / 0 skipped；temporary database deleted；primary database not used
+M1-S8B findings: CLOSED — insert gate Job identity；Existing operation；durable-state error classification；dynamic expiry
+M1-S8B Behavior Flow: CURRENT (`docs/flow/evaluation-run-creation.md`)
+M1-S8B standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
+M1-S8C Current Slice Contract: APPROVED
+M1-S8C implementation / Critical Diff Review / Architecture: PASS；COMPLETE (`de29ada`)
+M1-S8C unit verification: PASS — EvaluationResultConsumptionService 19/19；affected unit 106/106
+M1-S8C external verification: PASS (2026-09-07) — disposable PostgreSQL 18.6；empty schema Flyway V1–V12 12/12；
+  EvaluationResultConsumptionIntegrationTests 12/12 + affected integration regression 43/43；
+  0 failures / 0 errors / 0 skipped；temporary databases deleted；primary database not used
+M1-S8C findings: NONE BLOCKING；initial LOC guardrail overrun explicitly accepted by user
+M1-S8C Behavior Flow: CURRENT (`docs/flow/evaluation-result-consumption.md`)
+M1-S8C standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
+M1-S8D Current Slice Contract: APPROVED
+M1-S8D implementation / Critical Diff Review / Architecture: PASS；COMPLETE (`8228d64`)
+M1-S8D verification: PASS (2026-09-08) — fresh targeted 29/29；disposable PostgreSQL 18.6 empty schema
+  Flyway V1–V12 12/12；EvaluationDispatchIntegrationTests 1/1；affected reports 243/243；full server regression
+  700 tests / 0 failures / 0 errors / 159 environment-conditional skips；temporary database deleted；primary database
+  not used；PostgreSQL / Redis restored stopped；live Provider NOT_RUN
+M1-S8D findings: NONE BLOCKING；known crash window after durable commit and before in-memory submission remains in approved scope
+M1-S8D Behavior Flow: CURRENT (`docs/flow/evaluation-model-dispatch.md`; shared Job dispatch flow updated)
+M1-S8D standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
+M1-S8E Current Slice Contract: APPROVED — split into S8E-R reconciliation kernel and S8E-API orchestration
+M1-S8E-R implementation / Critical Diff Review / Architecture: PASS；COMPLETE (`bf02aed`)
+M1-S8E-R local verification: PASS — final targeted 35/35；implementation-stage full server 703 tests / 0 failures / 0 errors /
+  160 environment-conditional skips；git diff --check PASS
+M1-S8E-R external verification: PASS (2026-09-08) — disposable PostgreSQL 18.6；empty schema Flyway V1–V13
+  13/13；Evaluation result/Run creation/dispatch/ModelCallJob consumption integration 28/28；V12→V13 upgrade
+  probes 10/10 at V12 and 10/10 after V13；historical FAILED Run backfilled to GROUNDING_REJECTED；temporary
+  container/databases deleted；primary database not used；existing PostgreSQL / Redis remained healthy
+M1-S8E-R findings: NONE BLOCKING
+M1-S8E-R Behavior Flow: CURRENT (`docs/flow/evaluation-result-consumption.md`)
+M1-S8E-R standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
+M1-S8E-API Current Slice Contract: APPROVED
+M1-S8E-API implementation / Critical Diff Review / Architecture: PASS；uncommitted
+M1-S8E-API local verification: PASS — targeted 45 discovered / 43 executed / 2 database-conditional skipped；full server
+  727 tests / 0 failures / 0 errors / 162 environment-conditional skips（实际执行 565）；git diff --check PASS
+M1-S8E-API external verification: PASS (2026-09-09) — disposable PostgreSQL 18.6；empty schema Flyway V1–V13
+  13/13；pgvector 0.8.6；S8 evaluator integration 31/31，0 failures / 0 errors / 0 skipped；HTTP integration
+  验证 trigger / async Job / reconciliation / terminal replay / foreign-owner 404 / Credential 不落 Job；temporary
+  container deleted；primary database not used；live Provider NOT_RUN
+M1-S8E-API findings: NONE BLOCKING
+M1-S8E-API Behavior Flow: CURRENT (`docs/flow/evaluation-api-orchestration.md`；S8D/S8E-R flows synchronized)
+M1-S8 full-loop Ownership Check: PASS (2026-09-09) — Understanding `UNDERSTOOD`；用户能够区分
+  `ModelCallJob` execution/consumption 与 `EvaluationRun` business outcome，并正确说明 Provider execution
+  `SUCCEEDED + CONSUMED` 仍可因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`；Human Touch
+  `NOT_REQUIRED`
+M1-S8 deferred scope: scheduler / automatic retry / legacy CREATED-RUNNING recovery / SSE-WebSocket NOT_IMPLEMENTED
+M1-S9+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-M1-S7 已完成文档收口。下一步由用户决定是否进入 M1-S8 Design / Scope；在批准前不得修改 M1-S8
-Production、schema 或 API。
+用户执行 S8E-API Commit Decision。M1-S8 implementation、Critical Review、external verification、documentation
+与完整 Ownership 均已收口为 `READY_TO_COMMIT`；不自动 commit、push、merge 或开始 M1-S8T。
 
 ## Blockers
 
-没有已发现的 M0、M1-S6 closeout 或 M1-S7 的 Code Review / Documentation / Ownership blocker。M1-S8 Scope
-尚未批准。M1-S7 baseline external verification 使用 disposable
+M1-S8E-API 无剩余 Code Review / Verification / Documentation / Ownership blocker，当前只剩 Commit Decision。
+S8E-API external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema 与完整 S8 evaluator
+integration；临时容器已删除，未将 primary database 作为测试目标。
+M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。
-Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output / grounding 目前只有
-module-local Evaluator validation，Trace 只有安全 logging metadata。当前仍没有 Hosted TLS verification、
+Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output / grounding 已接入 S8C
+durable result consumption，S8D 已接通 versioned request 与 transient dispatch，S8E-R 已终结 Model failure 与
+unavailable result；S8E-API 已接通显式 HTTP trigger/reconciliation，scheduler、automatic retry 与遗留
+CREATED/RUNNING recovery 尚未实现，Trace 只有安全 logging metadata。
+当前仍没有 Hosted TLS verification、
 Browser local/session storage UI、业务 Agent
 Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured
 Output / Trace End-to-End complete。

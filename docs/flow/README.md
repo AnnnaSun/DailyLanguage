@@ -201,8 +201,12 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | Text Generation Credential Propagation | IMPLEMENTED | M0-S7A / M0-S8C / M0-S8D | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |
 | OpenAI-compatible Text Provider Call | IMPLEMENTED | M0-S7B / M0-S7C / M0-S8A / M0-S8D | [`text-generation-openai-compatible-provider.md`](text-generation-openai-compatible-provider.md) |
 | Model Provider Connection Verification | IMPLEMENTED | M0-S7D / M0-S8C | [`model-provider-connection-verification.md`](model-provider-connection-verification.md) |
-| Text Generation Job Start | IMPLEMENTED | M0-S9K1 / M0-S9K2 / M0-S9K3 | [`text-generation-job-start.md`](text-generation-job-start.md) |
+| Text Generation Job Start / Existing Job Dispatch | IMPLEMENTED | M0-S9K1 / M0-S9K2 / M0-S9K3 / M1-S8D | [`text-generation-job-start.md`](text-generation-job-start.md) |
 | LearningTask Persistence | IMPLEMENTED | M1-S3 | [`learning-task-persistence.md`](learning-task-persistence.md) |
 | Owner-scoped LearningTask Planning | IMPLEMENTED | M1-S4 | [`owner-scoped-learning-task-planning.md`](owner-scoped-learning-task-planning.md) |
 | PracticeSession Lifecycle | IMPLEMENTED | M1-S5 / M1-S6 | [`practice-session-lifecycle.md`](practice-session-lifecycle.md) |
-| Grounded Semantic Validation | IMPLEMENTED | M1-S7 | [`grounded-semantic-validation.md`](grounded-semantic-validation.md) |
+| Grounded Semantic Validation | IMPLEMENTED | M1-S7 / M1-S8A | [`grounded-semantic-validation.md`](grounded-semantic-validation.md) |
+| EvaluationRun Creation | IMPLEMENTED | M1-S8A / M1-S8B | [`evaluation-run-creation.md`](evaluation-run-creation.md) |
+| Evaluation Result Consumption and Reconciliation | IMPLEMENTED | M1-S8C / M1-S8E-R | [`evaluation-result-consumption.md`](evaluation-result-consumption.md) |
+| Evaluation Model Dispatch | IMPLEMENTED | M1-S8D | [`evaluation-model-dispatch.md`](evaluation-model-dispatch.md) |
+| Evaluation API Orchestration | IMPLEMENTED | M1-S8E-API | [`evaluation-api-orchestration.md`](evaluation-api-orchestration.md) |

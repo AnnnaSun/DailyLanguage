@@ -11,6 +11,9 @@ app:
         conversation:
           model-id: ${MODEL_GATEWAY_CONVERSATION_MODEL_ID:deepseek-v4-flash}
           execution-timeout: ${MODEL_GATEWAY_CONVERSATION_EXECUTION_TIMEOUT:30s}
+        evaluation:
+          model-id: ${MODEL_GATEWAY_EVALUATION_MODEL_ID:deepseek-v4-flash}
+          execution-timeout: ${MODEL_GATEWAY_EVALUATION_EXECUTION_TIMEOUT:30s}
       executor:
         workers: ${MODEL_GATEWAY_TEXT_EXECUTOR_WORKERS:4}
         queue-capacity: ${MODEL_GATEWAY_TEXT_EXECUTOR_QUEUE_CAPACITY:16}

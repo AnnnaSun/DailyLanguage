@@ -79,6 +79,12 @@ class TextGenerationGatewayConfigurationTests {
             assertThat(verificationRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
             assertThat(verificationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
             assertThat(verificationRoute.adapter()).isSameAs(conversationRoute.adapter());
+            TextGenerationRoute evaluationRoute = routes.findRoute(ModelPurpose.EVALUATION)
+                    .orElseThrow();
+            assertThat(evaluationRoute.providerId()).isEqualTo(new ProviderId("deepseek"));
+            assertThat(evaluationRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
+            assertThat(evaluationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
+            assertThat(evaluationRoute.adapter()).isSameAs(conversationRoute.adapter());
             assertThat(routes.findRoute(ModelPurpose.PLANNING)).isEmpty();
 
             HttpClient httpClient = context.getBean(

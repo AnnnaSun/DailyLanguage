@@ -115,6 +115,13 @@ class ModelCallJobConsumptionRepositoryIntegrationTests {
                 runningJob.id(), userId, 4, runningJob.rowVersion())).isEmpty();
         assertThat(modelCallJobRepository.tryConsumeSucceededResult(
                 expiredJob.id(), userId, 4, expiredJob.rowVersion())).isEmpty();
+
+        ModelCallJob markedExpired = modelCallJobRepository.tryExpireSucceededResult(
+                expiredJob.id(), userId, expiredJob.rowVersion()).orElseThrow();
+        assertThat(markedExpired.consumptionStatus()).isEqualTo(ModelCallJob.ConsumptionStatus.EXPIRED);
+        assertThat(markedExpired.rowVersion()).isEqualTo(expiredJob.rowVersion() + 1);
+        assertThat(modelCallJobRepository.tryExpireSucceededResult(
+                runningJob.id(), userId, runningJob.rowVersion())).isEmpty();
     }
 
     private ModelCallJob createSucceededJob(UUID userId, long workflowVersion, OffsetDateTime expiresAt) {

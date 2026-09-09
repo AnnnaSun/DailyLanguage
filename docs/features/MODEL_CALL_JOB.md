@@ -3,6 +3,7 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-08-30
 > Architecture amendment: 2026-09-02 — typed submission boundary and durable backlog evolution seam
+> Evaluator integration: 2026-09-08 — existing durable Job dispatch reused by M1-S8D
 > Implementation scope: SLICE-GATED
 > Foundation phase: M0-S9
 
@@ -193,6 +194,12 @@ Transient BYOK 下的 restart invariant 不变：缺少 Credential 的 `RUNNING`
 
 V1 站内提示不等于 Module 34 Push Notification / Learning Recall。Push、scheduler、邮件或外部通知继续
 留在 V1 之后。
+
+M1-S8D 已把 Evaluator 接到该 lifecycle：S8B 在 `REQUIRES_NEW` transaction 内原子创建
+`EvaluationRun + ModelCallJob`，提交后由 `TextGenerationJobDispatch` 复用既有 typed submission / Worker；
+只有新建关联会 dispatch，重复请求返回 durable Existing 状态。versioned request 与 transient Credential
+只在内存调用链传播，不成为 durable Job payload。S8E-R 已在 Evaluation-owned consumption entry 归约 terminal
+failure 与 unavailable result；HTTP status、background discovery/recovery 与 automatic retry 未实现。
 
 ## 9. Explicit non-goals
 

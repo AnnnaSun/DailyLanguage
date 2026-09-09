@@ -1,19 +1,21 @@
 # Text Generation Job Start Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M0-S9K1 / M0-S9K2 / M0-S9K3`
-- Last Verified: `2026-09-02`
-- Entry: `TextGenerationJobStart.start(command)`
+- Feature / Slice: `M0-S9K1 / M0-S9K2 / M0-S9K3 / M1-S8D`
+- Last Verified: `2026-09-08`
+- Entry: `TextGenerationJobStart.start(command)`；`TextGenerationJobDispatch.dispatchCreated(command)`
 
 ## 1. Behavior Boundary
 
-本 Flow 描述已经实现的 Text Generation Job 启动链路：Application caller 提供 owner、Workflow identity、
-provider-neutral request 与 transient Credential；`TextGenerationJobStart` 先创建 PostgreSQL Job，再构造只存在于
-内存的 work item，通过 `TextGenerationJobSubmission` 交给独立 Job Executor，最终由
+本 Flow 描述已经实现的 Text Generation Job 启动与既有 Job dispatch 链路：Application caller 提供 owner、
+Workflow identity、provider-neutral request 与 transient Credential；`TextGenerationJobStart` 先创建 PostgreSQL Job，
+再委托 `TextGenerationJobDispatch` 构造只存在于内存的 work item。M1-S8D 的 Evaluator 已由 S8B 原子创建
+Run/Job，因此直接调用同一 `TextGenerationJobDispatch`，不创建第二个 Job。该组件通过
+`TextGenerationJobSubmission` 交给独立 Job Executor，最终由
 `TextGenerationJobWorker` claim Job、调用 `TextGenerationPort` 并持久化结果。
 
-入口本身尚未接入 Planner、Conversation、Evaluator 或 HTTP API，也不实现 interactive wait、polling、用户确认、
-durable queue、automatic retry 或 CREATED Job reconciliation。
+Evaluator 已在 M1-S8D 接入；Planner、Conversation 与 HTTP API 尚未接入。该链路不实现 interactive wait、
+polling、用户确认、durable queue、automatic retry 或 CREATED Job reconciliation。
 
 ## 2. Main Call Chain
 
@@ -23,6 +25,7 @@ sequenceDiagram
     participant Start as TextGenerationJobStart
     participant Repository as ModelCallJobRepository
     participant DB as PostgreSQL
+    participant Dispatch as TextGenerationJobDispatch
     participant Submission as TextGenerationJobSubmission
     participant Executor as Model-call Job Executor
     participant Worker as TextGenerationJobWorker
@@ -37,11 +40,13 @@ sequenceDiagram
         DB-->>Repository: inserted Job + rowVersion
         Note over Repository,DB: 没有外层 transaction，mapper statement 在 create 返回前提交
         Repository-->>Start: ModelCallJob
-        Note over Start: request 与 Credential 只进入内存 work item
-        Start->>Submission: submit(workItem)
+        Start->>Dispatch: dispatchCreated(Job, Request, Credential)
+        Note over Dispatch: request 与 Credential 只进入内存 work item
+        Dispatch->>Submission: submit(workItem)
         Submission->>Executor: execute(worker task)
         alt executor 接纳 task
-            Submission-->>Start: ACCEPTED
+            Submission-->>Dispatch: ACCEPTED
+            Dispatch-->>Start: DispatchResult(jobId, ACCEPTED)
             Start-->>Caller: StartResult(jobId, ACCEPTED)
             Note over Executor,Worker: Worker 可能在 ACCEPTED 返回前或返回后开始
             Executor->>Worker: execute(workItem)
@@ -56,18 +61,21 @@ sequenceDiagram
                 Worker-->>Executor: CLAIM_LOST, 不调用 Gateway
             end
         else executor capacity rejection
-            Submission-->>Start: CAPACITY_UNAVAILABLE
-            Start->>Repository: tryRecordSubmissionRejection(...)
+            Submission-->>Dispatch: CAPACITY_UNAVAILABLE
+            Dispatch->>Repository: tryRecordSubmissionRejection(...)
             Repository->>DB: CREATED to SUBMISSION_REJECTED
             DB-->>Repository: updated Job
-            Repository-->>Start: Optional of updated Job
+            Repository-->>Dispatch: Optional of updated Job
+            Dispatch-->>Start: DispatchResult(jobId, CAPACITY_UNAVAILABLE)
             Start-->>Caller: StartResult(jobId, CAPACITY_UNAVAILABLE)
         end
     end
 ```
 
-`@Transactional(propagation = NEVER)` 不会为 `start()` 创建事务。它拒绝已有调用方事务，使 Job INSERT 在
-submission 之前完成提交，避免异步 Worker 使用另一个数据库连接时看不到尚未提交的 Job。
+`TextGenerationJobStart.start` 与 `TextGenerationJobDispatch.dispatchCreated` 都使用
+`@Transactional(propagation = NEVER)`。它们拒绝已有调用方事务，使 Job INSERT 在 submission 前完成提交，
+避免异步 Worker 使用另一个数据库连接时看不到尚未提交的 Job。S8D Evaluator 的 S8B Run/Job creation 使用
+`REQUIRES_NEW`，返回后再进入 dispatch，因此遵守同一可见性约束。
 
 ## 3. State and Authority
 
@@ -116,11 +124,9 @@ Execution status 与 consumption status 保持分离，本 Flow 不执行 result
 
 ## 6. Verification Evidence
 
-- `TextGenerationJobStartTests.acceptedStartCreatesJobBeforeSubmittingTransientWorkItem`
-- `TextGenerationJobStartTests.capacityRejectionIsPersistedBeforeItIsReturned`
-- `TextGenerationJobStartTests.lostCapacityRejectionWriteIsNotReportedAsACompletedStart`
-- `TextGenerationJobStartTests.createFailureDoesNotSubmitWork`
-- `TextGenerationJobStartTests.unexpectedSubmissionFailureIsPropagatedWithoutCapacityCompensation`
+- `TextGenerationJobStartTests`: create-before-dispatch、create failure 与 dispatch failure propagation；
+- `TextGenerationJobDispatchTests`: memory-only work item、capacity rejection CAS、unknown failure、state/purpose gate；
+- `TextGenerationJobDispatchTransactionTests.activeCallerTransactionIsRejectedBeforeSubmission`
 - `TextGenerationJobStartTransactionTests.startsWithoutOpeningATransaction`
 - `TextGenerationJobStartTransactionTests.activeCallerTransactionIsRejectedBeforeJobCreation`
 - `TextGenerationJobSubmissionTests`: accepted 与 capacity rejection boundary；
@@ -128,10 +134,14 @@ Execution status 与 consumption status 保持分离，本 Flow 不执行 result
 - `ModelCallJobSubmissionRejectionRepositoryIntegrationTests`: owner、status 与 rowVersion conditional transition；
 - S9K3 targeted tests: `7/7 PASS`；Spring context smoke: `2/2 PASS`；
 - fresh PostgreSQL 18.6 + Flyway V1–V7 ModelCallJob regression: `103/103 PASS`。
+- M1-S8D fresh targeted unit/config regression：29/29 PASS；disposable PostgreSQL 18.6 empty schema Flyway
+  V1–V12 12/12，Evaluation dispatch integration 1/1 PASS；full server regression 700 tests / 0 failures /
+  0 errors / 159 environment-conditional skips。
 
 ## 7. Source References
 
 - `server/src/main/java/com/dailylanguage/modelcalljob/application/TextGenerationJobStart.java`
+- `server/src/main/java/com/dailylanguage/modelcalljob/application/TextGenerationJobDispatch.java`
 - `server/src/main/java/com/dailylanguage/modelcalljob/application/TextGenerationJobSubmission.java`
 - `server/src/main/java/com/dailylanguage/modelcalljob/application/TextGenerationJobWorkItem.java`
 - `server/src/main/java/com/dailylanguage/modelcalljob/application/TextGenerationJobWorker.java`
