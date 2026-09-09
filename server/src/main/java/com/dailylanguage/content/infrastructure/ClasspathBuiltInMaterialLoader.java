@@ -9,9 +9,11 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.IllformedLocaleException;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -23,11 +25,13 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import com.dailylanguage.content.domain.GuidedStepScaffold;
 import com.dailylanguage.content.domain.MaterialIdentity;
 import com.dailylanguage.content.domain.MaterialSourceLineage;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 
 /**
@@ -205,6 +209,18 @@ public final class ClasspathBuiltInMaterialLoader {
             validateAcceptedAnswers(step, stepContext);
         }
 
+        // guided 判定基于 step 集合本身：只要任一 step 声明 guided purpose，整个 material 就必须满足
+        // guided 教学序列与逐 scaffold 支架覆盖约束；纯 legacy（全 PRACTICE）material 不受这些约束。
+        Map<String, TextLearningPurpose> stepPurposes = new LinkedHashMap<>();
+        for (TextPracticeStep step : targetCore.steps()) {
+            stepPurposes.put(step.stepId(), step.learningPurpose());
+        }
+        boolean guided = stepPurposes.values().stream()
+                .anyMatch(purpose -> purpose != TextLearningPurpose.PRACTICE);
+        if (guided) {
+            validateGuidedStepSequence(targetCore.steps(), context);
+        }
+
         if (artifact.supportScaffolds() == null || artifact.supportScaffolds().isEmpty()) {
             throw new BuiltInMaterialValidationException(context + ": supportScaffolds must not be empty");
         }
@@ -222,6 +238,7 @@ public final class ClasspathBuiltInMaterialLoader {
                 throw new BuiltInMaterialValidationException(
                         scaffoldContext + ": contrastiveNote must be null or non-blank");
             }
+            validateGuidedStepScaffolding(scaffold, stepPurposes, scaffoldContext);
             if (!scaffoldLanguages.add(scaffold.supportLanguage())) {
                 throw new BuiltInMaterialValidationException(
                         scaffoldContext + ": duplicate supportLanguage in material");
@@ -230,6 +247,85 @@ public final class ClasspathBuiltInMaterialLoader {
         if (!scaffoldLanguages.equals(new LinkedHashSet<>(entry.supportLanguages()))) {
             throw new BuiltInMaterialValidationException(context + ": artifact support scaffold languages "
                     + scaffoldLanguages + " do not match manifest supportLanguages " + entry.supportLanguages());
+        }
+    }
+
+    /**
+     * guided material 的教学序列约束：不允许任何 PRACTICE step（无论显式声明还是 legacy 缺省）混入，
+     * 且必须先有 COMPREHENSION_CHECK、后有 SCAFFOLDED_USE，保证"先理解示范、再辅助使用"的最小教学闭环。
+     */
+    private static void validateGuidedStepSequence(List<TextPracticeStep> steps, String context) {
+        int firstComprehensionCheckIndex = -1;
+        boolean scaffoldedUseAfterCheck = false;
+        for (int index = 0; index < steps.size(); index++) {
+            TextLearningPurpose purpose = steps.get(index).learningPurpose();
+            if (purpose == TextLearningPurpose.PRACTICE) {
+                throw new BuiltInMaterialValidationException(context + " step " + steps.get(index).stepId()
+                        + ": guided material must mark every step with a guided learningPurpose"
+                        + " (COMPREHENSION_CHECK / SCAFFOLDED_USE / INDEPENDENT_TRANSFER), got PRACTICE");
+            }
+            if (purpose == TextLearningPurpose.COMPREHENSION_CHECK && firstComprehensionCheckIndex < 0) {
+                firstComprehensionCheckIndex = index;
+            }
+            if (purpose == TextLearningPurpose.SCAFFOLDED_USE && firstComprehensionCheckIndex >= 0) {
+                scaffoldedUseAfterCheck = true;
+            }
+        }
+        if (firstComprehensionCheckIndex < 0) {
+            throw new BuiltInMaterialValidationException(
+                    context + ": guided material must declare at least one COMPREHENSION_CHECK step");
+        }
+        if (!scaffoldedUseAfterCheck) {
+            throw new BuiltInMaterialValidationException(context
+                    + ": guided material must declare a SCAFFOLDED_USE step after a COMPREHENSION_CHECK step");
+        }
+    }
+
+    /**
+     * 每个 SupportScaffold 必须为每个 guided step 提供有且仅一个支架项；entry 只能引用 guided step，
+     * 因此 legacy material 携带孤儿 guidedSteps（指向 PRACTICE step）同样被拒绝。
+     * responseFrame 是答案性辅助，只允许出现在 SCAFFOLDED_USE 上（且必须提供）：
+     * COMPREHENSION_CHECK 与 INDEPENDENT_TRANSFER 携带它会让理解检查或迁移检验暴露答案，
+     * 削弱对应 evidence 的语义。
+     */
+    private static void validateGuidedStepScaffolding(
+            SupportScaffold scaffold, Map<String, TextLearningPurpose> stepPurposes, String scaffoldContext) {
+        Set<String> scaffoldedStepIds = new LinkedHashSet<>();
+        for (GuidedStepScaffold guidedStep : scaffold.guidedSteps()) {
+            if (guidedStep == null) {
+                throw new BuiltInMaterialValidationException(
+                        scaffoldContext + ": guidedSteps entry must not be null");
+            }
+            String stepContext = scaffoldContext + " guidedStep "
+                    + requireNonBlank(guidedStep.stepId(), "stepId", scaffoldContext);
+            requireNonBlank(guidedStep.instruction(), "instruction", stepContext);
+            if (guidedStep.responseFrame() != null && guidedStep.responseFrame().isBlank()) {
+                throw new BuiltInMaterialValidationException(
+                        stepContext + ": responseFrame must be null or non-blank");
+            }
+            TextLearningPurpose purpose = stepPurposes.get(guidedStep.stepId());
+            if (purpose == null || purpose == TextLearningPurpose.PRACTICE) {
+                throw new BuiltInMaterialValidationException(stepContext
+                        + ": guidedSteps entry must reference a guided step of this material"
+                        + " (unknown or non-guided stepId)");
+            }
+            if (purpose == TextLearningPurpose.SCAFFOLDED_USE && guidedStep.responseFrame() == null) {
+                throw new BuiltInMaterialValidationException(
+                        stepContext + ": SCAFFOLDED_USE step must provide a responseFrame");
+            }
+            if (purpose != TextLearningPurpose.SCAFFOLDED_USE && guidedStep.responseFrame() != null) {
+                throw new BuiltInMaterialValidationException(
+                        stepContext + ": only SCAFFOLDED_USE steps may declare a responseFrame");
+            }
+            if (!scaffoldedStepIds.add(guidedStep.stepId())) {
+                throw new BuiltInMaterialValidationException(stepContext + ": duplicate guidedSteps entry");
+            }
+        }
+        for (Map.Entry<String, TextLearningPurpose> step : stepPurposes.entrySet()) {
+            if (step.getValue() != TextLearningPurpose.PRACTICE && !scaffoldedStepIds.contains(step.getKey())) {
+                throw new BuiltInMaterialValidationException(scaffoldContext + ": guided step "
+                        + step.getKey() + " is missing a guidedSteps entry");
+            }
         }
     }
 

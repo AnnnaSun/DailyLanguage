@@ -20,6 +20,7 @@ import com.dailylanguage.content.domain.MaterialSourceLineage;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.planner.domain.LearningTask;
@@ -843,16 +844,18 @@ class PracticeSessionApplicationServiceTests {
                 null,
                 List.of(
                         new TextPracticeStep(
-                                "order-drink", TextStepKind.EXACT, "Order a medium coffee politely.",
+                                "order-drink", TextStepKind.EXACT, TextLearningPurpose.PRACTICE,
+                                "Order a medium coffee politely.",
                                 List.of("Could I have a medium coffee, please?")),
                         new TextPracticeStep(
-                                "answer-to-go", TextStepKind.SEMANTIC_ONLY, "Answer to go.", List.of())),
+                                "answer-to-go", TextStepKind.SEMANTIC_ONLY, TextLearningPurpose.PRACTICE,
+                                "Answer to go.", List.of())),
                 "builtin-text-communication-rubric/v1");
         return new PublishedLearningMaterial(
                 identity,
                 core,
                 List.of(new SupportScaffold(
-                        "zh-cn", "完成点单的中文指令", "场景解释", "提示", "对比提示")),
+                        "zh-cn", "完成点单的中文指令", "场景解释", "提示", "对比提示", List.of())),
                 new MaterialSourceLineage("PROJECT_ORIGINAL", "v1", "AGPL-3.0", "sha256"));
     }
 
@@ -862,7 +865,7 @@ class PracticeSessionApplicationServiceTests {
                 material.identity(),
                 material.targetCore(),
                 List.of(new SupportScaffold(
-                        supportLanguage, "完成点单的中文指令", "场景解释", "提示", "对比提示")),
+                        supportLanguage, "完成点单的中文指令", "场景解释", "提示", "对比提示", List.of())),
                 material.sourceLineage());
     }
 

@@ -17,9 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.dailylanguage.content.domain.GuidedStepScaffold;
 import com.dailylanguage.content.domain.MaterialDifficulty;
 import com.dailylanguage.content.domain.MaterialIdentity;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextStepKind;
 
 /**
@@ -369,8 +371,223 @@ class ClasspathBuiltInMaterialLoaderTests {
                 "hint must not be blank");
     }
 
+    @Test
+    void interpretsLegacyInMemoryPackAsPlainPracticeWithoutGuidedSteps() {
+        PublishedLearningMaterial legacy = new ClasspathBuiltInMaterialLoader(
+                validPack()::get).load().materials().getFirst();
+
+        assertThat(legacy.targetCore().steps())
+                .extracting(step -> step.learningPurpose())
+                .containsOnly(TextLearningPurpose.PRACTICE);
+        assertThat(legacy.supportScaffolds())
+                .allSatisfy(scaffold -> assertThat(scaffold.guidedSteps()).isEmpty());
+    }
+
+    @Test
+    void loadsValidGuidedMaterialWithTypedPurposesAndGuidedScaffolds() {
+        PublishedLearningMaterial guided = new ClasspathBuiltInMaterialLoader(
+                readerFor(guidedPack())).load().materials().getFirst();
+
+        assertThat(guided.targetCore().steps())
+                .extracting(step -> step.learningPurpose())
+                .containsExactly(
+                        TextLearningPurpose.COMPREHENSION_CHECK,
+                        TextLearningPurpose.SCAFFOLDED_USE,
+                        TextLearningPurpose.INDEPENDENT_TRANSFER);
+        List<GuidedStepScaffold> guidedSteps = guided.supportScaffolds().getFirst().guidedSteps();
+        assertThat(guidedSteps)
+                .extracting(GuidedStepScaffold::stepId)
+                .containsExactly("s1", "s2", "s3");
+        assertThat(guidedSteps)
+                .extracting(GuidedStepScaffold::responseFrame)
+                .containsExactly(null, "Could I have ___, please?", null);
+    }
+
+    @Test
+    void rejectsInvalidLearningPurposeEnum() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"learningPurpose\": \"COMPREHENSION_CHECK\"",
+                                "\"learningPurpose\": \"SHOW_AND_TELL\""),
+                "invalid JSON structure in materials/mat-1/v1.json");
+    }
+
+    @Test
+    void rejectsGuidedMaterialWithoutComprehensionCheck() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"learningPurpose\": \"COMPREHENSION_CHECK\"",
+                                "\"learningPurpose\": \"SCAFFOLDED_USE\""),
+                "must declare at least one COMPREHENSION_CHECK step");
+    }
+
+    @Test
+    void rejectsGuidedMaterialWithoutScaffoldedUseAfterComprehensionCheck() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"learningPurpose\": \"COMPREHENSION_CHECK\"",
+                                "\"learningPurpose\": \"SCAFFOLDED_USE\"")
+                        .replace(
+                                "\"learningPurpose\": \"SCAFFOLDED_USE\", \"prompt\": \"prompt two\"",
+                                "\"learningPurpose\": \"COMPREHENSION_CHECK\", \"prompt\": \"prompt two\""),
+                "must declare a SCAFFOLDED_USE step after a COMPREHENSION_CHECK step");
+    }
+
+    @Test
+    void rejectsGuidedMaterialMixingUnmarkedPracticeStep() {
+        // s2 缺失 learningPurpose 时被解释为 PRACTICE，guided material 内禁止与 guided steps 混用。
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"learningPurpose\": \"SCAFFOLDED_USE\", ", ""),
+                "guided learningPurpose");
+    }
+
+    @Test
+    void rejectsGuidedMaterialWithExplicitPracticeStep() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"SCAFFOLDED_USE\"", "\"PRACTICE\""),
+                "guided learningPurpose");
+    }
+
+    @Test
+    void rejectsGuidedStepMissingScaffoldEntry() {
+        assertRejectedWithMaterial(
+                guidedMaterial("""
+                        [{"stepId": "s1", "instruction": "a", "responseFrame": null},
+                         {"stepId": "s2", "instruction": "b", "responseFrame": "frame"}]
+                        """),
+                "guided step s3 is missing a guidedSteps entry");
+    }
+
+    @Test
+    void rejectsDuplicateGuidedStepEntry() {
+        assertRejectedWithMaterial(
+                guidedMaterial("""
+                        [{"stepId": "s1", "instruction": "a", "responseFrame": null},
+                         {"stepId": "s1", "instruction": "a2", "responseFrame": null},
+                         {"stepId": "s2", "instruction": "b", "responseFrame": "frame"},
+                         {"stepId": "s3", "instruction": "c", "responseFrame": null}]
+                        """),
+                "duplicate guidedSteps entry");
+    }
+
+    @Test
+    void rejectsUnknownGuidedStepReference() {
+        assertRejectedWithMaterial(
+                guidedMaterial("""
+                        [{"stepId": "s1", "instruction": "a", "responseFrame": null},
+                         {"stepId": "sX", "instruction": "b", "responseFrame": null},
+                         {"stepId": "s2", "instruction": "c", "responseFrame": "frame"},
+                         {"stepId": "s3", "instruction": "d", "responseFrame": null}]
+                        """),
+                "must reference a guided step of this material");
+    }
+
+    @Test
+    void rejectsLegacyMaterialWithOrphanGuidedSteps() {
+        // legacy material 的 step 都是 PRACTICE，guidedSteps 没有可引用的 guided step，fail closed。
+        assertRejectedWithMaterial(
+                material().replace(
+                        "\"contrastiveNote\": null}]",
+                        "\"contrastiveNote\": null, \"guidedSteps\": ["
+                                + "{\"stepId\": \"s1\", \"instruction\": \"gi\", \"responseFrame\": null}]}]"),
+                "must reference a guided step of this material");
+    }
+
+    @Test
+    void rejectsScaffoldedUseStepWithoutResponseFrame() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace(
+                                "\"stepId\": \"s2\", \"instruction\": \"use the frame\", "
+                                        + "\"responseFrame\": \"Could I have ___, please?\"",
+                                "\"stepId\": \"s2\", \"instruction\": \"use the frame\", \"responseFrame\": null"),
+                "SCAFFOLDED_USE step must provide a responseFrame");
+    }
+
+    @Test
+    void rejectsIndependentTransferStepWithResponseFrame() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace(
+                                "\"stepId\": \"s3\", \"instruction\": \"go solo\", \"responseFrame\": null",
+                                "\"stepId\": \"s3\", \"instruction\": \"go solo\", "
+                                        + "\"responseFrame\": \"Could I have ___, please?\""),
+                "only SCAFFOLDED_USE steps may declare a responseFrame");
+    }
+
+    @Test
+    void rejectsComprehensionCheckWithResponseFrame() {
+        // 理解检查携带答案性 responseFrame 会削弱 comprehension evidence 的语义，fail closed。
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace(
+                                "\"stepId\": \"s1\", \"instruction\": \"check the demo\", \"responseFrame\": null",
+                                "\"stepId\": \"s1\", \"instruction\": \"check the demo\", "
+                                        + "\"responseFrame\": \"Could I have ___, please?\""),
+                "only SCAFFOLDED_USE steps may declare a responseFrame");
+    }
+
+    @Test
+    void rejectsBlankGuidedStepInstruction() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace("\"instruction\": \"use the frame\"", "\"instruction\": \" \""),
+                "instruction must not be blank");
+    }
+
+    @Test
+    void rejectsBlankGuidedStepResponseFrame() {
+        assertRejectedWithMaterial(
+                guidedMaterial(VALID_GUIDED_STEPS)
+                        .replace(
+                                "\"responseFrame\": \"Could I have ___, please?\"", "\"responseFrame\": \" \""),
+                "responseFrame must be null or non-blank");
+    }
+
     private static String material() {
         return VALID_MATERIAL;
+    }
+
+    private static final String VALID_GUIDED_STEPS = """
+            [{"stepId": "s1", "instruction": "check the demo", "responseFrame": null},
+             {"stepId": "s2", "instruction": "use the frame", "responseFrame": "Could I have ___, please?"},
+             {"stepId": "s3", "instruction": "go solo", "responseFrame": null}]""";
+
+    /** 合法 Guided material：理解检查 → 辅助使用 → 独立迁移，逐 step 提供支架项。 */
+    private static String guidedMaterial(String guidedStepsJson) {
+        return """
+                {
+                  "materialId": "mat-1",
+                  "publishedVersion": "v1",
+                  "targetCore": {
+                    "targetLanguage": "en",
+                    "difficulty": "FOUNDATION",
+                    "scenario": "SCENARIO_A",
+                    "communicationObjective": "objective",
+                    "targetLanguageText": "scenario text",
+                    "readingInfo": null,
+                    "steps": [
+                      {"stepId": "s1", "kind": "EXACT", "learningPurpose": "COMPREHENSION_CHECK", "prompt": "prompt one", "acceptedAnswers": ["ok"]},
+                      {"stepId": "s2", "kind": "SEMANTIC_ONLY", "learningPurpose": "SCAFFOLDED_USE", "prompt": "prompt two", "acceptedAnswers": []},
+                      {"stepId": "s3", "kind": "SEMANTIC_ONLY", "learningPurpose": "INDEPENDENT_TRANSFER", "prompt": "prompt three", "acceptedAnswers": []}
+                    ],
+                    "semanticRubricReference": "rubric/v1"
+                  },
+                  "supportScaffolds": [
+                    {"supportLanguage": "zh-cn", "instruction": "i", "explanation": "e", "hint": "h", "contrastiveNote": null, "guidedSteps": GUIDED_STEPS_PLACEHOLDER}
+                  ]
+                }
+                """.replace("GUIDED_STEPS_PLACEHOLDER", guidedStepsJson);
+    }
+
+    private static Map<String, byte[]> guidedPack() {
+        byte[] material = guidedMaterial(VALID_GUIDED_STEPS).getBytes(StandardCharsets.UTF_8);
+        Map<String, byte[]> pack = new HashMap<>();
+        pack.put("materials/mat-1/v1.json", material);
+        pack.put("manifest.json", manifest(sha256(material)).getBytes(StandardCharsets.UTF_8));
+        return pack;
     }
 
     private static byte[] materialBytes() {

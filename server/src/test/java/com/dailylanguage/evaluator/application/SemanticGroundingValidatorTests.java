@@ -21,6 +21,7 @@ import com.dailylanguage.content.domain.MaterialSourceLineage;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.evaluator.domain.GroundedEvaluationInput;
@@ -772,15 +773,18 @@ class SemanticGroundingValidatorTests {
                         null,
                         List.of(
                                 new TextPracticeStep("order-drink", TextStepKind.EXACT,
+                                                TextLearningPurpose.PRACTICE,
                                         "Order a medium coffee politely.",
                                         List.of("Could I have a medium coffee, please?")),
                                 new TextPracticeStep("ask-price", TextStepKind.EXACT,
+                                                TextLearningPurpose.PRACTICE,
                                         "Ask how much the coffee costs.",
                                         List.of("How much is it?")),
                                 new TextPracticeStep("answer-to-go", TextStepKind.SEMANTIC_ONLY,
+                                                TextLearningPurpose.PRACTICE,
                                         "Answer that you want it to go.", List.of())),
                         rubricReference),
-                List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null)),
+                List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null, List.of())),
                 new MaterialSourceLineage("PROJECT_ORIGINAL", "1", "AGPL-3.0",
                         "sha256:" + "0".repeat(64)));
     }
