@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.6
 > Approved: 2026-08-20  
-> Last updated: 2026-09-08 — M1-S8D Evaluator Model dispatch documentation closeout
+> Last updated: 2026-09-09 — M1-S8E-API documentation closeout
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -151,7 +151,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | IN_PROGRESS — S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D COMPLETE (`8228d64`)；S8E-R READY_TO_COMMIT；S8E-API 实施未批准 |
+| M1-S8 | Evaluator ModelCallJob integration | READY_TO_COMMIT — S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D COMPLETE (`8228d64`)；S8E-R COMPLETE (`bf02aed`)；S8E-API implementation/review/external/docs/ownership PASS，未 commit |
 | M1-S8T | Minimum guided text learning | PLANNED — 在完整 M1-S8 后、M1-S9 前；交付范围已批准，Current Slice Contract 未批准 |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
@@ -205,7 +205,8 @@ wider server regression 622 tests / 0 failures / 0 errors / 11 Redis 相关条�
 
 M1-S8 整体设计方向已批准，按 S8A trusted input 读取、S8B Run / Job 原子关联、S8C grounding outcome /
 candidate 原子消费、S8D prompt / route / transient dispatch、S8E reconciliation / API 拆分；S8A–S8E
-Current Slice Contract 已批准。S8E-R reconciliation kernel 已完成，S8E-API 仍需单独 implementation approval。
+Current Slice Contract 已批准。S8E-R reconciliation kernel 已提交为 `bf02aed`；S8E-API 已完成 implementation、
+Critical Review、external verification 与 documentation；完整 S8 Ownership 已按批准节奏统一完成。
 
 S8A 已实现 `GroundedEvaluationInputReader.readOwned`，通过 authenticated caller 的 owner/profile-scoped
 读取与 exact material identity 组装 completed snapshot；零写入、不新增 schema / API 或 Model 调用。
@@ -272,7 +273,25 @@ verification：disposable PostgreSQL
 18.6 empty schema Flyway V1–V13 13/13、相关 integration 28/28；V12→V13 upgrade probe 在 V12 与升级后各 10/10，
 历史 grounding `FAILED` Run 正确回填 `GROUNDING_REJECTED`。临时容器/数据库已删除，primary database 未使用，
 existing PostgreSQL / Redis 保持 healthy。Behavior Flow `CURRENT`；standalone Ownership 按批准节奏不要求。
-S8E-R 当前 `READY_TO_COMMIT`、未 commit；S8E-API、scheduler 与 automatic retry 未实现、未获实施授权。
+S8E-R 已提交为 `bf02aed`。
+
+S8E-API 已实现 `EvaluationController` 与 `PracticeSessionEvaluationService`，提供两个 authenticated + CSRF PUT
+入口。Trigger 先执行 owner/profile-scoped completed snapshot read，再验证 `providerId`、transient Credential 与
+fixed EVALUATION route，调用 S8D dispatch 后立即进入 S8E-R consumption；`PENDING` 返回 `202 Accepted` 与
+reconciliation `Location`，durable `SUCCEEDED / FAILED` 返回 `200 OK`。显式 reconciliation 不接收 Credential、
+Provider、Job id 或 raw Model output，也不触发新 dispatch，只推进或 replay 同一 Run。
+
+外层 orchestration 使用 `@Transactional(NEVER)`，保留 Reader readOnly、S8B `REQUIRES_NEW`、transaction-free
+dispatch 与 S8C/S8E-R read-write transaction。Response 不暴露 userId、Job id、workflow/row version、Credential、
+Prompt 或 raw output；Model 仍只产生 candidate，Java 保持 owner gate、grounding、state transition 与 persistence
+authority。Critical Diff Review / Architecture PASS，无 blocking finding；local full server 727 tests / 0 failures /
+0 errors / 162 conditional skips。2026-09-09 disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13，S8
+evaluator integration 31/31 PASS；临时容器已删除，primary database 未使用，live Provider NOT_RUN。Behavior Flow
+`CURRENT`（`docs/flow/evaluation-api-orchestration.md`）。scheduler、automatic retry、遗留 CREATED/RUNNING
+recovery、SSE/WebSocket 与 M2 qualification 未实现。2026-09-09 完整 S8 Ownership Check PASS：用户能够区分
+`ModelCallJob` 的 execution/consumption 状态与 `EvaluationRun` 业务 outcome，并正确解释 Provider execution
+成功仍可能因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`。Understanding `UNDERSTOOD`，
+Human Touch `NOT_REQUIRED`；当前 Gate 为 M1-S8 `READY_TO_COMMIT`。
 
 ### M2 — Persistent Adaptation Loop
 

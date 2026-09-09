@@ -2,7 +2,7 @@
 
 - Document Status: `IMPLEMENTED`
 - Feature / Slice: `M1-S8D`
-- Last Verified: `2026-09-08`
+- Last Verified: `2026-09-09`
 - Entry: `EvaluationDispatchService.dispatchForReadyInput`
 
 ## 1. Behavior Boundary
@@ -12,10 +12,11 @@
 在独立事务中建立或读取 durable `EvaluationRun + ModelCallJob`，并且只对新建 Job 提交一次异步执行。
 
 S8D 负责 Evaluator prompt / request、`EVALUATION` route、7 天 result TTL 和 transient Credential dispatch。
-它不提供 HTTP API，不自动 retry 或 reconciliation，也不修改 completed Practice、deterministic assessment、
-Memory、Weakness、Level 或 Mastery。S8C 仍负责把成功 Job 的 durable result grounding 并原子消费；Model
-failure 与过期/stale/depleted result 已由 S8E-R 在 consumption entry 归约；遗留 `CREATED / RUNNING` Job 的自动
-发现、HTTP status 与 recovery 仍留给 S8E-API 或后续明确批准的 reliability scope。
+它本身不提供 HTTP API，也不自动 retry 或 reconciliation，并且不修改 completed Practice、deterministic assessment、
+Memory、Weakness、Level 或 Mastery。S8E-API 已通过 `PracticeSessionEvaluationService` 与两个 owner-scoped PUT
+入口复用本 Flow；HTTP trigger / reconciliation 见 `evaluation-api-orchestration.md`。S8C/S8E-R 继续负责成功
+result consumption、Model failure 与过期/stale/depleted result 归约；遗留 `CREATED / RUNNING` Job 自动发现与
+recovery 仍属于后续明确批准的 reliability scope。
 
 ## 2. Main Call Chain
 
@@ -100,8 +101,8 @@ OpenAI-compatible adapter、`deepseek-v4-flash` 与 30 秒 execution timeout。
 - executor capacity rejection：Provider 未调用；Job 必须成功 CAS 为 `SUBMISSION_REJECTED` 后才返回结果。
 - rejection CAS 丢失：抛出安全 `IllegalStateException`，不把未确认状态报告为成功。
 - submission 抛出未知异常：异常原样传播，不猜测 Executor 是否接纳，不执行可能重复调用 Provider 的补偿。
-- 进程在 durable commit 后、内存 submission 前终止：Job 可能停留在 `CREATED`。S8D/S8E-R 不自动 retry；
-  status、自动发现与 recovery 尚未实现。
+- 进程在 durable commit 后、内存 submission 前终止：Job 可能停留在 `CREATED`。S8E-API 可显式返回该 durable
+  `PENDING` 状态，但不自动发现或 retry；recovery 尚未实现。
 - Model 执行或 semantic output 失败不删除 completed Practice，也不污染长期学习状态。
 
 ## 6. Verification Evidence
@@ -116,6 +117,9 @@ OpenAI-compatible adapter、`deepseek-v4-flash` 与 30 秒 execution timeout。
   700 tests / 0 failures / 0 errors / 159 environment-conditional skips（实际执行 541）。
 - Integration 使用受控 `TextGenerationPort` mock，不访问 live Provider；临时数据库已删除，primary database 未使用，
   PostgreSQL / Redis 已恢复停止状态。`git diff --check` PASS。
+- S8E-API external（2026-09-09）：disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13；完整 S8 evaluator
+  integration regression 31/31 PASS，其中 `EvaluationDispatchIntegrationTests` 2/2 覆盖 HTTP trigger、异步
+  dispatch、reconciliation、terminal replay 与单次 Provider 调用。
 
 ## 7. Source References
 
@@ -133,3 +137,4 @@ OpenAI-compatible adapter、`deepseek-v4-flash` 与 30 秒 execution timeout。
 - `server/src/test/java/com/dailylanguage/evaluator/application/EvaluationDispatchIntegrationTests.java`
 - `server/src/test/java/com/dailylanguage/modelcalljob/application/TextGenerationJobDispatchTests.java`
 - `server/src/test/java/com/dailylanguage/modelcalljob/application/TextGenerationJobDispatchTransactionTests.java`
+- `docs/flow/evaluation-api-orchestration.md`

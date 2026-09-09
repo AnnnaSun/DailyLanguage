@@ -1,8 +1,8 @@
 # Evaluation Result Consumption and Reconciliation Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M1-S8C / M1-S8E-R`
-- Last Verified: `2026-09-08`
+- Feature / Slice: `M1-S8C / M1-S8E-R / M1-S8E-API`
+- Last Verified: `2026-09-09`
 - Entry: `EvaluationResultConsumptionService.consumeForReadyInput`
 
 ## 1. Behavior Boundary
@@ -18,11 +18,13 @@ current workflow 的 `SUCCEEDED / NOT_READY` result 继续由 S8C 执行 Java gr
 
 S8E-R 归约 terminal Model execution failure、expired、stale 或其他不可再消费 result，只把 Run 的 semantic branch
 终结为 `FAILED`，不修改 completed Practice、`DeterministicAssessment` 或长期 learner state。`CREATED / RUNNING`
-仍返回 `Pending`，不猜测 outcome、不自动 retry。terminal Run 重复调用只读取 durable outcome，不重新 grounding。
+返回带 durable Run snapshot 的 `Pending`，不猜测 outcome、不自动 retry；S8E-API 用该 snapshot 返回 `202`，无需
+第二次无锁查询。terminal Run 重复调用只读取 durable outcome，不重新 grounding。
 
 本 Flow 不负责 Model request / prompt 构造、route、Credential、submission 或 dispatch（M1-S8D，见
-`evaluation-model-dispatch.md`），也不提供 HTTP API、background scheduler、automatic retry 或遗留
-`CREATED / RUNNING` recovery。它不创建长期 Evidence，不修改 Memory、Weakness、Level 或 Mastery。
+`evaluation-model-dispatch.md`）。S8E-API 只通过 `PracticeSessionEvaluationService` 调用该 kernel，完整 HTTP
+orchestration 见 `evaluation-api-orchestration.md`。background scheduler、automatic retry 与遗留
+`CREATED / RUNNING` recovery 仍未实现。本 Flow 不创建长期 Evidence，不修改 Memory、Weakness、Level 或 Mastery。
 
 ## 2. Main Call Chain
 
@@ -151,6 +153,8 @@ Job；identity 漂移、无合法 state transition 或 `CONSUMED + PENDING Run` 
 - 临时容器/数据库均已删除，primary database 未作为测试目标；既有 PostgreSQL / Redis 保持 healthy。未执行
   Flyway repair、checksum 修改或 live Provider call。
 - Critical Diff Review：Scope MATCH；Code Review / Architecture PASS；no blocking findings。
+- S8E-API external（2026-09-09）：disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13；S8 evaluator
+  integration regression 31/31 PASS，其中 result consumption 13/13，0 failures / 0 errors / 0 skipped。
 
 ## 7. Source References
 
@@ -168,3 +172,5 @@ Job；identity 漂移、无合法 state transition 或 `CONSUMED + PENDING Run` 
 - `server/src/test/java/com/dailylanguage/evaluator/application/EvaluationResultConsumptionServiceTests.java`
 - `server/src/test/java/com/dailylanguage/evaluator/application/EvaluationResultConsumptionIntegrationTests.java`
 - `server/src/test/java/com/dailylanguage/modelcalljob/infrastructure/ModelCallJobConsumptionRepositoryIntegrationTests.java`
+- `server/src/main/java/com/dailylanguage/evaluator/application/PracticeSessionEvaluationService.java`
+- `docs/flow/evaluation-api-orchestration.md`

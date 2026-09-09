@@ -121,7 +121,7 @@ public class EvaluationResultConsumptionService {
         }
         switch (job.executionStatus()) {
             case CREATED, RUNNING -> {
-                return new ConsumptionResult.Pending();
+                return new ConsumptionResult.Pending(run);
             }
             case FAILED, TIMED_OUT, OUTCOME_UNKNOWN, SUBMISSION_REJECTED -> {
                 return finalizeModelFailure(
@@ -342,7 +342,14 @@ public class EvaluationResultConsumptionService {
         }
 
         /** 绑定 Job 仍为 CREATED / RUNNING，尚无可消费的 durable result。 */
-        record Pending() implements ConsumptionResult {
+        record Pending(EvaluationRun run) implements ConsumptionResult {
+
+            public Pending {
+                Objects.requireNonNull(run, "run must not be null");
+                if (run.status() != EvaluationRun.Status.PENDING) {
+                    throw new IllegalArgumentException("pending result requires a PENDING run");
+                }
+            }
         }
 
         /** owner/profile 范围内不存在该 Session 的 Run。 */

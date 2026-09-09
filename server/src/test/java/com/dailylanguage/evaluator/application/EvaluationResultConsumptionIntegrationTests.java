@@ -297,16 +297,18 @@ class EvaluationResultConsumptionIntegrationTests {
     @Test
     void createdOrRunningJobIsPendingWithoutMutation() {
         Prepared prepared = prepareCreatedEvaluation();
+        EvaluationRun pendingRun = evaluationRunRepository.findOwnedBySessionId(
+                prepared.sessionId, prepared.ownerId, prepared.profileId).orElseThrow();
 
         assertThat(consumptionService.consumeForReadyInput(prepared.ready, prepared.user))
-                .isEqualTo(new ConsumptionResult.Pending());
+                .isEqualTo(new ConsumptionResult.Pending(pendingRun));
 
         sqlSession.clearCache();
         ModelCallJob started = modelCallJobRepository.tryStartExecution(
                 prepared.jobId, prepared.ownerId, 0L).orElseThrow();
         assertThat(started.executionStatus()).isEqualTo(ModelCallJob.ExecutionStatus.RUNNING);
         assertThat(consumptionService.consumeForReadyInput(prepared.ready, prepared.user))
-                .isEqualTo(new ConsumptionResult.Pending());
+                .isEqualTo(new ConsumptionResult.Pending(pendingRun));
         assertThat(runStatus(prepared.runId)).isEqualTo("PENDING");
     }
 

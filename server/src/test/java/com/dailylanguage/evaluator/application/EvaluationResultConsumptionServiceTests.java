@@ -256,13 +256,13 @@ class EvaluationResultConsumptionServiceTests {
         stubPendingRun(job(ModelCallJob.ExecutionStatus.CREATED,
                 ModelCallJob.ConsumptionStatus.NOT_READY, 0L));
         assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
-                .isEqualTo(new ConsumptionResult.Pending());
+                .isEqualTo(new ConsumptionResult.Pending(pendingRun()));
 
         Mockito.reset(evaluationRunRepository, modelCallJobRepository);
         stubPendingRun(job(ModelCallJob.ExecutionStatus.RUNNING,
                 ModelCallJob.ConsumptionStatus.NOT_READY, 1L));
         assertThat(realValidatorService.consumeForReadyInput(ready(), new UserContext(USER_ID)))
-                .isEqualTo(new ConsumptionResult.Pending());
+                .isEqualTo(new ConsumptionResult.Pending(pendingRun()));
         verifyNoInteractions(validator);
     }
 

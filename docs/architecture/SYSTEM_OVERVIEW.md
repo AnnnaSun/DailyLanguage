@@ -706,8 +706,9 @@ dedicated model-call `ExecutorService` 包围同步 Provider Adapter call 并控
 
 `ModelCallJob` 在调用 Provider 前创建。PostgreSQL 保存 owner、workflow reference/version、execution /
 consumption status、safe typed result 与 expiry；BYOK Credential 只存在于当前 Worker 内存，不进入 durable
-Job state。用户可感知的迟到结果通过站内查询等待确认；Planner / Evaluator 等内部结果由 owning Workflow
-根据 version 自动消费或标记 stale。
+Job state。用户或 owning Workflow 通过受控入口确认迟到结果；M1 Evaluator 当前提供显式 owner-scoped HTTP
+trigger / reconciliation，由 Java 根据 workflow version 消费或标记 stale。background scheduler、automatic retry
+与遗留 `CREATED / RUNNING` recovery 尚未实现。
 
 当前架构不因为“未来可能有大量任务”提前引入 Kafka。
 

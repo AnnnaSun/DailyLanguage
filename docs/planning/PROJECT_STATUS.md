@@ -1,10 +1,10 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-08
+> Last updated: 2026-09-09
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S8E-R READY_TO_COMMIT；M1-S8 overall IN_PROGRESS
-> Production baseline: M1-S8D COMPLETE (`8228d64`)
-> Current candidate: M1-S8E-R reconciliation kernel；Critical Review / PostgreSQL-Flyway-Integration / documentation PASS；未 commit；S8E-API 未开始
+> Current Gate: M1-S8 READY_TO_COMMIT
+> Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
+> Current candidate: M1-S8E-API；implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation PASS；未 commit
 
 ## Approved Decisions
 
@@ -17,8 +17,8 @@
 - M1-S8 整体设计方向 D1–D4、S8A–S8D 与 S8E Current Slice Contract 已批准：显式触发可选 evaluation、Run / Job 原子关联后
   在事务外 dispatch、业务 outcome 与 Job consumption 原子完成、首版限制重复评估并区分迟到与 expiry。
   S8A 已提交为 `226b804`，S8B 已提交为 `2d46df6`，S8C 已提交为 `de29ada`，S8D 已提交为
-  `8228d64`。S8E 按 S8E-R reconciliation kernel 与 S8E-API 拆分；本轮只批准并完成 S8E-R，S8E-API
-  implementation 尚未批准。
+  `8228d64`，S8E-R 已提交为 `bf02aed`。S8E 按 reconciliation kernel 与 HTTP orchestration 拆分；S8E-API
+  Current Slice Contract 已批准并完成 implementation、Critical Review、external verification 与 documentation。
 - M1-S8 Ownership 节奏已批准：每个子 slice 保留 Critical Review 与相关验证；S8A 不单独 Explain Back，
   S8B–S8E 只在关键事务或并发边界存在理解缺口时简短确认；正式 Ownership Check 留到 S8 完整闭环完成。
 - M1-S8A 已完成 implementation、Critical / delta Review 与适用验证：新增 owner-scoped Reader，零写入、无新
@@ -57,7 +57,15 @@
   160 conditional skips。Fresh disposable PostgreSQL 18.6 empty schema Flyway V1–V13 13/13，相关 integration
   28/28；V12→V13 upgrade probe 两次各 10/10，
   历史 grounding `FAILED` Run 正确回填 `GROUNDING_REJECTED`。临时容器/数据库已删除，primary database 未使用且
-  PostgreSQL / Redis 保持 healthy；Behavior Flow `CURRENT`。S8E-API、scheduler 与 automatic retry 未实现。
+  PostgreSQL / Redis 保持 healthy；Behavior Flow `CURRENT`。S8E-R 已提交为 `bf02aed`。
+- M1-S8E-API 已完成两个 owner-scoped mutation endpoint：trigger 接收 `providerId` 与 transient Credential，按固定
+  EVALUATION route dispatch 后立即 reconcile；reconciliation 不接收 Credential、Provider、Job id 或 raw input，
+  只推进或 replay 同一 durable Run。`PENDING` 返回 `202 + Location`，durable `SUCCEEDED / FAILED` 返回 `200`；
+  stable error mapping、authentication、CSRF、language-profile isolation 与 secret-safe response 已验证。Critical Diff
+  Review / Architecture PASS，无 blocking finding；local targeted 43 executed + 2 database-conditional skips，full server
+  727 tests / 0 failures / 0 errors / 162 conditional skips（实际执行 565）。Fresh disposable PostgreSQL 18.6 empty
+  schema Flyway V1–V13 13/13；S8 evaluator integration 31/31 PASS。临时容器已删除，primary database 未使用，
+  live Provider NOT_RUN；Behavior Flow `CURRENT`。scheduler、automatic retry 与遗留 CREATED/RUNNING recovery 未实现。
 - 四个 pending modules 的 V1 裁剪已确认；
 - M0–M6 的 Phase 顺序已确认；
 - Architecture Baseline 已确认；
@@ -303,21 +311,21 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S8E-R READY_TO_COMMIT；M1-S8 overall IN_PROGRESS
+Gate: M1-S8 READY_TO_COMMIT
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
-Behavior Flow: CURRENT (`docs/flow/evaluation-result-consumption.md`；S8D dispatch flow remains current)
+Behavior Flow: CURRENT (`docs/flow/evaluation-api-orchestration.md`；S8A–S8E-R flows remain current)
 M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
 M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
 S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database integration 3 SKIPPED because
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
-Compose infrastructure: existing PostgreSQL / Redis healthy after disposable S8E-R verification
-Documentation reconciliation: COMPLETE for M1-S8E-R
-Primary local database: NOT USED for S8E-R verification；current migration level not rechecked
+Compose infrastructure: S8E-API disposable PostgreSQL removed after verification
+Documentation reconciliation: COMPLETE for M1-S8E-API
+Primary local database: NOT USED for S8E-API verification；current migration level not rechecked
 M0 integrated closeout: PASS
-Production baseline: M1-S8D COMPLETE (`8228d64`)
+Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -379,7 +387,7 @@ M1-S7 current structure: 7 Production Java files / 643 lines after approved non-
 M1-S7 baseline commit: COMPLETE (`7deb720`)
 M1-S7 Rubric source extraction: COMPLETE (`e93f624`)；DELTA REVIEW PASS；local unit 55/55 PASS；
   merge confirmed by user
-M1-S8 overall design direction: APPROVED；overall implementation INCOMPLETE
+M1-S8 overall design direction: APPROVED；implementation COMPLETE；Ownership UNDERSTOOD
 M1-S8A Current Slice Contract: APPROVED
 M1-S8A implementation / Critical Review / delta Review: PASS；COMPLETE (`226b804`)
 M1-S8A unit verification: PRIOR PASS — Reader 18/18 + S7 validator 33/33 + rubric 22/22 = 73/73
@@ -414,8 +422,8 @@ M1-S8D verification: PASS (2026-09-08) — fresh targeted 29/29；disposable Pos
 M1-S8D findings: NONE BLOCKING；known crash window after durable commit and before in-memory submission remains in approved scope
 M1-S8D Behavior Flow: CURRENT (`docs/flow/evaluation-model-dispatch.md`; shared Job dispatch flow updated)
 M1-S8D standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
-M1-S8E Current Slice Contract: APPROVED — split into S8E-R reconciliation kernel and later S8E-API
-M1-S8E-R implementation / Critical Diff Review / Architecture: PASS；READY_TO_COMMIT；uncommitted
+M1-S8E Current Slice Contract: APPROVED — split into S8E-R reconciliation kernel and S8E-API orchestration
+M1-S8E-R implementation / Critical Diff Review / Architecture: PASS；COMPLETE (`bf02aed`)
 M1-S8E-R local verification: PASS — final targeted 35/35；implementation-stage full server 703 tests / 0 failures / 0 errors /
   160 environment-conditional skips；git diff --check PASS
 M1-S8E-R external verification: PASS (2026-09-08) — disposable PostgreSQL 18.6；empty schema Flyway V1–V13
@@ -425,27 +433,42 @@ M1-S8E-R external verification: PASS (2026-09-08) — disposable PostgreSQL 18.6
 M1-S8E-R findings: NONE BLOCKING
 M1-S8E-R Behavior Flow: CURRENT (`docs/flow/evaluation-result-consumption.md`)
 M1-S8E-R standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
-M1-S8E-API implementation scope: NOT_APPROVED；scheduler / automatic retry NOT_IMPLEMENTED
+M1-S8E-API Current Slice Contract: APPROVED
+M1-S8E-API implementation / Critical Diff Review / Architecture: PASS；uncommitted
+M1-S8E-API local verification: PASS — targeted 45 discovered / 43 executed / 2 database-conditional skipped；full server
+  727 tests / 0 failures / 0 errors / 162 environment-conditional skips（实际执行 565）；git diff --check PASS
+M1-S8E-API external verification: PASS (2026-09-09) — disposable PostgreSQL 18.6；empty schema Flyway V1–V13
+  13/13；pgvector 0.8.6；S8 evaluator integration 31/31，0 failures / 0 errors / 0 skipped；HTTP integration
+  验证 trigger / async Job / reconciliation / terminal replay / foreign-owner 404 / Credential 不落 Job；temporary
+  container deleted；primary database not used；live Provider NOT_RUN
+M1-S8E-API findings: NONE BLOCKING
+M1-S8E-API Behavior Flow: CURRENT (`docs/flow/evaluation-api-orchestration.md`；S8D/S8E-R flows synchronized)
+M1-S8 full-loop Ownership Check: PASS (2026-09-09) — Understanding `UNDERSTOOD`；用户能够区分
+  `ModelCallJob` execution/consumption 与 `EvaluationRun` business outcome，并正确说明 Provider execution
+  `SUCCEEDED + CONSUMED` 仍可因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`；Human Touch
+  `NOT_REQUIRED`
+M1-S8 deferred scope: scheduler / automatic retry / legacy CREATED-RUNNING recovery / SSE-WebSocket NOT_IMPLEMENTED
 M1-S9+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-用户执行 M1-S8E-R Commit Decision。当前 reconciliation kernel、Critical Review、external verification 与文档已
-收口为 `READY_TO_COMMIT`；不要求单独 Explain Back，不自动 commit、push、merge 或开始 S8E-API。
+用户执行 S8E-API Commit Decision。M1-S8 implementation、Critical Review、external verification、documentation
+与完整 Ownership 均已收口为 `READY_TO_COMMIT`；不自动 commit、push、merge 或开始 M1-S8T。
 
 ## Blockers
 
-M1-S8E-R 无剩余 Code Review / Verification / Documentation blocker，当前只剩 Commit Decision。
-S8E-API 尚未获实施批准，S8 整体仍未完成。S8E-R external verification 使用独立 disposable PostgreSQL 18.6
-验证 empty-schema 与 V12 upgrade；临时容器/数据库已删除，未将 primary database 作为测试目标。
+M1-S8E-API 无剩余 Code Review / Verification / Documentation / Ownership blocker，当前只剩 Commit Decision。
+S8E-API external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema 与完整 S8 evaluator
+integration；临时容器已删除，未将 primary database 作为测试目标。
 M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改
 `flyway_schema_history`。
 Model Gateway 与 BYOK / Provider Configuration Ownership 仍为 L2；Structured Output / grounding 已接入 S8C
 durable result consumption，S8D 已接通 versioned request 与 transient dispatch，S8E-R 已终结 Model failure 与
-unavailable result；S8E API / scheduler 尚未实现，Trace 只有安全 logging metadata。
+unavailable result；S8E-API 已接通显式 HTTP trigger/reconciliation，scheduler、automatic retry 与遗留
+CREATED/RUNNING recovery 尚未实现，Trace 只有安全 logging metadata。
 当前仍没有 Hosted TLS verification、
 Browser local/session storage UI、业务 Agent
 Workflow、live DeepSeek Credential / network verification 或 durable Trace，因此不能宣称完整产品 BYOK / Structured

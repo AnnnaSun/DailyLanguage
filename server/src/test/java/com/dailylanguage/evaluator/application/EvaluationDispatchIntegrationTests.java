@@ -6,6 +6,12 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -20,8 +26,12 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import com.dailylanguage.evaluator.application.EvaluationDispatchService.DispatchResult;
 import com.dailylanguage.evaluator.application.EvaluationResultConsumptionService.ConsumptionResult;
@@ -55,10 +65,15 @@ import com.dailylanguage.user.infrastructure.UserRepository;
  * 使用真实 PostgreSQL 与异步 Job Worker 验证 S8D，不访问真实 Model Provider。
  */
 @SpringBootTest(properties = "app.registration-enabled=true")
+@AutoConfigureMockMvc
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class EvaluationDispatchIntegrationTests {
 
     private static final String GENERATED_JSON = "{\"claims\":[]}";
+    private static final String PROVIDER_CREDENTIAL_HEADER = "X-Model-Provider-Credential";
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Autowired
     private UserRepository userRepository;
@@ -204,6 +219,63 @@ class EvaluationDispatchIntegrationTests {
                 String.class)).isEqualTo("13");
     }
 
+    @Test
+    void httpOwnerCanTriggerReconcileAndReplayOneEvaluation() throws Exception {
+        UUID ownerId = newUser();
+        LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
+        UserContext owner = new UserContext(ownerId);
+        UUID sessionId = completeCafeSession(profile.id(), owner);
+        String endpoint = "/api/language-profiles/" + profile.id()
+                + "/practice-sessions/" + sessionId + "/evaluation";
+        String credential = "api-integration-secret";
+        when(textGenerationPort.generateText(
+                any(TextGenerationRequest.class), any(TransientProviderCredential.class)))
+                .thenReturn(ModelResult.success(new TextGenerationResponse(
+                        new ProviderId("deepseek"),
+                        new ModelId("deepseek-v4-flash"),
+                        GENERATED_JSON,
+                        TextGenerationResponse.FinishReason.COMPLETED,
+                        Optional.empty())));
+
+        int triggerStatus = mockMvc.perform(put(endpoint)
+                        .with(authenticated(owner)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(PROVIDER_CREDENTIAL_HEADER, credential)
+                        .content("{\"providerId\":\"deepseek\"}"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.sessionId").value(sessionId.toString()))
+                .andReturn().getResponse().getStatus();
+        assertThat(triggerStatus).isIn(200, 202);
+
+        UUID jobId = jdbcTemplate.queryForObject(
+                "SELECT id FROM model_call_job WHERE user_id = ?", UUID.class, ownerId);
+        awaitTerminalJob(jobId, ownerId);
+        mockMvc.perform(put(endpoint + "/reconciliation")
+                        .with(authenticated(owner)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.semanticResult.claims").isEmpty());
+
+        mockMvc.perform(put(endpoint)
+                        .with(authenticated(owner)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(PROVIDER_CREDENTIAL_HEADER, credential)
+                        .content("{\"providerId\":\"deepseek\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+        verify(textGenerationPort, timeout(5_000).times(1))
+                .generateText(any(TextGenerationRequest.class), any(TransientProviderCredential.class));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT row_to_json(job)::text FROM model_call_job job WHERE user_id = ?",
+                String.class, ownerId)).doesNotContain(credential);
+
+        UUID foreignUserId = newUser();
+        mockMvc.perform(put(endpoint + "/reconciliation")
+                        .with(authenticated(new UserContext(foreignUserId))).with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRACTICE_SESSION_NOT_FOUND"));
+    }
+
     private UUID newUser() {
         UUID userId = userRepository.create();
         createdUserIds.add(userId);
@@ -257,5 +329,11 @@ class EvaluationDispatchIntegrationTests {
             }
         }
         throw new IllegalStateException("model call job did not reach a terminal state");
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor authenticated(
+            UserContext userContext) {
+        return authentication(UsernamePasswordAuthenticationToken.authenticated(
+                userContext, null, List.of()));
     }
 }

@@ -209,3 +209,4 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | EvaluationRun Creation | IMPLEMENTED | M1-S8A / M1-S8B | [`evaluation-run-creation.md`](evaluation-run-creation.md) |
 | Evaluation Result Consumption and Reconciliation | IMPLEMENTED | M1-S8C / M1-S8E-R | [`evaluation-result-consumption.md`](evaluation-result-consumption.md) |
 | Evaluation Model Dispatch | IMPLEMENTED | M1-S8D | [`evaluation-model-dispatch.md`](evaluation-model-dispatch.md) |
+| Evaluation API Orchestration | IMPLEMENTED | M1-S8E-API | [`evaluation-api-orchestration.md`](evaluation-api-orchestration.md) |
