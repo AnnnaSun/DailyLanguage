@@ -35,6 +35,10 @@ interface PracticeSessionMapper {
             @Param("sessionId") UUID sessionId,
             @Param("stepId") String stepId,
             @Param("learnerText") String learnerText,
+            @Param("demonstrationExposure") String demonstrationExposure,
+            @Param("explanationExposure") String explanationExposure,
+            @Param("hintExposure") String hintExposure,
+            @Param("responseFrameExposure") String responseFrameExposure,
             @Param("trustedUserId") UUID trustedUserId,
             @Param("languageProfileId") UUID languageProfileId);
 

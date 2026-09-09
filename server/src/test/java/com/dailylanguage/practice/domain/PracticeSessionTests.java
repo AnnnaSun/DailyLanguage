@@ -187,4 +187,70 @@ class PracticeSessionTests {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("submittedAt must not be null");
     }
+
+    @Test
+    void unknownSupportConditionCoversAllFourConditions() {
+        PracticeSession.ResponseSupportCondition condition =
+                PracticeSession.ResponseSupportCondition.unknown();
+
+        assertThat(condition.demonstration()).isEqualTo(PracticeSession.SupportExposure.UNKNOWN);
+        assertThat(condition.explanation()).isEqualTo(PracticeSession.SupportExposure.UNKNOWN);
+        assertThat(condition.hint()).isEqualTo(PracticeSession.SupportExposure.UNKNOWN);
+        assertThat(condition.responseFrame()).isEqualTo(PracticeSession.SupportExposure.UNKNOWN);
+    }
+
+    @Test
+    void supportConditionRejectsNullComponents() {
+        assertThatThrownBy(() -> new PracticeSession.ResponseSupportCondition(
+                null, PracticeSession.SupportExposure.NOT_PROVIDED,
+                PracticeSession.SupportExposure.NOT_PROVIDED, PracticeSession.SupportExposure.NOT_PROVIDED))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("demonstration must not be null");
+        assertThatThrownBy(() -> new PracticeSession.ResponseSupportCondition(
+                PracticeSession.SupportExposure.NOT_PROVIDED, null,
+                PracticeSession.SupportExposure.NOT_PROVIDED, PracticeSession.SupportExposure.NOT_PROVIDED))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("explanation must not be null");
+        assertThatThrownBy(() -> new PracticeSession.ResponseSupportCondition(
+                PracticeSession.SupportExposure.NOT_PROVIDED, PracticeSession.SupportExposure.NOT_PROVIDED,
+                null, PracticeSession.SupportExposure.NOT_PROVIDED))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("hint must not be null");
+        assertThatThrownBy(() -> new PracticeSession.ResponseSupportCondition(
+                PracticeSession.SupportExposure.NOT_PROVIDED, PracticeSession.SupportExposure.NOT_PROVIDED,
+                PracticeSession.SupportExposure.NOT_PROVIDED, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("responseFrame must not be null");
+    }
+
+    @Test
+    void learnerResponseCarriesExplicitSupportConditionSnapshot() {
+        PracticeSession.ResponseSupportCondition condition = new PracticeSession.ResponseSupportCondition(
+                PracticeSession.SupportExposure.PROVIDED,
+                PracticeSession.SupportExposure.OPENED,
+                PracticeSession.SupportExposure.NOT_PROVIDED,
+                PracticeSession.SupportExposure.OPENED);
+
+        PracticeSession.LearnerResponse response = new PracticeSession.LearnerResponse(
+                SESSION_ID, "order-drink", "text", STARTED_AT, condition);
+
+        assertThat(response.supportCondition()).isEqualTo(condition);
+    }
+
+    @Test
+    void legacyLearnerResponseConstructorDefaultsToUnknownSupportCondition() {
+        PracticeSession.LearnerResponse legacy = new PracticeSession.LearnerResponse(
+                SESSION_ID, "order-drink", "text", STARTED_AT);
+
+        assertThat(legacy.supportCondition())
+                .isEqualTo(PracticeSession.ResponseSupportCondition.unknown());
+        assertThat(new PracticeSession.LearnerResponse(
+                SESSION_ID, "order-drink", "text", STARTED_AT,
+                PracticeSession.ResponseSupportCondition.unknown()))
+                .isEqualTo(legacy);
+        assertThatThrownBy(() -> new PracticeSession.LearnerResponse(
+                SESSION_ID, "order-drink", "text", STARTED_AT, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("supportCondition must not be null");
+    }
 }

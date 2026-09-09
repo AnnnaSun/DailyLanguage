@@ -89,7 +89,7 @@ class GroundedEvaluationInputReaderTests {
         // 所有分支都只能复用 owner-scoped 读取，不得触发任何 mutation、锁或重选材料查询。
         verify(practiceSessionRepository, never()).insertForOwnedTask(any(), any(), any());
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
         verify(practiceSessionRepository, never()).completeOwned(any(), any(), any());
         verify(practiceSessionRepository, never()).insertOwnedAssessment(any(), any(), anyLong(), any(), any());
         verify(practiceSessionRepository, never())

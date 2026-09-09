@@ -317,7 +317,8 @@ class PracticeSessionApplicationServiceTests {
                 new PracticeSession.LearnerResponse(SESSION_ID, "order-drink", rawLearnerText, SUBMITTED_AT)));
         // 传入数据库的是原始文本：不 trim、不改大小写、不做 normalization；owner scope 随调用显式传入。
         verify(practiceSessionRepository).insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", rawLearnerText, USER_ID, PROFILE_ID);
+                SESSION_ID, "order-drink", rawLearnerText,
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID);
         // Contract flow：owned Session → owned Task → material → stepId → lock → 再确认 → insert。
         InOrder flow = inOrder(practiceSessionRepository, learningTaskRepository, materialCatalog);
         flow.verify(practiceSessionRepository).findOwned(SESSION_ID, USER_ID, PROFILE_ID);
@@ -325,7 +326,8 @@ class PracticeSessionApplicationServiceTests {
         flow.verify(materialCatalog).findByIdentity(CAFE_IDENTITY, "zh-cn");
         flow.verify(practiceSessionRepository).findOwnedForUpdate(SESSION_ID, USER_ID, PROFILE_ID);
         flow.verify(practiceSessionRepository).insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", rawLearnerText, USER_ID, PROFILE_ID);
+                SESSION_ID, "order-drink", rawLearnerText,
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID);
     }
 
     @Test
@@ -362,7 +364,7 @@ class PracticeSessionApplicationServiceTests {
 
         verifyNoInteractions(learningTaskRepository, materialCatalog);
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -374,7 +376,7 @@ class PracticeSessionApplicationServiceTests {
 
         verify(practiceSessionRepository, never()).findOwnedForUpdate(any(UUID.class), any(UUID.class), any(UUID.class));
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -391,7 +393,7 @@ class PracticeSessionApplicationServiceTests {
                 .isEqualTo(new SubmitResult.MaterialUnavailable());
 
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -425,14 +427,15 @@ class PracticeSessionApplicationServiceTests {
                 .isEqualTo(new SubmitResult.SessionNotAcceptingResponses());
 
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void samePayloadReplayReturnsTheFirstSubmittedAtWithoutMutation() {
         arrangeSubmittableSession();
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", "Same text", USER_ID, PROFILE_ID))
+                SESSION_ID, "order-drink", "Same text",
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID))
                 .thenReturn(Optional.empty());
         PracticeSession.LearnerResponse stored = new PracticeSession.LearnerResponse(
                 SESSION_ID, "order-drink", "Same text", SUBMITTED_AT);
@@ -447,7 +450,8 @@ class PracticeSessionApplicationServiceTests {
     void differentPayloadConflictKeepsTheFirstAcceptedResponse() {
         arrangeSubmittableSession();
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", "Could I have a large coffee, please?", USER_ID, PROFILE_ID))
+                SESSION_ID, "order-drink", "Could I have a large coffee, please?",
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID))
                 .thenReturn(Optional.empty());
         when(practiceSessionRepository.findOwnedResponse(SESSION_ID, "order-drink", USER_ID, PROFILE_ID))
                 .thenReturn(Optional.of(new PracticeSession.LearnerResponse(
@@ -715,10 +719,12 @@ class PracticeSessionApplicationServiceTests {
         when(practiceSessionRepository.findOwnedForUpdate(SESSION_ID, USER_ID, PROFILE_ID))
                 .thenReturn(Optional.of(inProgressSession()));
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                eq(SESSION_ID), eq("order-drink"), any(), eq(USER_ID), eq(PROFILE_ID)))
+                eq(SESSION_ID), eq("order-drink"), any(),
+                eq(PracticeSession.ResponseSupportCondition.unknown()), eq(USER_ID), eq(PROFILE_ID)))
                 .thenReturn(Optional.of(SUBMITTED_AT));
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                eq(SESSION_ID), eq("answer-to-go"), any(), eq(USER_ID), eq(PROFILE_ID)))
+                eq(SESSION_ID), eq("answer-to-go"), any(),
+                eq(PracticeSession.ResponseSupportCondition.unknown()), eq(USER_ID), eq(PROFILE_ID)))
                 .thenReturn(Optional.of(SUBMITTED_AT));
     }
 

@@ -160,11 +160,15 @@ public class PracticeSessionApplicationService {
             return new SubmitResult.SessionNotAcceptingResponses();
         }
 
+        // 当前 API 不接受客户端自报的 support condition；HTTP submit 显式落 UNKNOWN，
+        // 等 runtime 记录真实暴露条件后由后续 slice 替换。
+        PracticeSession.ResponseSupportCondition supportCondition =
+                PracticeSession.ResponseSupportCondition.unknown();
         Optional<OffsetDateTime> submittedAt = practiceSessionRepository.insertOwnedAcceptedResponse(
-                sessionId, stepId, learnerText, userContext.userId(), languageProfileId);
+                sessionId, stepId, learnerText, supportCondition, userContext.userId(), languageProfileId);
         if (submittedAt.isPresent()) {
             return new SubmitResult.Accepted(new PracticeSession.LearnerResponse(
-                    sessionId, stepId, learnerText, submittedAt.orElseThrow()));
+                    sessionId, stepId, learnerText, submittedAt.orElseThrow(), supportCondition));
         }
         // conflict 后同事务内读取既有 response；行由 (sessionId, stepId) 主键保证存在。
         PracticeSession.LearnerResponse stored = practiceSessionRepository

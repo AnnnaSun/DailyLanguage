@@ -182,16 +182,16 @@ class PracticeSessionPersistenceIntegrationTests {
 
         Optional<java.time.OffsetDateTime> first = practiceSessionRepository.insertOwnedAcceptedResponse(
                 session.id(), "order-drink", "  Could I have a medium coffee, please?  ",
-                owned.ownerId(), owned.profileId());
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId());
         assertThat(first).isPresent();
 
         // 相同或不同 payload 的重复 insert 都不覆盖、不报错，由调用方比较既有行裁决。
         assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
                 session.id(), "order-drink", "  Could I have a medium coffee, please?  ",
-                owned.ownerId(), owned.profileId())).isEmpty();
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId())).isEmpty();
         assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
                 session.id(), "order-drink", "A large coffee, please.",
-                owned.ownerId(), owned.profileId())).isEmpty();
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId())).isEmpty();
 
         PracticeSession.LearnerResponse stored = practiceSessionRepository
                 .findOwnedResponse(session.id(), "order-drink", owned.ownerId(), owned.profileId())
@@ -214,14 +214,16 @@ class PracticeSessionPersistenceIntegrationTests {
 
         practiceSessionRepository.insertOwnedAcceptedResponse(
                 session.id(), "order-drink", "Could I have a medium coffee, please?",
-                owned.ownerId(), owned.profileId());
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId());
 
         // foreign user / foreign profile 不能写入也不能读取 private learner text。
         assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
-                session.id(), "ask-price", "How much is it?", otherUserId, owned.profileId()))
+                session.id(), "ask-price", "How much is it?",
+                PracticeSession.ResponseSupportCondition.unknown(), otherUserId, owned.profileId()))
                 .isEmpty();
         assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
-                session.id(), "ask-price", "How much is it?", owned.ownerId(), otherProfile.id()))
+                session.id(), "ask-price", "How much is it?",
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), otherProfile.id()))
                 .isEmpty();
         assertThat(practiceSessionRepository.findOwnedResponse(
                 session.id(), "order-drink", otherUserId, owned.profileId())).isEmpty();
@@ -234,7 +236,8 @@ class PracticeSessionPersistenceIntegrationTests {
                         + "WHERE id = ?",
                 session.id());
         assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
-                session.id(), "ask-price", "How much is it?", owned.ownerId(), owned.profileId()))
+                session.id(), "ask-price", "How much is it?",
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId()))
                 .isEmpty();
 
         assertThat(countResponsesForSession(session.id())).isEqualTo(1);
@@ -250,14 +253,91 @@ class PracticeSessionPersistenceIntegrationTests {
                 owned.taskId(), owned.ownerId(), owned.profileId());
 
         assertThatThrownBy(() -> practiceSessionRepository.insertOwnedAcceptedResponse(
-                session.id(), "order-drink", "", owned.ownerId(), owned.profileId()))
+                session.id(), "order-drink", "",
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId()))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> practiceSessionRepository.insertOwnedAcceptedResponse(
-                session.id(), "order-drink", "a".repeat(2001), owned.ownerId(), owned.profileId()))
+                session.id(), "order-drink", "a".repeat(2001),
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId()))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> practiceSessionRepository.insertOwnedAcceptedResponse(
                 session.id(), " order-drink", "Could I have a medium coffee, please?",
-                owned.ownerId(), owned.profileId()))
+                PracticeSession.ResponseSupportCondition.unknown(), owned.ownerId(), owned.profileId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(countResponsesForSession(session.id())).isZero();
+    }
+
+    @Test
+    void responseInsertPersistsExplicitSupportConditionSnapshot() {
+        OwnedTask owned = createOwnedStartedTask();
+        PracticeSession session = practiceSessionRepository.insertForOwnedTask(
+                owned.taskId(), owned.ownerId(), owned.profileId());
+        PracticeSession.ResponseSupportCondition condition =
+                new PracticeSession.ResponseSupportCondition(
+                        PracticeSession.SupportExposure.PROVIDED,
+                        PracticeSession.SupportExposure.OPENED,
+                        PracticeSession.SupportExposure.NOT_PROVIDED,
+                        PracticeSession.SupportExposure.OPENED);
+
+        assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
+                session.id(), "order-drink", "Could I have a medium coffee, please?", condition,
+                owned.ownerId(), owned.profileId())).isPresent();
+
+        assertThat(practiceSessionRepository
+                .findOwnedResponse(session.id(), "order-drink", owned.ownerId(), owned.profileId())
+                .orElseThrow().supportCondition()).isEqualTo(condition);
+        assertThat(practiceSessionRepository
+                .findOwnedResponses(session.id(), owned.ownerId(), owned.profileId())
+                .getFirst().supportCondition()).isEqualTo(condition);
+    }
+
+    @Test
+    void repeatedResponseInsertDoesNotOverwriteFirstSupportCondition() {
+        OwnedTask owned = createOwnedStartedTask();
+        PracticeSession session = practiceSessionRepository.insertForOwnedTask(
+                owned.taskId(), owned.ownerId(), owned.profileId());
+        PracticeSession.ResponseSupportCondition firstCondition =
+                new PracticeSession.ResponseSupportCondition(
+                        PracticeSession.SupportExposure.NOT_PROVIDED,
+                        PracticeSession.SupportExposure.NOT_PROVIDED,
+                        PracticeSession.SupportExposure.NOT_PROVIDED,
+                        PracticeSession.SupportExposure.NOT_PROVIDED);
+
+        practiceSessionRepository.insertOwnedAcceptedResponse(
+                session.id(), "order-drink", "Could I have a medium coffee, please?", firstCondition,
+                owned.ownerId(), owned.profileId());
+
+        // 携带不同 condition 的重复 insert 不覆盖首次 snapshot。
+        assertThat(practiceSessionRepository.insertOwnedAcceptedResponse(
+                session.id(), "order-drink", "Could I have a medium coffee, please?",
+                PracticeSession.ResponseSupportCondition.unknown(),
+                owned.ownerId(), owned.profileId())).isEmpty();
+        assertThat(practiceSessionRepository
+                .findOwnedResponse(session.id(), "order-drink", owned.ownerId(), owned.profileId())
+                .orElseThrow().supportCondition()).isEqualTo(firstCondition);
+    }
+
+    // V14 后四列 NOT NULL 且无 DB default，CHECK violation 会 abort 当前事务（SQLSTATE 25P02）；
+    // 与上方 constraint 测试同理，NOT_SUPPORTED 下每次 raw insert 都在自己的事务中失败。
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void supportConditionColumnsRejectImplicitAndInvalidValues() {
+        OwnedTask owned = createOwnedStartedTask();
+        PracticeSession session = practiceSessionRepository.insertForOwnedTask(
+                owned.taskId(), owned.ownerId(), owned.profileId());
+
+        // 不显式提供四列的 insert 违反 NOT NULL：V14 已移除 DB default，要求完整 snapshot。
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO practice_response (session_id, step_id, learner_text) VALUES (?, ?, ?)",
+                session.id(), "order-drink", "Could I have a medium coffee, please?"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        // 枚举外的取值由 CHECK 约束拒绝。
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO practice_response (session_id, step_id, learner_text, "
+                        + "demonstration_exposure, explanation_exposure, hint_exposure, "
+                        + "response_frame_exposure) "
+                        + "VALUES (?, ?, ?, 'SHOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN')",
+                session.id(), "order-drink", "Could I have a medium coffee, please?"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(countResponsesForSession(session.id())).isZero();
     }
@@ -344,6 +424,28 @@ class PracticeSessionPersistenceIntegrationTests {
                 .isInstanceOf(SubmitResult.Accepted.class);
 
         assertThat(countResponsesForSession(sessionId)).isEqualTo(3);
+    }
+
+    @Test
+    void serviceSubmitPersistsUnknownSupportConditionForEveryResponse() {
+        OwnedTask owned = createOwnedPlannedTask();
+        StartResult.Created started = (StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), new UserContext(owned.ownerId()));
+        UUID sessionId = started.session().id();
+        UserContext context = new UserContext(owned.ownerId());
+
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "order-drink", context,
+                "Could I have a medium coffee, please?");
+        practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "answer-to-go", context, "To go, please.");
+
+        // 当前 API 不接受客户端自报的 support condition：HTTP submit 全部落 UNKNOWN，
+        // 等 runtime 记录真实暴露条件后由后续 slice 替换。
+        assertThat(practiceSessionRepository.findOwnedResponses(
+                sessionId, owned.ownerId(), owned.profileId()))
+                .allSatisfy(response -> assertThat(response.supportCondition())
+                        .isEqualTo(PracticeSession.ResponseSupportCondition.unknown()));
     }
 
     @Test
@@ -612,9 +714,12 @@ class PracticeSessionPersistenceIntegrationTests {
         PreparedSession prepared = prepareFullyAnsweredCafeSession();
         // 故障注入：material 未定义的 response step（绕过 service 的 stepId 校验），
         // 属 durable invariant violation：completion 必须整体回滚而不是返回可恢复 result。
+        // 四个 exposure 列必须显式写 UNKNOWN：V14 后无 DB default，注入行需要真实落库。
         jdbcTemplate.update(
-                "INSERT INTO practice_response (session_id, step_id, learner_text) "
-                        + "VALUES (?, 'unknown-step', 'text')",
+                "INSERT INTO practice_response (session_id, step_id, learner_text, "
+                        + "demonstration_exposure, explanation_exposure, hint_exposure, "
+                        + "response_frame_exposure) "
+                        + "VALUES (?, 'unknown-step', 'text', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN')",
                 prepared.sessionId());
 
         assertThatThrownBy(() -> practiceSessionApplicationService.complete(
