@@ -2,19 +2,37 @@
 
 > Last updated: 2026-09-10
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S8T READY_TO_COMMIT
-> Production baseline: M1-S8T-B COMPLETE (`f2eefa6`)
-> Current candidate: M1-S8T-C；implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation /
-> Ownership PASS；未 commit
+> Current Gate: M1-S9A IMPLEMENTATION
+> Production baseline: M1-S8T COMPLETE — PR #25 merged to main (`c2dbb4f`)
+> Current candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
 
 ## Approved Decisions
+
+- 2026-09-10：用户批准 `M2C — Minimum Adaptive Text Conversation` Product / Architecture Scope，并将其作为
+  M2 exit criteria 通过后、M3 implementation 前的独立 Product Proof Gate。V1 只交付一个受控 `en + zh-CN`
+  text scenario：支持显式求助、`TOPIC_DIRECTIONS → KEYWORDS → RESPONSE_FRAME → HOW_TO_SAY` 渐进辅助、
+  目标语言重新表达、Session-level evaluation 与变化场景 transfer。Text inactivity 最多触发非打断式 offer，
+  offer 不等于 opened support，一次迟疑或 assistance request 不形成 Weakness。具体 schema、API、event contract、
+  Prompt、Context strategy 与 implementation slice 未批准；高级 Voice hesitation、realtime、pronunciation scoring
+  等进入 Backlog。V1 Scope 更新为 v1.10，Phase Plan 更新为 v1.7；详细 Contract 见
+  `docs/features/ADAPTIVE_SCENARIO_CONVERSATION.md`。
+
+- 2026-09-10：用户批准 M1-S9 recommended
+  `PlanningRun + candidate snapshot + recommendationReason` Architecture / Scope、当前受控 two-candidate soft
+  decision 的 walking-skeleton 定位，以及 `S9A → S9B → S9C1 → S9C2 → S9D → S9E1 → S9E2 → S9F`
+  拆分顺序。该次总体批准本身不授权 Production implementation；S9A 已在后续独立决定中获批。
+
+- 2026-09-10：用户批准 M1-S9A `Deterministic Candidate Set` Current Slice Contract 交由 Zcode 实现。授权仅覆盖
+  planner 内 deterministic candidate boundary 与 targeted tests；S9B、schema、API、Model、Prompt、Credential
+  均未授权。Zcode 完成后必须停在 `REVIEW_PENDING`，由 Codex 执行 Critical Diff Review。
 
 - 2026-09-07：用户批准 Guided Language Learning 纳入 V1 P0 及 M1–M6 分配；正式 Scope 为 v1.9，
   Phase Plan 为 v1.6。完整 M1-S8 后、S9 前增加 `M1-S8T` 最小文本教学，包含必要辅助条件记录，
   S11 承接最小 UX；M2 聚合适应、M3 内容生产、M4 完整迁移复习、M5 音频、M6 验证。
   详细设计见 `docs/features/GUIDED_LANGUAGE_LEARNING.md`；Phase exit criteria 已更新。
   S8T 后续已批准拆分为 S8T-A Guided Material Contract、S8T-B Response Support Condition Persistence、
-  S8T-C Guided Cafe Material Delivery；三者 implementation 与 Critical Review 均已完成，整体 Ownership PASS。
+  S8T-C Guided Cafe Material Delivery；三者 implementation 与 Critical Review 均已完成，整体 Ownership PASS，
+  并于 2026-09-10 随 PR #25 merge to main as `c2dbb4f`。
 
 - M1-S8 整体设计方向 D1–D4、S8A–S8D 与 S8E Current Slice Contract 已批准：显式触发可选 evaluation、Run / Job 原子关联后
   在事务外 dispatch、业务 outcome 与 Job consumption 原子完成、首版限制重复评估并区分迟到与 expiry。
@@ -71,9 +89,10 @@
   schema Flyway V1–V13 13/13；S8 evaluator integration 31/31 PASS。临时容器已删除，primary database 未使用，
   live Provider NOT_RUN；Behavior Flow `CURRENT`。scheduler、automatic retry 与遗留 CREATED/RUNNING recovery 未实现。
 - 四个 pending modules 的 V1 裁剪已确认；
-- M0–M6 的 Phase 顺序已确认；
+- M0–M6 的 Phase 顺序及 M2 后、M3 前的 M2C Product Proof Gate 已确认；
 - Architecture Baseline 已确认；
-- V1 Scope v1.9 已纳入 Engineering Evidence Track、Model Call Job、M1 Minimum Text Practice 与 Guided Language Learning，正式范围记录在
+- V1 Scope v1.10 已纳入 Engineering Evidence Track、Model Call Job、M1 Minimum Text Practice、Guided Language Learning
+  与 Minimum Adaptive Text Conversation，正式范围记录在
   `docs/product/V1_SCOPE.md`；
 - Phase Gate 与 M0 slices 记录在 `docs/planning/V1_PHASE_PLAN.md`。
 - Engineering Evidence Track 已批准：M1 Grounded Evaluator、M2 versioned Memory / replay、M3 RAG +
@@ -315,7 +334,7 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S8T READY_TO_COMMIT
+Gate: M1-S9A IMPLEMENTATION
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -327,10 +346,10 @@ S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
 Compose infrastructure: S8T disposable PostgreSQL removed after verification
-Documentation reconciliation: COMPLETE for M1-S8T
+Documentation reconciliation: COMPLETE for M1-S8T post-merge
 Primary local database: NOT USED for S8T verification；current migration level not rechecked
 M0 integrated closeout: PASS
-Production baseline: M1-S8T-B COMPLETE (`f2eefa6`)
+Production baseline: M1-S8T COMPLETE (`c2dbb4f`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -459,7 +478,7 @@ M1-S8T-A Guided Material Contract: COMPLETE (`71751f5`)；Critical / delta Revie
 M1-S8T-B Current Slice Contract: APPROVED
 M1-S8T-B Response Support Condition Persistence: COMPLETE (`f2eefa6`)；Critical / delta Review PASS
 M1-S8T-C Current Slice Contract: APPROVED
-M1-S8T-C Guided Cafe Material Delivery: implementation / Critical / delta Review PASS；uncommitted
+M1-S8T-C Guided Cafe Material Delivery: COMPLETE (`329ffda`)；Critical / delta Review PASS
 M1-S8T-C finding: CLOSED — v2 `communicationObjective` fixture exact match
 M1-S8T affected regression finding: CLOSED — Grounded Evaluator Reader integration fixture migrated from v1 step ids
 M1-S8T fresh local verification: PASS (2026-09-09) — targeted unit 168/168；`git diff --check` PASS
@@ -473,21 +492,27 @@ M1-S8T full-loop Ownership Check: PASS (2026-09-10) — Understanding `UNDERSTOO
   single-candidate / long-term-state authority 边界；Human Touch `NOT_REQUIRED`
 M1-S8T deferred scope: actual support exposure capture、M2 qualification/aggregation、S11 UX、Review scheduling
   NOT_IMPLEMENTED
-M1-S9+ implementation scope: NOT_APPROVED
+M1-S8T integration / merge: COMPLETE（PR #25；`c2dbb4f` on main）
+M1-S9 Design / Scope: APPROVED（2026-09-10；`docs/features/PLANNER_ENRICHMENT.md`）
+M1-S9A Current Slice Contract: APPROVED（2026-09-10）— Deterministic Candidate Set
+M1-S9A implementation: NOT_STARTED — assigned to Zcode
+M1-S9B+: NOT_AUTHORIZED
+M2C Product / Architecture Scope: APPROVED（2026-09-10）
+M2C Phase allocation: APPROVED — after M2, before M3；does not renumber M3–M6
+M2C Current Slice Contract / implementation: NOT_APPROVED / NOT_STARTED
 ```
 
 ## Next Action
 
-用户执行 S8T-C Commit Decision。S8T-A/B 已提交，S8T-C implementation、Critical/delta Review、external
-verification、documentation 与完整 S8T Ownership 均已收口为 `READY_TO_COMMIT`。不自动 commit、push、merge
-或开始 M1-S9。
+Zcode 按 `docs/features/PLANNER_ENRICHMENT.md` 第 11 节实现 S9A，执行 targeted verification，并携真实 Diff 与
+test evidence 停在 `REVIEW_PENDING`；随后 Codex 只对 S9A 执行 Critical Diff Review。不得自动开始 S9B。
 
 ## Blockers
 
-M1-S8T 无剩余 Code Review / Verification / Documentation / Ownership blocker；当前只剩 S8T-C Commit Decision。
+M1-S8T 无剩余 Code Review / Verification / Documentation / Ownership / merge blocker；PR #25 已 merge。
 S8T external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema Flyway V1–V14，以及 Planner、
 Practice 与 Grounded Evaluator Reader 的 47 项 integration regression；临时容器已删除，未将 primary database
-作为测试目标。
+作为测试目标。以上为 merge candidate 的 prior evidence，本次 post-merge 文档收口未重跑测试。
 M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改

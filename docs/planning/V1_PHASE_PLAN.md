@@ -1,19 +1,21 @@
 # AI Language Tutor — V1 Phase Plan
 
 > Status: APPROVED  
-> Version: 1.6
+> Version: 1.7
 > Approved: 2026-08-20  
-> Last updated: 2026-09-10 — M1-S8T documentation closeout
+> Last updated: 2026-09-10 — M2C Minimum Adaptive Text Conversation scope approved
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
 
-V1 按 M0–M6 顺序推进。每个 Phase 只在前一 Phase 的 exit criteria 通过后进入实现。
+V1 按 M0–M6 顺序推进，并在 M2 后设置 `M2C` 独立 Product Proof Gate；每个 Phase / Gate 只在前一项的
+exit criteria 通过后进入实现。
 
 ```text
 M0 Foundation
   → M1 Minimum Practice
   → M2 Persistent Adaptation
+  → M2C Minimum Adaptive Text Conversation
   → M3 Content / RAG / Multi-role Agent Workflow
   → M4 Learning Completeness
   → M5 Listening / Voice
@@ -71,6 +73,7 @@ artifact，不把 live public source 或外部网络作为硬依赖；详细 Con
 ```text
 M1 Built-in Text Practice walking skeleton
   → M2 deterministic Evidence / Memory / Re-planning
+  → M2C Minimum Adaptive Text Conversation proof
   → M3 versioned Content productionization
   → M5 verified Built-in Audio
 ```
@@ -108,7 +111,7 @@ M1 Built-in Text Practice walking skeleton
   经 M1-S11 最小 UX 可由用户实际完成，不以仅存在内容字段或 API 作为交付证明；
 - 教学任务保留 material identity/version 与必要辅助条件，区分提供、请求/打开和 UNKNOWN；
   Session-level 结果不得把辅助完成解释成独立使用，缺失辅助记录不得默认为无辅助；
-- 用户完成 text conversation / writing practice；
+- 用户完成 guided text practice / writing response；该项不表示 Adaptive multi-turn Conversation 已交付；
 - Practice 产生 trusted event 可确定的 deterministic assessment；
 - Model 可用时 Evaluator 生成经过 validation 的 semantic diagnosis；
 - semantic issue 可以定位到具体 Practice turn / span；缺少 grounding 的 claim 不得进入 Evidence；
@@ -152,8 +155,8 @@ integration、failure invariant 与完整 slices 见
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
 | M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
-| M1-S8T | Minimum guided text learning | READY_TO_COMMIT — S8T-A COMPLETE (`71751f5`)；S8T-B COMPLETE (`f2eefa6`)；S8T-C implementation/review/external/docs/ownership PASS，未 commit |
-| M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
+| M1-S8T | Minimum guided text learning | COMPLETE — S8T-A/B/C merged to main in PR #25 (`c2dbb4f`)；review/external/docs/ownership PASS |
+| M1-S9 | Optional Planner enrichment | DESIGN_SCOPE_APPROVED — S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
@@ -309,14 +312,17 @@ M1-S8T-C `Guided Cafe Material Delivery` 已发布 `en-builtin-cafe-request/v2`�
 `HISTORICAL_ONLY`、v2 设为唯一 `PLANNABLE`。v2 顺序为理解检查、句型辅助使用与无 responseFrame 的独立迁移；
 Practice start additive 下发 `learningPurpose` 与 guided scaffold，不暴露 accepted answers / rubric / lineage；
 legacy `PRACTICE` step 的 guided scaffold 为 null。该 slice implementation、Critical/delta Review、external
-verification 与 documentation PASS，未 commit。
+verification、documentation 与 Ownership PASS，已作为 `329ffda` 随 PR #25 merge。
 
 2026-09-09 fresh closeout evidence：targeted unit 168/168；disposable PostgreSQL 18.6 empty schema Flyway
 V1–V14 14/14；LearningTaskPlanning 7/7、PracticeSession 35/35、GroundedEvaluationInputReader 5/5，共
 47/47 integration PASS；临时容器已删除，primary database 未使用。2026-09-10 完整 S8T Ownership Check PASS：
 Understanding `UNDERSTOOD`，Human Touch `NOT_REQUIRED`；用户能够解释 learning purpose / evaluation kind、
 support-condition evidence、immutable response snapshot、exact-version history 与长期状态 authority 边界。
-当前 Gate 为 S8T-C `READY_TO_COMMIT`，等待用户 Commit Decision，不自动开始 M1-S9。
+PR #25 已于 2026-09-10 merge to main as `c2dbb4f`；以上测试是 merge candidate 的 prior evidence，本次
+post-merge 文档收口未重跑。S8T 状态为 `COMPLETE`。M1-S9 Design / Scope 与 slice breakdown 已于
+2026-09-10 批准；S9A Current Slice Contract 随后获批交由 Zcode 实现，见
+[`PLANNER_ENRICHMENT.md`](../features/PLANNER_ENRICHMENT.md)。S9A 完成后停在 `REVIEW_PENDING`，S9B 未授权。
 
 ### M2 — Persistent Adaptation Loop
 
@@ -341,6 +347,36 @@ support-condition evidence、immutable response snapshot、exact-version history
 - Built-in Practice 的正确、错误与 assistance Evidence 进入同一 aggregation、Review 与 re-planning
   链路，并区分 assisted / independent 语义；
 - 不同 `languageProfileId` 的状态不可串用。
+
+### M2C — Minimum Adaptive Text Conversation
+
+**Goal**
+
+在 M2 已能解释 assistance / independence 并驱动 re-planning 后，用一个受控 `en + zh-CN` text scenario
+验证“基本回应 → 自然追问 → 渐进辅助 → 目标语言重新表达 → 变化场景迁移”的最小产品闭环。
+
+**Done Criteria**
+
+- Adaptive Conversation、Guided Scenario Practice 与 turn-based Voice 使用清晰、不同的产品语义；
+- 一个版本化 scenario 提供 communication goal，以及有限、可验证的 topic directions / response dimensions；
+- 用户可以显式请求 `TOPIC_DIRECTIONS → KEYWORDS → RESPONSE_FRAME → HOW_TO_SAY`，并可 Skip 或拒绝辅助；
+- 简短但自然、已完成沟通目标的回答不因长度被判错；只有 goal 要求 clarification / elaboration 时才继续追问；
+- Text inactivity 最多触发非打断式 assistance offer；offer、opened support 与 learner response 可区分，
+  inactivity 本身不形成 Weakness 或能力 Evidence；
+- 中文 `HOW_TO_SAY` 后要求用户重新用目标语言表达，并记录为 assisted production；
+- 多轮 interaction 的 assistance、accepted response、replay identity 与 overwrite rule 可持久化且可验证；
+- Evaluator 可以使用 trusted scenario / assistant-turn Context，但 learner issue 仍 ground 到真实 learner turn / span；
+- Model failure 保留已接受的 Practice interaction，不伪造评价、辅助条件或长期状态；
+- 至少一个变化场景在减少答案性辅助后产生 independent transfer candidate，并进入 M2 qualification / re-planning；
+- lightweight report 说明沟通目标、真实辅助条件、Session-level finding 与下一次任务理由，不以轮数、时长或
+  字数替代 Learning Outcome；
+- Conversation Runtime 不直接修改 Weakness、Level、Mastery 或 Review State；
+- targeted Eval 覆盖 unnecessary prompting、短回答误判、assistance level、中文辅助、transfer 与 Model failure。
+
+M2C 复用现有模块，不新增顶层 Learning module、第二套 Session 或长期状态 authority。具体 schema、API、
+turn-scoped event contract、Context strategy、Prompt、model route、scenario artifact 与 slice breakdown 需要在
+后续独立 Design / Current Slice Contract 中批准；本 Phase allocation 不授权 implementation。详细 Contract 见
+[`ADAPTIVE_SCENARIO_CONVERSATION.md`](../features/ADAPTIVE_SCENARIO_CONVERSATION.md)。
 
 ### M3 — Content / RAG / Multi-role Agent Workflow
 
@@ -396,6 +432,7 @@ support-condition evidence、immutable response snapshot、exact-version history
 **Done Criteria**
 
 - Listening / turn-based Voice 复用 Language Profile、Planner、Evaluator 与 Memory 边界；
+- turn-based Voice 保留显式 assistance entry；复杂 hesitation detection、semantic endpointing 与个体化阈值不进入 V1；
 - 教学流程扩展至音频输入、听力理解与适用的听说任务；保留重听、文本提示等辅助条件，
   文本表现不能直接转为听力或发音证据；
 - 经过验证的固定音频可以作为 Built-in Listening material；浏览器或设备 TTS 仅作为可选 UX，
@@ -1087,7 +1124,7 @@ Verification:
 ## 4. Later-phase Planning Rule
 
 M1 已在 Phase 开始时根据 M0 真实 baseline 完成 Architecture 与 slice decomposition；各 Production slice
-仍需单独批准 Current Slice Contract。M2–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细
+仍需单独批准 Current Slice Contract。M2、M2C 与 M3–M6 当前只批准 Goal、顺序与 exit criteria，不预先生成详细
 implementation tasks。
 
 当某个 Phase 即将开始时，只根据已经存在的真实代码和前一 Phase 结果拆分 slices，避免 speculative abstraction 与过早计划漂移。

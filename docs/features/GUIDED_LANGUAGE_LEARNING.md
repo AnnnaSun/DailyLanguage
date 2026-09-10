@@ -4,8 +4,8 @@
 > Direction: APPROVED — 用户同意补充教学流程并复用现有模块
 > Product design / V1 phase allocation: APPROVED — 2026-09-07
 > Current Slice Contract: APPROVED — S8T-A / S8T-B / S8T-C
-> Implementation: S8T-A COMPLETE (`71751f5`)；S8T-B COMPLETE (`f2eefa6`)；S8T-C implementation / Review /
-> external verification PASS，documentation COMPLETE，整体 Ownership PASS，`READY_TO_COMMIT`，未 commit
+> Implementation: COMPLETE — S8T-A/B/C 已随 PR #25 merge to main（`c2dbb4f`）；Review、external verification、
+> documentation 与整体 Ownership PASS
 
 ## 1. Goal and current evidence
 
@@ -125,24 +125,31 @@ Grammar Repair 继续用于真实使用后重复、高置信的问题。首次�
 |---|---|---|
 | M1 | S8 结束后插入 S8T 最小文本教学；S11 提供相应最小 UX | 至少一个 en + zh-CN 场景具备示范、解释、理解检查、辅助使用与必要辅助条件记录 |
 | M2 | 教学表现接入既有 qualification、aggregation 与下一次规划 | 看过、理解、辅助使用与独立使用不混同；UNKNOWN 不当作独立成功 |
+| M2C | 在独立 Adaptation foundation 上增加最小 Adaptive Text Conversation | 显式求助、渐进辅助、目标语言重新表达与变化场景 transfer 可解释 |
 | M3 | 教学材料结构进入内容生产与发布 | 按任务提供适用教学内容并验证，检索结果不直接成为教材 |
 | M4 | 完成先教我 / 直接尝试、减少辅助、迁移与后续复习体验 | 至少一个目标完成端到端教学验收 |
 | M5 | 扩展音频输入、听力理解与听说任务 | 保留相应辅助条件，不跨能力维度推断成功 |
 | M6 | 教学回归与实际使用验证 | 核对证据语义，记录迁移表现及样本局限 |
 
+M2C 不替代本文件的 Guided Scenario Practice，也不把 M1 scripted steps 描述成多轮 Conversation。Adaptive
+Scenario Conversation 的 Product / Architecture Contract 见
+[`ADAPTIVE_SCENARIO_CONVERSATION.md`](ADAPTIVE_SCENARIO_CONVERSATION.md)。
+
 `M1-S8T` 独立于 S8A–E，在 S9 前交付，保留既有 S9–S12 编号。实现按三个已批准 slice 完成：
 
 - S8T-A `Guided Material Contract`：COMPLETE (`71751f5`)；
 - S8T-B `Response Support Condition Persistence`：COMPLETE (`f2eefa6`)；
-- S8T-C `Guided Cafe Material Delivery`：implementation / Critical Review / external verification /
-  documentation PASS，未 commit。
+- S8T-C `Guided Cafe Material Delivery`：COMPLETE（`329ffda`）；Critical Review / external verification /
+  documentation / Ownership PASS。
 
 Fresh closeout evidence（2026-09-09）：S8T targeted unit 168/168；disposable PostgreSQL 18.6 empty schema
 Flyway V1–V14；Planner 7/7、Practice 35/35、Grounded Evaluator Reader 5/5 integration，共 47/47 PASS；
 临时容器已删除，primary database 未使用。2026-09-10 完整 S8T Ownership Check PASS：用户能够解释
 `TextStepKind` 与 `TextLearningPurpose` 的正交语义、`UNKNOWN` 与 `NOT_PROVIDED` 的证据差异、首次 response/support
 snapshot 不可覆盖、exact material version 的历史可重现性，以及单次 candidate 不直接修改长期状态；Understanding
-`UNDERSTOOD`，Human Touch `NOT_REQUIRED`。当前下一 Gate 是 S8T-C Commit Decision；不自动 commit 或开始 M1-S9。
+`UNDERSTOOD`，Human Touch `NOT_REQUIRED`。PR #25 已于 2026-09-10 merge to main as `c2dbb4f`；以上验证是
+merge candidate 的 prior evidence，本次 post-merge 文档收口未重跑测试。S8T 已无剩余 Gate，下一阶段为
+M1-S9 Design / Scope Review。
 
 ## 8. Reference
 

@@ -940,6 +940,10 @@ Review System 输出：
 
 # 15. Conversation Data Flow / 对话数据流
 
+V1 M2C 只批准一个受控 Adaptive Text Conversation Product Proof；它不等同于 M1 scripted Guided Scenario
+Practice，也不包含 M5 Turn-based Voice。具体 contract 见
+`docs/features/ADAPTIVE_SCENARIO_CONVERSATION.md`。
+
 Conversation：
 
     LearningTask
@@ -970,6 +974,10 @@ Conversation：
 - elaboration；
 - help request；
 - assistance request。
+
+Assistance data 需要区分 offer、opened topic directions / keywords / response frame、中文 `HOW_TO_SAY` 与随后
+的 target-language response。inactivity offer 不进入能力判断；assisted production 与变化场景中的 independent
+transfer 必须分别 qualification。
 
 这些首先是：
 

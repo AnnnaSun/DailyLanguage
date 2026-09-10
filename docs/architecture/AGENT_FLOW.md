@@ -485,6 +485,10 @@ Tool Eval 后续应检查这种冗余行为。
 
 Conversation 是持续多轮 Agent Runtime。
 
+V1 将其与 M1 `Guided Scenario Practice` 和 M5 `Turn-based Voice` 明确区分。M2C 只批准一个受控
+Adaptive Text Conversation Product Proof；具体 Runtime / API / Prompt / persistence contract 尚未批准，见
+`docs/features/ADAPTIVE_SCENARIO_CONVERSATION.md`。
+
 启动：
 
     LearningTask
@@ -605,11 +609,11 @@ Summary 可以包含：
 
 用户卡住时，可以请求：
 
-    IDEA
+    TOPIC_DIRECTIONS
       ↓
     KEYWORDS
       ↓
-    PATTERN
+    RESPONSE_FRAME
       ↓
     HOW_TO_SAY
 
@@ -631,6 +635,11 @@ Summary 可以包含：
 但一次帮助请求不能直接形成：
 
     Weakness
+
+Text inactivity 最多触发非打断式 assistance offer；offer 不等于 opened support，也不表示用户不会。简短但
+task-appropriate 的回答可以完成基本 communication goal；只有任务明确要求 clarification / elaboration 时，
+Conversation 才通过自然追问继续挑战。中文 `HOW_TO_SAY` 后的目标语言回答属于 assisted production，后续变化
+场景中的更少辅助表现才可进入 independent transfer qualification。
 
 ---
 

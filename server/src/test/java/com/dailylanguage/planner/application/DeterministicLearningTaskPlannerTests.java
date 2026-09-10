@@ -47,7 +47,8 @@ class DeterministicLearningTaskPlannerTests {
         FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
                 summary(GREETING, "GREETING_INTRODUCTION"),
                 summary(CAFE, "CAFE_SIMPLE_REQUEST")));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
 
         PlanningResult result = planner.plan(request(10, Set.of()));
 
@@ -72,7 +73,8 @@ class DeterministicLearningTaskPlannerTests {
         FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
                 summary(CAFE, "CAFE_SIMPLE_REQUEST"),
                 summary(GREETING, "GREETING_INTRODUCTION")));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
 
         PlanningResult result = planner.plan(request(10, Set.of(CAFE)));
 
@@ -92,7 +94,8 @@ class DeterministicLearningTaskPlannerTests {
             int expectedDurationMinutes
     ) {
         LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
-                new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST"))));
+                new EligibleLearningTaskCandidateReader(
+                        new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")))));
 
         PlanningResult result = planner.plan(request(availableMinutes, Set.of()));
 
@@ -104,7 +107,8 @@ class DeterministicLearningTaskPlannerTests {
     @Test
     void returnsUnavailableWithoutReadingCatalogWhenAvailableTimeIsTooShort() {
         FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
 
         PlanningResult result = planner.plan(request(4, Set.of()));
 
@@ -121,7 +125,8 @@ class DeterministicLearningTaskPlannerTests {
                 "CLARIFICATION",
                 List.of("zh-cn"));
         LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
-                new FakeMaterialCatalog(List.of(wrongLanguage)));
+                new EligibleLearningTaskCandidateReader(
+                        new FakeMaterialCatalog(List.of(wrongLanguage))));
 
         PlanningResult result = planner.plan(request(10, Set.of()));
 
@@ -137,7 +142,8 @@ class DeterministicLearningTaskPlannerTests {
                 "BROKEN",
                 List.of("zh-cn"));
         LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
-                new FakeMaterialCatalog(List.of(malformed)));
+                new EligibleLearningTaskCandidateReader(
+                        new FakeMaterialCatalog(List.of(malformed))));
 
         PlanningResult result = planner.plan(request(10, Set.of()));
 
@@ -147,7 +153,7 @@ class DeterministicLearningTaskPlannerTests {
     @Test
     void doesNotFallbackAcrossLanguagePairsWithRealBuiltInCatalog() {
         LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
-                new BuiltInLearningMaterialCatalog());
+                new EligibleLearningTaskCandidateReader(new BuiltInLearningMaterialCatalog()));
         PlanningRequest japaneseRequest = new PlanningRequest(
                 new LanguageProfileIdentity(PROFILE_ID, USER_ID, "ja"),
                 "zh-cn",
@@ -165,7 +171,8 @@ class DeterministicLearningTaskPlannerTests {
         FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")));
         catalog.results.put(CAFE, new MaterialQueryResult.Unavailable(
                 MaterialUnavailableReason.MATERIAL_NOT_PUBLISHED));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
 
         PlanningResult result = planner.plan(request(10, Set.of()));
 
@@ -178,7 +185,8 @@ class DeterministicLearningTaskPlannerTests {
         catalog.results.put(CAFE, new MaterialQueryResult.Available(
                 material(CAFE, "ja", "CAFE_SIMPLE_REQUEST"),
                 scaffold("zh-cn")));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
 
         PlanningResult result = planner.plan(request(10, Set.of()));
 
@@ -192,7 +200,8 @@ class DeterministicLearningTaskPlannerTests {
                 material(CAFE, "en", "CAFE_SIMPLE_REQUEST"),
                 scaffold("ja")
         ));
-        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(catalog);
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(catalog));
         PlanningResult result = planner.plan(request(10, Set.of()));
         assertUnavailable(result, SELECTED_MATERIAL_UNAVAILABLE);
     }

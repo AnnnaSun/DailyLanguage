@@ -458,7 +458,7 @@ Source Module:
 
 V1:
 
-`P0`
+`P0 — M2C Product / Architecture Scope APPROVED；implementation NOT_STARTED`
 
 V1 Modes:
 
@@ -468,6 +468,14 @@ V1 Modes:
 Voice:
 
 `P1`
+
+Product boundary:
+
+- `Guided Scenario Practice`：M1 versioned scripted teaching flow；
+- `Adaptive Scenario Conversation`：M2C 受控多轮 text interaction、渐进辅助与变化场景 transfer；
+- `Turn-based Voice`：M5 的 STT / Conversation / TTS 通道，不等于 pronunciation assessment。
+
+详细 Contract：`docs/features/ADAPTIVE_SCENARIO_CONVERSATION.md`。
 
 Responsibility:
 
@@ -2261,7 +2269,7 @@ RAG Result 返回 Context。
 | Language Profile | `server/src/main/java/com/dailylanguage/languageprofile` | `LanguageProfileRepository` | `LanguageProfileIdentity`, `LanguageProfileRepository`, `LanguageProfileMapper` | `PersistenceIdentityIntegrationTests`, `MapperSqlSafetyTests` | PARTIAL — identity and ownership query only |
 | Planner | `server/src/main/java/com/dailylanguage/planner`, `server/src/main/resources/mapper/LearningTaskMapper.xml`, `server/src/main/resources/db/migration/V8__add_learning_task.sql` | `LearningTaskPlanningController`, `LearningTaskPlanningService`, `LearningTaskPlanner`, `DeterministicLearningTaskPlanner`, `LearningTaskRepository` | `PlanningRequest`, `PlanningResult`, `LearningTaskPlan`, `LearningTaskPlanningResult`, `LearningTask`, `LearningTaskMapper` | `LearningTaskPlanningControllerTests`, `LearningTaskPlanningServiceTests`, `LearningTaskPlanningIntegrationTests`, `DeterministicLearningTaskPlannerTests`, `LearningTaskTests`, `LearningTaskPersistenceIntegrationTests` | PARTIAL — M1-S2 deterministic core、M1-S3 persistence 与 M1-S4 owner-scoped planning API COMPLETE (`dd9559d`)：authenticated `UserContext` → owned Profile → deterministic Planner → Profile guard → durable `PLANNED` task；Repository 使用 trusted owner + Profile + target language 原子创建 UUIDv7 row，并提供 owner/profile-scoped read 与 `PLANNED → STARTED → COMPLETED` conditional transition；PostgreSQL 是 identity/status/timestamp authority；M1-S5 Practice Runtime 通过本 Repository 的 `tryStart` 接入，Planner module 自身仍无 Model enrichment 或 learner-state mutation |
 | Practice Runtime | `server/src/main/java/com/dailylanguage/practice`, `server/src/main/resources/mapper/PracticeSessionMapper.xml`, `server/src/main/resources/db/migration/V9__add_practice_session.sql`, `server/src/main/resources/db/migration/V10__add_deterministic_assessment.sql`, `server/src/main/resources/db/migration/V14__add_practice_response_support_condition.sql` | `PracticeSessionController`, `PracticeSessionApplicationService`, `PracticeSessionRepository` | `PracticeSession`, `LearnerResponse`, `ResponseSupportCondition`, `SupportExposure`, `DeterministicAssessment`, `DeterministicTextAssessmentPolicy`, `StartResult`, `SubmitResult`, `CompletionResult`, `PracticeMaterialView`, `PracticeSessionMapper` | `PracticeSessionControllerTests`, `PracticeSessionApplicationServiceTests`, `PracticeSessionTests`, `DeterministicAssessmentTests`, `DeterministicTextAssessmentPolicyTests`, `PracticeSessionPersistenceIntegrationTests` | PARTIAL — M1-S5/S6 lifecycle 与 deterministic completion 已完成；S8T-B (`f2eefa6`) 将四类 support exposure 与首次 learner response 原子持久化，migration 前历史为 `UNKNOWN`，replay/conflict 不覆盖；S8T-C start additive 下发 `learningPurpose` 和 guided scaffold，legacy `PRACTICE` scaffold 为 null。当前 HTTP submit 显式写全 `UNKNOWN`，尚无真实 UI exposure capture、M2 Evidence qualification、abandon 或长期 learner-state mutation |
-| Conversation | TBD | TBD | TBD | TBD | NOT_STARTED |
+| Conversation | TBD | TBD | TBD | TBD | PLANNED — M2C Product / Architecture Scope APPROVED；Current Slice Contract NOT_APPROVED，implementation NOT_STARTED；一个受控 `en + zh-CN` text scenario 验证显式求助、渐进辅助、目标语言重新表达、Session evaluation 与变化场景 transfer；不包含 Voice / pronunciation scoring / 无限场景 |
 | Reading | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Vocabulary | TBD | TBD | TBD | TBD | NOT_STARTED |
 | Evaluator | `server/src/main/java/com/dailylanguage/evaluator`, `server/src/main/resources/evaluator/rubrics`, `server/src/main/resources/evaluator/prompts`, `server/src/main/resources/mapper/EvaluationRunMapper.xml`, `server/src/main/resources/db/migration/V11__add_evaluation_run.sql`, `server/src/main/resources/db/migration/V12__add_evaluation_run_outcome.sql`, `server/src/main/resources/db/migration/V13__add_evaluation_run_failure_reason.sql` | `EvaluationController.startEvaluation / reconcileEvaluation`; `PracticeSessionEvaluationService.start / reconcile`; `SemanticGroundingValidator.validate`; `GroundedEvaluationInputReader.readOwned`; `EvaluationRunCreationService.createForReadyInput`; `EvaluationDispatchService.dispatchForReadyInput`; `EvaluationTextRequestFactory.build`; `EvaluationResultConsumptionService.consumeForReadyInput` | `GroundedEvaluationInput`, `SemanticGroundingResult`, `ValidatedSemanticCandidate`, `GroundedClaim`, `GroundedEvaluationInputResult`, `EvaluationRun`, `EvaluationRun.FailureReason`, API/application/creation/dispatch/consumption typed results, `EvaluationRunRepository`, `EvaluationRunMapper` | HTTP security/response、orchestration、Grounding、Reader、Run creation、request/dispatch 与 result consumption/reconciliation unit/integration tests | PARTIAL — M1-S7/S8 Evaluator workflow 已 merged to main as `7776111`；S8T-B 后 Reader 的 trusted input 携带每条 durable response 的 support-condition snapshot，当前 HTTP 路径保存 durable `UNKNOWN`，不据此声称 independent success。S8T affected Reader integration 5/5 PASS。无 scheduler、automatic retry、legacy recovery、live Provider、Japanese rubric 或 M2 qualification |

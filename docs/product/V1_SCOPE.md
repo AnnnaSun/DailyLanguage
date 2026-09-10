@@ -1,9 +1,9 @@
 # AI Language Tutor — V1 Scope
 
 > Status: APPROVED  
-> Version: 1.9
+> Version: 1.10
 > Approved: 2026-08-21
-> Last updated: 2026-09-07 — Guided Language Learning V1 scope and phase allocation
+> Last updated: 2026-09-10 — Minimum Adaptive Text Conversation V1 scope and phase allocation
 > Authority: Product Scope Baseline
 
 ## 1. Purpose
@@ -40,6 +40,10 @@
 - 所有路径最终都以在真实场景中更独立地理解、回应并持续沟通为目标。
 
 本节定义长期一致的 Product Audience 与学习模型原则，不自动授权 V1 完整实现零基础课程体系。V1 支持的具体起始能力范围、Bootstrap 深度以及 Listening 进入哪个 Phase，仍需通过后续 Delivery Scope Decision 明确。
+
+V1 的首批 Adaptive Conversation product validation 聚焦已有一定阅读或词汇基础、但在日常沟通中仍依赖中文、
+示例或简短回避性回答的 `en + zh-CN` 成年学习者。该 validation wedge 用于控制首个真实产品闭环，不改变
+长期多语言 Product Audience，也不授权完整零基础课程。
 
 V1 已批准 `Provider-free Learning Baseline`：用户未提供 Model Provider 时，仍可通过经过验证的
 Built-in Content 完成最小 Practice，并产生与 deterministic source 相符的 Assessment / Evidence。
@@ -178,6 +182,21 @@ M1-S8 收完后先进入最小文本教学 slice 的设计；M1 交付教学与�
 M3 扩展材料生产，M4 完成选择、迁移与复习体验，M5 扩展音频，M6 验证。Phase exit criteria 已同步；
 当前 M1-S8 Contract 不变，后续 Current Slice Contract、具体 API / schema 和起始能力细节仍需单独批准。
 
+### 3.7 Adaptive Scenario Conversation
+
+V1 已批准 `M2C — Minimum Adaptive Text Conversation`，位于 M2 Persistent Adaptation 完成后、M3 Content / RAG
+implementation 前。它围绕一个有限、版本化的 `en + zh-CN` scenario，支持用户显式请求话题方向、关键词、
+response frame 或中文 `HOW_TO_SAY`，并在 communication goal 确实要求时通过自然追问推动 clarification / elaboration。
+
+简短但自然且完成沟通目标的回答不能仅因长度被判错。Text UI 可以在配置的 inactivity interval 后只显示
+非打断式 assistance offer；offer 不等于用户打开提示，inactivity 不形成 Weakness。中文辅助后的目标语言回答
+属于 assisted production；只有后续变化场景中更少辅助的表现，才可以进入 independent transfer qualification。
+
+该能力复用既有 Conversation、Practice、Evaluator、Evidence / Learning Memory、Review、Context Manager 与
+Model Gateway 边界，不新增第二套 Session、课程进度或长期状态 authority。具体 schema、API、turn-scoped
+assistance event、Prompt、Context strategy、scenario artifact 与 implementation slice 尚未批准。详细 Contract 见
+[`ADAPTIVE_SCENARIO_CONVERSATION.md`](../features/ADAPTIVE_SCENARIO_CONVERSATION.md)。
+
 ## 4. Approved Architecture Baseline
 
 ### 4.1 Long-term State Authority
@@ -270,7 +289,9 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
   lineage / provenance；
 - `TargetPracticeCore + SupportScaffold` 的 versioned Built-in Content composition；
 - Java candidate / hard constraint + optional LLM enrichment 的最小 Planner 输出；
-- Text Practice / Conversation 的最小闭环；
+- M1 Guided Text Practice 的最小闭环；
+- Minimum Adaptive Text Conversation：围绕一个受控 scenario 支持显式求助、渐进辅助、目标语言重新表达、
+  Session-level communication evaluation 与变化场景 transfer；
 - deterministic assessment + validated semantic candidate 的 Session-level Evaluation；
 - Raw Evidence、Aggregated Memory 与 Long-term State 的最小链路；
 - Weakness / Skill State 的确定性 qualification 与 lifecycle；
@@ -302,6 +323,7 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 - advanced assessment mechanisms；
 - advanced feedback dispute / appeal；
 - realtime full-duplex voice；
+- Voice semantic endpointing、个体化 hesitation threshold、从声音推断情绪或信心；
 - 完整零基础课程、全语言 Built-in / Public Source Bundle 与大规模通用词库或完整公共语料镜像；
 - 完整 exam curriculum、考试题库、未经官方依据的 score equivalence 与 pronunciation scoring；
 - live public source 作为 Provider-free runtime 硬依赖，或公共 connector 接收个人学习数据；
@@ -320,6 +342,7 @@ V1 使用 `Spring TaskExecutor + DB Job State`，不引入 Kafka / RabbitMQ。`j
 | M0 | Engineering Foundation & Language Workspace | 建立可运行工程、状态 authority、语言隔离与 Model/BYOK 边界 |
 | M1 | Minimum Text Practice Loop | 跑通一次 text practice、source-lineage Built-in artifact 与 session-level evaluation |
 | M2 | Persistent Adaptation Loop | Evidence 进入长期状态并影响下一次 Planner 决策 |
+| M2C | Minimum Adaptive Text Conversation | 一个受控 text scenario 形成渐进辅助、Session evaluation 与变化场景 transfer proof |
 | M3 | Content / RAG / Multi-role Agent Workflow | Public Reference、grounded retrieval、Tool Gateway 和受控 Multi-role Agent Workflow 进入统一 Evidence 链路 |
 | M4 | Learning Completeness | 补齐 Milestone Check、Review 与 V1 学习完整性 |
 | M5 | Listening / Turn-based Voice | 增加非实时的听说训练闭环 |
