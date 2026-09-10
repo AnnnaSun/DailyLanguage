@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
+import com.dailylanguage.content.domain.GuidedStepScaffold;
 import com.dailylanguage.content.domain.LearningMaterialCatalog;
 import com.dailylanguage.content.domain.MaterialDifficulty;
 import com.dailylanguage.content.domain.MaterialIdentity;
@@ -20,6 +21,7 @@ import com.dailylanguage.content.domain.MaterialSourceLineage;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.planner.domain.LearningTask;
@@ -63,6 +65,14 @@ class PracticeSessionApplicationServiceTests {
     private static final OffsetDateTime ASSESSMENT_CREATED_AT = COMPLETED_AT;
     private static final MaterialIdentity CAFE_IDENTITY =
             new MaterialIdentity("en-builtin-cafe-request", "v1");
+    private static final MaterialIdentity GUIDED_CAFE_IDENTITY =
+            new MaterialIdentity("en-builtin-cafe-request", "v2");
+    // 与真实 v2 artifact 的 communicationObjective 逐字一致；start 的 snapshot guard 会比较该值。
+    private static final String GUIDED_CAFE_OBJECTIVE =
+            "Understand a modeled cafe order, use the polite request frame with support, "
+                    + "then order something new on your own.";
+    private static final String CAFE_OBJECTIVE =
+            "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.";
 
     private final LearningTaskRepository learningTaskRepository =
             Mockito.mock(LearningTaskRepository.class);
@@ -289,7 +299,10 @@ class PracticeSessionApplicationServiceTests {
         assertThat(viewComponents).doesNotContain(
                 "acceptedAnswers", "semanticRubricReference", "sourceLineage", "userId");
         List<String> stepComponents = componentNames(PracticeMaterialView.StepView.class);
-        assertThat(stepComponents).containsExactly("stepId", "kind", "prompt");
+        assertThat(stepComponents).containsExactly(
+                "stepId", "kind", "learningPurpose", "prompt", "guidedScaffold");
+        List<String> scaffoldComponents = componentNames(PracticeMaterialView.GuidedScaffoldView.class);
+        assertThat(scaffoldComponents).containsExactly("instruction", "responseFrame");
 
         assertThat(view.materialId()).isEqualTo("en-builtin-cafe-request");
         assertThat(view.publishedVersion()).isEqualTo("v1");
@@ -297,9 +310,47 @@ class PracticeSessionApplicationServiceTests {
         assertThat(view.supportLanguage()).isEqualTo("zh-cn");
         assertThat(view.scenario()).isEqualTo("CAFE_SIMPLE_REQUEST");
         assertThat(view.instruction()).isEqualTo("完成点单的中文指令");
+        // legacy material：learningPurpose 解释为 PRACTICE，guidedScaffold 为 null。
         assertThat(view.steps()).containsExactly(
-                new PracticeMaterialView.StepView("order-drink", "EXACT", "Order a medium coffee politely."),
-                new PracticeMaterialView.StepView("answer-to-go", "SEMANTIC_ONLY", "Answer to go."));
+                new PracticeMaterialView.StepView(
+                        "order-drink", "EXACT", "PRACTICE", "Order a medium coffee politely.", null),
+                new PracticeMaterialView.StepView(
+                        "answer-to-go", "SEMANTIC_ONLY", "PRACTICE", "Answer to go.", null));
+    }
+
+    @Test
+    void guidedMaterialStartDeliversPurposesAndStepScaffoldsWithoutAnswers() {
+        when(learningTaskRepository.findOwned(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(task(
+                        LearningTask.Status.PLANNED, GUIDED_CAFE_IDENTITY, GUIDED_CAFE_OBJECTIVE)));
+        when(materialCatalog.findByIdentity(GUIDED_CAFE_IDENTITY, "zh-cn"))
+                .thenReturn(available(guidedCafeMaterial()));
+        when(practiceSessionRepository.findOwnedByTask(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.empty());
+        when(learningTaskRepository.tryStart(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(task(
+                        LearningTask.Status.STARTED, GUIDED_CAFE_IDENTITY, GUIDED_CAFE_OBJECTIVE)));
+        when(practiceSessionRepository.insertForOwnedTask(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(inProgressSession());
+
+        StartResult.Created created =
+                (StartResult.Created) service.start(PROFILE_ID, TASK_ID, USER_CONTEXT);
+
+        PracticeMaterialView view = created.material();
+        assertThat(view.publishedVersion()).isEqualTo("v2");
+        assertThat(view.steps())
+                .extracting(step -> step.learningPurpose())
+                .containsExactly("COMPREHENSION_CHECK", "SCAFFOLDED_USE", "INDEPENDENT_TRANSFER");
+        // 逐 step 支架：responseFrame 只在 SCAFFOLDED_USE 上，其余 guided step 为 null 但支架存在。
+        assertThat(view.steps().get(0).guidedScaffold().instruction())
+                .isEqualTo("阅读对话，回答顾客点了什么。");
+        assertThat(view.steps().get(0).guidedScaffold().responseFrame()).isNull();
+        assertThat(view.steps().get(1).guidedScaffold().responseFrame())
+                .isEqualTo("Could I have ___, please?");
+        assertThat(view.steps().get(2).guidedScaffold().responseFrame()).isNull();
+        // projection 不携带评分答案：steps 与 scaffold 字段集在上一测试中封闭断言。
+        assertThat(view.steps())
+                .allSatisfy(step -> assertThat(step.toString()).doesNotContain("acceptedAnswers"));
     }
 
     // --- submit ---
@@ -316,7 +367,8 @@ class PracticeSessionApplicationServiceTests {
                 new PracticeSession.LearnerResponse(SESSION_ID, "order-drink", rawLearnerText, SUBMITTED_AT)));
         // 传入数据库的是原始文本：不 trim、不改大小写、不做 normalization；owner scope 随调用显式传入。
         verify(practiceSessionRepository).insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", rawLearnerText, USER_ID, PROFILE_ID);
+                SESSION_ID, "order-drink", rawLearnerText,
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID);
         // Contract flow：owned Session → owned Task → material → stepId → lock → 再确认 → insert。
         InOrder flow = inOrder(practiceSessionRepository, learningTaskRepository, materialCatalog);
         flow.verify(practiceSessionRepository).findOwned(SESSION_ID, USER_ID, PROFILE_ID);
@@ -324,7 +376,8 @@ class PracticeSessionApplicationServiceTests {
         flow.verify(materialCatalog).findByIdentity(CAFE_IDENTITY, "zh-cn");
         flow.verify(practiceSessionRepository).findOwnedForUpdate(SESSION_ID, USER_ID, PROFILE_ID);
         flow.verify(practiceSessionRepository).insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", rawLearnerText, USER_ID, PROFILE_ID);
+                SESSION_ID, "order-drink", rawLearnerText,
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID);
     }
 
     @Test
@@ -361,7 +414,7 @@ class PracticeSessionApplicationServiceTests {
 
         verifyNoInteractions(learningTaskRepository, materialCatalog);
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -373,7 +426,7 @@ class PracticeSessionApplicationServiceTests {
 
         verify(practiceSessionRepository, never()).findOwnedForUpdate(any(UUID.class), any(UUID.class), any(UUID.class));
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -390,7 +443,7 @@ class PracticeSessionApplicationServiceTests {
                 .isEqualTo(new SubmitResult.MaterialUnavailable());
 
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -424,14 +477,15 @@ class PracticeSessionApplicationServiceTests {
                 .isEqualTo(new SubmitResult.SessionNotAcceptingResponses());
 
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void samePayloadReplayReturnsTheFirstSubmittedAtWithoutMutation() {
         arrangeSubmittableSession();
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", "Same text", USER_ID, PROFILE_ID))
+                SESSION_ID, "order-drink", "Same text",
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID))
                 .thenReturn(Optional.empty());
         PracticeSession.LearnerResponse stored = new PracticeSession.LearnerResponse(
                 SESSION_ID, "order-drink", "Same text", SUBMITTED_AT);
@@ -446,7 +500,8 @@ class PracticeSessionApplicationServiceTests {
     void differentPayloadConflictKeepsTheFirstAcceptedResponse() {
         arrangeSubmittableSession();
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                SESSION_ID, "order-drink", "Could I have a large coffee, please?", USER_ID, PROFILE_ID))
+                SESSION_ID, "order-drink", "Could I have a large coffee, please?",
+                PracticeSession.ResponseSupportCondition.unknown(), USER_ID, PROFILE_ID))
                 .thenReturn(Optional.empty());
         when(practiceSessionRepository.findOwnedResponse(SESSION_ID, "order-drink", USER_ID, PROFILE_ID))
                 .thenReturn(Optional.of(new PracticeSession.LearnerResponse(
@@ -714,10 +769,12 @@ class PracticeSessionApplicationServiceTests {
         when(practiceSessionRepository.findOwnedForUpdate(SESSION_ID, USER_ID, PROFILE_ID))
                 .thenReturn(Optional.of(inProgressSession()));
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                eq(SESSION_ID), eq("order-drink"), any(), eq(USER_ID), eq(PROFILE_ID)))
+                eq(SESSION_ID), eq("order-drink"), any(),
+                eq(PracticeSession.ResponseSupportCondition.unknown()), eq(USER_ID), eq(PROFILE_ID)))
                 .thenReturn(Optional.of(SUBMITTED_AT));
         when(practiceSessionRepository.insertOwnedAcceptedResponse(
-                eq(SESSION_ID), eq("answer-to-go"), any(), eq(USER_ID), eq(PROFILE_ID)))
+                eq(SESSION_ID), eq("answer-to-go"), any(),
+                eq(PracticeSession.ResponseSupportCondition.unknown()), eq(USER_ID), eq(PROFILE_ID)))
                 .thenReturn(Optional.of(SUBMITTED_AT));
     }
 
@@ -728,18 +785,27 @@ class PracticeSessionApplicationServiceTests {
     }
 
     private static LearningTask task(LearningTask.Status status) {
+        return task(status, CAFE_IDENTITY, CAFE_OBJECTIVE);
+    }
+
+    private static LearningTask task(LearningTask.Status status, MaterialIdentity materialIdentity) {
+        return task(status, materialIdentity, CAFE_OBJECTIVE);
+    }
+
+    private static LearningTask task(
+            LearningTask.Status status, MaterialIdentity materialIdentity, String primaryGoal) {
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-09-04T10:10:00.000Z");
         return new LearningTask(
                 TASK_ID,
                 USER_ID,
                 PROFILE_ID,
-                CAFE_IDENTITY,
+                materialIdentity,
                 "en",
                 "zh-cn",
                 MaterialDifficulty.FOUNDATION,
                 10,
                 "CAFE_SIMPLE_REQUEST",
-                "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.",
+                primaryGoal,
                 LearningTaskPlan.TaskType.TEXT_PRACTICE,
                 LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK,
                 status,
@@ -843,16 +909,18 @@ class PracticeSessionApplicationServiceTests {
                 null,
                 List.of(
                         new TextPracticeStep(
-                                "order-drink", TextStepKind.EXACT, "Order a medium coffee politely.",
+                                "order-drink", TextStepKind.EXACT, TextLearningPurpose.PRACTICE,
+                                "Order a medium coffee politely.",
                                 List.of("Could I have a medium coffee, please?")),
                         new TextPracticeStep(
-                                "answer-to-go", TextStepKind.SEMANTIC_ONLY, "Answer to go.", List.of())),
+                                "answer-to-go", TextStepKind.SEMANTIC_ONLY, TextLearningPurpose.PRACTICE,
+                                "Answer to go.", List.of())),
                 "builtin-text-communication-rubric/v1");
         return new PublishedLearningMaterial(
                 identity,
                 core,
                 List.of(new SupportScaffold(
-                        "zh-cn", "完成点单的中文指令", "场景解释", "提示", "对比提示")),
+                        "zh-cn", "完成点单的中文指令", "场景解释", "提示", "对比提示", List.of())),
                 new MaterialSourceLineage("PROJECT_ORIGINAL", "v1", "AGPL-3.0", "sha256"));
     }
 
@@ -862,7 +930,7 @@ class PracticeSessionApplicationServiceTests {
                 material.identity(),
                 material.targetCore(),
                 List.of(new SupportScaffold(
-                        supportLanguage, "完成点单的中文指令", "场景解释", "提示", "对比提示")),
+                        supportLanguage, "完成点单的中文指令", "场景解释", "提示", "对比提示", List.of())),
                 material.sourceLineage());
     }
 
@@ -875,6 +943,48 @@ class PracticeSessionApplicationServiceTests {
                 original.readingInfo(), original.steps(), original.semanticRubricReference());
         return new PublishedLearningMaterial(
                 material.identity(), changed, material.supportScaffolds(), material.sourceLineage());
+    }
+
+    /** 与真实 en-builtin-cafe-request/v2 同构的 guided fixture：check → scaffolded → transfer。 */
+    private static PublishedLearningMaterial guidedCafeMaterial() {
+        TargetPracticeCore core = new TargetPracticeCore(
+                "en",
+                MaterialDifficulty.FOUNDATION,
+                "CAFE_SIMPLE_REQUEST",
+                GUIDED_CAFE_OBJECTIVE,
+                "You are at a coffee shop. The barista asks: \"What can I get for you?\" "
+                        + "The customer replies: \"Could I have a medium coffee, please?\"",
+                null,
+                List.of(
+                        new TextPracticeStep(
+                                "comprehension-check", TextStepKind.EXACT,
+                                TextLearningPurpose.COMPREHENSION_CHECK,
+                                "What does the customer order?",
+                                List.of("A medium coffee.")),
+                        new TextPracticeStep(
+                                "order-with-frame", TextStepKind.EXACT,
+                                TextLearningPurpose.SCAFFOLDED_USE,
+                                "Order a medium coffee using the frame.",
+                                List.of("Could I have a medium coffee, please?")),
+                        new TextPracticeStep(
+                                "order-water-freely", TextStepKind.SEMANTIC_ONLY,
+                                TextLearningPurpose.INDEPENDENT_TRANSFER,
+                                "Order a bottle of water in your own words.", List.of())),
+                "builtin-text-communication-rubric/v1");
+        return new PublishedLearningMaterial(
+                GUIDED_CAFE_IDENTITY,
+                core,
+                List.of(new SupportScaffold(
+                        "zh-cn", "guided 中文总指令", "场景解释", "提示", null,
+                        List.of(
+                                new GuidedStepScaffold(
+                                        "comprehension-check", "阅读对话，回答顾客点了什么。", null),
+                                new GuidedStepScaffold(
+                                        "order-with-frame", "用句型框架点一杯 medium coffee。",
+                                        "Could I have ___, please?"),
+                                new GuidedStepScaffold(
+                                        "order-water-freely", "不用框架，用自己的话点一瓶水。", null)))),
+                new MaterialSourceLineage("PROJECT_ORIGINAL", "v2", "AGPL-3.0", "sha256"));
     }
 
     private static PracticeMaterialView cafeMaterialView() {

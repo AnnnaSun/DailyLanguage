@@ -29,6 +29,10 @@
             <arg column="step_id" javaType="java.lang.String"/>
             <arg column="learner_text" javaType="java.lang.String"/>
             <arg column="submitted_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="demonstration_exposure" javaType="java.lang.String"/>
+            <arg column="explanation_exposure" javaType="java.lang.String"/>
+            <arg column="hint_exposure" javaType="java.lang.String"/>
+            <arg column="response_frame_exposure" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -109,17 +113,25 @@
     </select>
 
     <!-- owner-scoped response insert：数据库内重校验 Session 归属同一 owner/profile 的 Task 且
-         仍为 IN_PROGRESS；首次接受返回 submitted_at。ON CONFLICT DO NOTHING 命中既有
+         仍为 IN_PROGRESS；首次接受返回 submitted_at。support-condition snapshot 与 learnerText
+         同一 INSERT 首次写入（列无 DB default，必须显式提供）。ON CONFLICT DO NOTHING 命中既有
          (session_id, step_id) 时不返回行，由调用方在同一锁定事务内读取既有 response 并以
          exact equality 裁决 replay 或 conflict；gate 不匹配同样为空，属 fail-closed。 -->
     <select id="insertOwnedResponseAndReturnSubmittedAt"
             resultType="java.time.OffsetDateTime"
             affectData="true"
             flushCache="true">
-        INSERT INTO practice_response (session_id, step_id, learner_text)
+        INSERT INTO practice_response (
+            session_id, step_id, learner_text,
+            demonstration_exposure, explanation_exposure, hint_exposure, response_frame_exposure
+        )
         SELECT session.id,
                #{stepId, jdbcType=VARCHAR},
-               #{learnerText, jdbcType=VARCHAR}
+               #{learnerText, jdbcType=VARCHAR},
+               #{demonstrationExposure, jdbcType=VARCHAR},
+               #{explanationExposure, jdbcType=VARCHAR},
+               #{hintExposure, jdbcType=VARCHAR},
+               #{responseFrameExposure, jdbcType=VARCHAR}
         FROM practice_session session
         JOIN learning_task task ON task.id = session.task_id
         WHERE session.id = #{sessionId, jdbcType=OTHER}
@@ -133,7 +145,9 @@
     <!-- private learner text 只能由 owner 在其 profile workspace 内读取；ownership 通过
          practice_response → practice_session → learning_task 链路重校验。 -->
     <select id="findOwnedResponse" resultMap="storedLearnerResponseResult">
-        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at
+        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at,
+               response.demonstration_exposure, response.explanation_exposure,
+               response.hint_exposure, response.response_frame_exposure
         FROM practice_response response
         JOIN practice_session session ON session.id = response.session_id
         JOIN learning_task task ON task.id = session.task_id
@@ -146,7 +160,9 @@
     <!-- completion 计算读取该 Session 的全部已接受 response；ownership 同样通过
          response → session → task 链路重校验，ORDER BY step_id 保证 deterministic 顺序。 -->
     <select id="findOwnedResponses" resultMap="storedLearnerResponseResult">
-        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at
+        SELECT response.session_id, response.step_id, response.learner_text, response.submitted_at,
+               response.demonstration_exposure, response.explanation_exposure,
+               response.hint_exposure, response.response_frame_exposure
         FROM practice_response response
         JOIN practice_session session ON session.id = response.session_id
         JOIN learning_task task ON task.id = session.task_id

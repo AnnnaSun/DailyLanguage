@@ -1,8 +1,9 @@
 # Grounded Semantic Validation Flow
 
-- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A–E-R）
-- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A–E-R` production workflow integration
-- Last Verified: `2026-09-08`
+- Document Status: `IMPLEMENTED`（M1-S7 / M1-S8A–E-R / M1-S8T-B）
+- Feature / Slice: `M1-S7`（本 Flow 主体）；`M1-S8A–E-R` production workflow integration；
+  `M1-S8T-B` trusted response snapshot compatibility
+- Last Verified: `2026-09-09`
 - Entry: `SemanticGroundingValidator.validate`；`GroundedEvaluationInputReader.readOwned`（S8A）
 
 ## 1. Behavior Boundary
@@ -20,6 +21,9 @@ M1-S8B `EvaluationRunCreationService.createForReadyInput` 已把该输入原子�
 内把绑定 Job 的 durable success result grounding 并原子保存为 terminal Run + candidate / safe rejection
 （见 `evaluation-result-consumption.md`）。M1-S8D 已实现 versioned prompt/request、固定 `EVALUATION` route、
 durable commit 后的 transient dispatch 与重复请求不重新提交（见 `evaluation-model-dispatch.md`）。
+M1-S8T-B 为每条 durable learner response 增加 immutable `ResponseSupportCondition`；Reader 将该 snapshot
+随 response 原样带入 trusted input。当前 HTTP submit 的四类 exposure 均为 `UNKNOWN`，因此它只表示未知的
+交互条件，不是“未使用辅助”或独立表现的资格证据。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，
@@ -68,10 +72,11 @@ sequenceDiagram
 
 ## 3. State and Authority
 
-- Authenticated `UserContext.userId` 是未来 S8 production assembler 的 caller identity authority；S7 不接收 HTTP
+- Authenticated `UserContext.userId` 是 S8 production Reader / assembler 的 caller identity authority；S7 不接收 HTTP
   identity，也不查询数据库。
 - PostgreSQL 已持久化的 `LearningTask`、completed `PracticeSession`、原始 `LearnerResponse` 与
-  `DeterministicAssessment` 是练习事实；S7 只读取传入 snapshot，不修改它们。
+  `DeterministicAssessment` 是练习事实；`LearnerResponse` 同时携带首次接受时的 immutable
+  `ResponseSupportCondition`。S7 只读取传入 snapshot，不修改它们。
 - immutable material 的 `semanticRubricReference` 与 target language 共同选择 classpath rubric；reference、resource
   内声明与 target language 必须精确匹配。
 - 不可信 Model output 只能声明 `sourceTurnId + exactQuote + occurrenceIndex + issueType + explanation + confidence`；
@@ -126,11 +131,17 @@ identity + supportLanguage 精确解析，HISTORICAL_ONLY 版本同样可读，�
 material steps 非空不重复、response step 集合与 material steps 完整相等）→ `Ready`。
 
 入口运行在 Spring bean 的短 readOnly transaction 内，不加 FOR UPDATE、零写入、不调用 Model / Job / Credential；
-learner text 原样透传；基础设施异常原样上抛，不吞成业务 failure。`Ready` 只代表输入可用于 evaluation，不代表
-Model diagnosis 正确，也不授权长期状态变化。S7 validator 的独立一致性检查保持不变，两者不抽取公共 validator。
+learner text 与 response support-condition snapshot 原样透传；基础设施异常原样上抛，不吞成业务 failure。
+`Ready` 只代表输入可用于 evaluation，不代表 Model diagnosis 正确，也不把 `UNKNOWN` support condition 解释为
+independent evidence，更不授权长期状态变化。S7 validator 的独立一致性检查保持不变，两者不抽取公共 validator。
 
 ## 7. Verification Evidence
 
+- M1-S8T fresh affected verification（2026-09-09）：`GroundedEvaluationInputReaderTests` 18/18 PASS；
+  disposable PostgreSQL 18.6 empty schema Flyway V1–V14 14/14 PASS；
+  `GroundedEvaluationInputReaderIntegrationTests` 5/5 PASS。Reader fixture 已按当前唯一 `PLANNABLE`
+  `en-builtin-cafe-request/v2` 的 exact step ids 构建，并验证当前 durable response shape 仍可组装为 `Ready`；
+  同批 Planner 7/7 + Practice 35/35 + Reader 5/5 integration 共 47/47 PASS，0 failures / 0 errors / 0 skipped。
 - M1-S8A prior unit evidence（2026-09-06）：`GroundedEvaluationInputReaderTests` 18/18 PASS（Ready、
   NotFound/NotCompleted 前置裁决、Task/assessment/material/response 全部 InconsistentSnapshot 分支、HISTORICAL
   exact-identity-only、learner text 原样透传、基础设施异常传播、readOnly transaction 注解契约、AfterEach 零
@@ -167,6 +178,8 @@ Model diagnosis 正确，也不授权长期状态变化。S7 validator 的独立
 - `server/src/main/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputReader.java`（M1-S8A）
 - `server/src/main/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputResult.java`（M1-S8A）
 - `server/src/main/java/com/dailylanguage/evaluator/domain/GroundedEvaluationInput.java`
+- `server/src/main/java/com/dailylanguage/practice/domain/PracticeSession.java`（S8T-B response support snapshot）
+- `server/src/main/resources/db/migration/V14__add_practice_response_support_condition.sql`（S8T-B）
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationOutput.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticEvaluationRubric.java`
 - `server/src/main/java/com/dailylanguage/evaluator/domain/SemanticGroundingResult.java`

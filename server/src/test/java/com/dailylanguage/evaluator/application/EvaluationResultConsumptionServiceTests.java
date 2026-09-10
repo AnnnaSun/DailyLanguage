@@ -19,6 +19,7 @@ import com.dailylanguage.content.domain.MaterialSourceLineage;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.evaluator.application.EvaluationResultConsumptionService.ConsumptionResult;
@@ -675,10 +676,10 @@ class EvaluationResultConsumptionServiceTests {
                 new TargetPracticeCore(
                         "en", MaterialDifficulty.FOUNDATION, "CAFE_SIMPLE_REQUEST", "objective",
                         "target text", null,
-                        List.of(new TextPracticeStep("order-drink", TextStepKind.EXACT,
+                        List.of(new TextPracticeStep("order-drink", TextStepKind.EXACT, TextLearningPurpose.PRACTICE,
                                 "prompt", List.of("answer"))),
                         "builtin-text-communication-rubric/v1"),
-                List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null)),
+                List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null, List.of())),
                 new MaterialSourceLineage("PROJECT_ORIGINAL", "1", "AGPL-3.0",
                         "sha256:" + "0".repeat(64)));
     }

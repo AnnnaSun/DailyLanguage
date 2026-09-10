@@ -62,9 +62,10 @@ class LearningTaskPlanningIntegrationTests {
             assertThat(task.id()).isNotNull();
             assertThat(task.userId()).isEqualTo(ownerId);
             assertThat(task.languageProfileId()).isEqualTo(profile.id());
-            // exact materialId + publishedVersion 来自 deterministic planner 的稳定选择，不被替换。
+            // exact materialId + publishedVersion 来自 deterministic planner 的稳定选择，不被替换；
+            // cafe v2 发布后新 Planner task 锁定 guided v2，v1 仅保留给既有 task 的 exact 重放。
             assertThat(task.materialIdentity())
-                    .isEqualTo(new MaterialIdentity("en-builtin-cafe-request", "v1"));
+                    .isEqualTo(new MaterialIdentity("en-builtin-cafe-request", "v2"));
             assertThat(task.targetLanguage()).isEqualTo("en");
             assertThat(task.supportLanguage()).isEqualTo("zh-cn");
             assertThat(task.status()).isEqualTo(LearningTask.Status.PLANNED);
@@ -79,7 +80,7 @@ class LearningTaskPlanningIntegrationTests {
                     task.id());
             assertThat(row.get("user_id")).isEqualTo(ownerId);
             assertThat(row.get("material_id")).isEqualTo("en-builtin-cafe-request");
-            assertThat(row.get("published_version")).isEqualTo("v1");
+            assertThat(row.get("published_version")).isEqualTo("v2");
             assertThat(row.get("status")).isEqualTo("PLANNED");
         });
     }

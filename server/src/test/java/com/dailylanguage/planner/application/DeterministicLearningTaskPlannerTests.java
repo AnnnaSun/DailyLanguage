@@ -247,7 +247,7 @@ class DeterministicLearningTaskPlannerTests {
     }
 
     private static SupportScaffold scaffold(String supportLanguage) {
-        return new SupportScaffold(supportLanguage, "instruction", "explanation", "hint", "note");
+        return new SupportScaffold(supportLanguage, "instruction", "explanation", "hint", "note", List.of());
     }
 
     private static void assertUnavailable(

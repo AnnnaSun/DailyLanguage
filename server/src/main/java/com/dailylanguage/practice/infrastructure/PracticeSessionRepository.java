@@ -70,24 +70,35 @@ public class PracticeSessionRepository {
 
     /**
      * owner-scoped 首次接受：数据库内重校验 Session 归属同一 owner/profile 的 Task 且仍为
-     * IN_PROGRESS。返回数据库裁决的 submittedAt；empty 表示未插入——在调用方前置条件（owner-scoped
-     * Session 行锁 + IN_PROGRESS 确认）下即 (sessionId, stepId) 已有既有 response；gate 不匹配时
-     * 同样为空，属 fail-closed，由调用方读取既有行并以 exact payload 比较裁决 replay 或 conflict。
+     * IN_PROGRESS。support-condition snapshot 与 learnerText 在同一 INSERT 首次写入。返回数据库
+     * 裁决的 submittedAt；empty 表示未插入——在调用方前置条件（owner-scoped Session 行锁 +
+     * IN_PROGRESS 确认）下即 (sessionId, stepId) 已有既有 response；gate 不匹配时同样为空，
+     * 属 fail-closed，由调用方读取既有行并以 exact payload 比较裁决 replay 或 conflict。
      */
     @Transactional
     public Optional<OffsetDateTime> insertOwnedAcceptedResponse(
             UUID sessionId,
             String stepId,
             String learnerText,
+            PracticeSession.ResponseSupportCondition supportCondition,
             UUID trustedUserId,
             UUID languageProfileId) {
         Objects.requireNonNull(sessionId, "sessionId must not be null");
         Objects.requireNonNull(stepId, "stepId must not be null");
         Objects.requireNonNull(learnerText, "learnerText must not be null");
+        Objects.requireNonNull(supportCondition, "supportCondition must not be null");
         Objects.requireNonNull(trustedUserId, "trustedUserId must not be null");
         Objects.requireNonNull(languageProfileId, "languageProfileId must not be null");
         return Optional.ofNullable(practiceSessionMapper.insertOwnedResponseAndReturnSubmittedAt(
-                sessionId, stepId, learnerText, trustedUserId, languageProfileId));
+                sessionId,
+                stepId,
+                learnerText,
+                supportCondition.demonstration().name(),
+                supportCondition.explanation().name(),
+                supportCondition.hint().name(),
+                supportCondition.responseFrame().name(),
+                trustedUserId,
+                languageProfileId));
     }
 
     /** private learner text 的 owner-scoped 读取；ownership 通过 response → session → task 链路重校验。 */
@@ -205,7 +216,12 @@ public class PracticeSessionRepository {
                 response.sessionId(),
                 response.stepId(),
                 response.learnerText(),
-                response.submittedAt());
+                response.submittedAt(),
+                new PracticeSession.ResponseSupportCondition(
+                        PracticeSession.SupportExposure.valueOf(response.demonstrationExposure()),
+                        PracticeSession.SupportExposure.valueOf(response.explanationExposure()),
+                        PracticeSession.SupportExposure.valueOf(response.hintExposure()),
+                        PracticeSession.SupportExposure.valueOf(response.responseFrameExposure())));
     }
 
     private static DeterministicAssessment toDomain(
@@ -246,7 +262,11 @@ record StoredLearnerResponse(
         UUID sessionId,
         String stepId,
         String learnerText,
-        OffsetDateTime submittedAt) {
+        OffsetDateTime submittedAt,
+        String demonstrationExposure,
+        String explanationExposure,
+        String hintExposure,
+        String responseFrameExposure) {
 }
 
 record StoredDeterministicAssessment(

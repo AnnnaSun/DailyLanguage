@@ -30,7 +30,8 @@ class PublishedLearningMaterialImmutabilityTests {
     @Test
     void copiesAcceptedAnswers() {
         List<String> source = new ArrayList<>(List.of("answer"));
-        TextPracticeStep step = new TextPracticeStep("step", TextStepKind.EXACT, "prompt", source);
+        TextPracticeStep step = new TextPracticeStep(
+                "step", TextStepKind.EXACT, TextLearningPurpose.PRACTICE, "prompt", source);
 
         source.add("changed");
 
@@ -40,9 +41,18 @@ class PublishedLearningMaterialImmutabilityTests {
     }
 
     @Test
+    void interpretsMissingLearningPurposeAsLegacyPractice() {
+        // 旧 artifact / legacy fixture 缺失 learningPurpose 时在 typed contract 层解释为 PRACTICE。
+        TextPracticeStep step = new TextPracticeStep(
+                "step", TextStepKind.EXACT, null, "prompt", List.of("answer"));
+
+        assertThat(step.learningPurpose()).isEqualTo(TextLearningPurpose.PRACTICE);
+    }
+
+    @Test
     void copiesTargetCoreSteps() {
         TextPracticeStep step = new TextPracticeStep(
-                "step", TextStepKind.SEMANTIC_ONLY, "prompt", List.of());
+                "step", TextStepKind.SEMANTIC_ONLY, TextLearningPurpose.PRACTICE, "prompt", List.of());
         List<TextPracticeStep> source = new ArrayList<>(List.of(step));
         TargetPracticeCore targetCore = new TargetPracticeCore(
                 "en",
@@ -62,8 +72,31 @@ class PublishedLearningMaterialImmutabilityTests {
     }
 
     @Test
+    void defaultsMissingGuidedStepsToEmptyImmutableList() {
+        SupportScaffold scaffold = new SupportScaffold("zh-cn", "i", "e", "h", null, null);
+
+        assertThat(scaffold.guidedSteps()).isEmpty();
+        assertThatThrownBy(() -> scaffold.guidedSteps().add(
+                new GuidedStepScaffold("step", "instruction", null)))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void copiesScaffoldGuidedSteps() {
+        GuidedStepScaffold guidedStep = new GuidedStepScaffold("step", "instruction", "Could I have ___, please?");
+        List<GuidedStepScaffold> source = new ArrayList<>(List.of(guidedStep));
+        SupportScaffold scaffold = new SupportScaffold("zh-cn", "i", "e", "h", null, source);
+
+        source.clear();
+
+        assertThat(scaffold.guidedSteps()).containsExactly(guidedStep);
+        assertThatThrownBy(() -> scaffold.guidedSteps().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
     void copiesPublishedMaterialScaffolds() {
-        SupportScaffold scaffold = new SupportScaffold("zh-cn", "i", "e", "h", null);
+        SupportScaffold scaffold = new SupportScaffold("zh-cn", "i", "e", "h", null, List.of());
         List<SupportScaffold> source = new ArrayList<>(List.of(scaffold));
         PublishedLearningMaterial material = new PublishedLearningMaterial(
                 new MaterialIdentity("material", "v1"),
@@ -75,7 +108,8 @@ class PublishedLearningMaterialImmutabilityTests {
                         "text",
                         null,
                         List.of(new TextPracticeStep(
-                                "step", TextStepKind.SEMANTIC_ONLY, "prompt", List.of())),
+                                "step", TextStepKind.SEMANTIC_ONLY, TextLearningPurpose.PRACTICE,
+                                "prompt", List.of())),
                         "rubric/v1"),
                 source,
                 new MaterialSourceLineage("PROJECT_ORIGINAL", "1", "AGPL-3.0", "sha256:test"));

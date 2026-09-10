@@ -21,6 +21,7 @@ import com.dailylanguage.content.domain.MaterialUnavailableReason;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextStepKind;
 import com.dailylanguage.evaluator.application.GroundedEvaluationInputResult.InconsistentSnapshot;
@@ -88,7 +89,7 @@ class GroundedEvaluationInputReaderTests {
         // 所有分支都只能复用 owner-scoped 读取，不得触发任何 mutation、锁或重选材料查询。
         verify(practiceSessionRepository, never()).insertForOwnedTask(any(), any(), any());
         verify(practiceSessionRepository, never())
-                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any());
+                .insertOwnedAcceptedResponse(any(), any(), any(), any(), any(), any());
         verify(practiceSessionRepository, never()).completeOwned(any(), any(), any());
         verify(practiceSessionRepository, never()).insertOwnedAssessment(any(), any(), anyLong(), any(), any());
         verify(practiceSessionRepository, never())
@@ -555,7 +556,7 @@ class GroundedEvaluationInputReaderTests {
 
     private static TextPracticeStep step(String stepId, TextStepKind kind) {
         return new TextPracticeStep(
-                stepId, kind, "Prompt for " + stepId,
+                stepId, kind, TextLearningPurpose.PRACTICE, "Prompt for " + stepId,
                 kind == TextStepKind.EXACT ? List.of("accepted answer") : List.of());
     }
 
@@ -564,7 +565,7 @@ class GroundedEvaluationInputReaderTests {
     }
 
     private static List<SupportScaffold> scaffolds() {
-        return List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null));
+        return List.of(new SupportScaffold("zh-cn", "instruction", "explanation", "hint", null, List.of()));
     }
 
     private static MaterialSourceLineage lineage() {
