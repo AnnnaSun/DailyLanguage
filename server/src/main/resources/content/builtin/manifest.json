@@ -24,6 +24,18 @@
       "license": "AGPL-3.0",
       "resource": "materials/en-builtin-cafe-request/v1.json",
       "contentHash": "sha256:166d8910d57be32c029396350858d12fefef7e53a2f883f19fa502fd4bfb2a4e",
+      "planningAvailability": "HISTORICAL_ONLY"
+    },
+    {
+      "materialId": "en-builtin-cafe-request",
+      "publishedVersion": "v2",
+      "targetLanguage": "en",
+      "supportLanguages": ["zh-cn"],
+      "source": "PROJECT_ORIGINAL",
+      "sourceVersion": "2",
+      "license": "AGPL-3.0",
+      "resource": "materials/en-builtin-cafe-request/v2.json",
+      "contentHash": "sha256:d9f9cdd3041b78f462c46a3c112a82db880bcca7e846cfdcb6cae82097675674",
       "planningAvailability": "PLANNABLE"
     }
   ]

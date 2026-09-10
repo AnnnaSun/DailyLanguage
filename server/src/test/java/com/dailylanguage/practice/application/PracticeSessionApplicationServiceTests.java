@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
+import com.dailylanguage.content.domain.GuidedStepScaffold;
 import com.dailylanguage.content.domain.LearningMaterialCatalog;
 import com.dailylanguage.content.domain.MaterialDifficulty;
 import com.dailylanguage.content.domain.MaterialIdentity;
@@ -64,6 +65,14 @@ class PracticeSessionApplicationServiceTests {
     private static final OffsetDateTime ASSESSMENT_CREATED_AT = COMPLETED_AT;
     private static final MaterialIdentity CAFE_IDENTITY =
             new MaterialIdentity("en-builtin-cafe-request", "v1");
+    private static final MaterialIdentity GUIDED_CAFE_IDENTITY =
+            new MaterialIdentity("en-builtin-cafe-request", "v2");
+    // 与真实 v2 artifact 的 communicationObjective 逐字一致；start 的 snapshot guard 会比较该值。
+    private static final String GUIDED_CAFE_OBJECTIVE =
+            "Understand a modeled cafe order, use the polite request frame with support, "
+                    + "then order something new on your own.";
+    private static final String CAFE_OBJECTIVE =
+            "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.";
 
     private final LearningTaskRepository learningTaskRepository =
             Mockito.mock(LearningTaskRepository.class);
@@ -290,7 +299,10 @@ class PracticeSessionApplicationServiceTests {
         assertThat(viewComponents).doesNotContain(
                 "acceptedAnswers", "semanticRubricReference", "sourceLineage", "userId");
         List<String> stepComponents = componentNames(PracticeMaterialView.StepView.class);
-        assertThat(stepComponents).containsExactly("stepId", "kind", "prompt");
+        assertThat(stepComponents).containsExactly(
+                "stepId", "kind", "learningPurpose", "prompt", "guidedScaffold");
+        List<String> scaffoldComponents = componentNames(PracticeMaterialView.GuidedScaffoldView.class);
+        assertThat(scaffoldComponents).containsExactly("instruction", "responseFrame");
 
         assertThat(view.materialId()).isEqualTo("en-builtin-cafe-request");
         assertThat(view.publishedVersion()).isEqualTo("v1");
@@ -298,9 +310,47 @@ class PracticeSessionApplicationServiceTests {
         assertThat(view.supportLanguage()).isEqualTo("zh-cn");
         assertThat(view.scenario()).isEqualTo("CAFE_SIMPLE_REQUEST");
         assertThat(view.instruction()).isEqualTo("完成点单的中文指令");
+        // legacy material：learningPurpose 解释为 PRACTICE，guidedScaffold 为 null。
         assertThat(view.steps()).containsExactly(
-                new PracticeMaterialView.StepView("order-drink", "EXACT", "Order a medium coffee politely."),
-                new PracticeMaterialView.StepView("answer-to-go", "SEMANTIC_ONLY", "Answer to go."));
+                new PracticeMaterialView.StepView(
+                        "order-drink", "EXACT", "PRACTICE", "Order a medium coffee politely.", null),
+                new PracticeMaterialView.StepView(
+                        "answer-to-go", "SEMANTIC_ONLY", "PRACTICE", "Answer to go.", null));
+    }
+
+    @Test
+    void guidedMaterialStartDeliversPurposesAndStepScaffoldsWithoutAnswers() {
+        when(learningTaskRepository.findOwned(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(task(
+                        LearningTask.Status.PLANNED, GUIDED_CAFE_IDENTITY, GUIDED_CAFE_OBJECTIVE)));
+        when(materialCatalog.findByIdentity(GUIDED_CAFE_IDENTITY, "zh-cn"))
+                .thenReturn(available(guidedCafeMaterial()));
+        when(practiceSessionRepository.findOwnedByTask(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.empty());
+        when(learningTaskRepository.tryStart(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(task(
+                        LearningTask.Status.STARTED, GUIDED_CAFE_IDENTITY, GUIDED_CAFE_OBJECTIVE)));
+        when(practiceSessionRepository.insertForOwnedTask(TASK_ID, USER_ID, PROFILE_ID))
+                .thenReturn(inProgressSession());
+
+        StartResult.Created created =
+                (StartResult.Created) service.start(PROFILE_ID, TASK_ID, USER_CONTEXT);
+
+        PracticeMaterialView view = created.material();
+        assertThat(view.publishedVersion()).isEqualTo("v2");
+        assertThat(view.steps())
+                .extracting(step -> step.learningPurpose())
+                .containsExactly("COMPREHENSION_CHECK", "SCAFFOLDED_USE", "INDEPENDENT_TRANSFER");
+        // 逐 step 支架：responseFrame 只在 SCAFFOLDED_USE 上，其余 guided step 为 null 但支架存在。
+        assertThat(view.steps().get(0).guidedScaffold().instruction())
+                .isEqualTo("阅读对话，回答顾客点了什么。");
+        assertThat(view.steps().get(0).guidedScaffold().responseFrame()).isNull();
+        assertThat(view.steps().get(1).guidedScaffold().responseFrame())
+                .isEqualTo("Could I have ___, please?");
+        assertThat(view.steps().get(2).guidedScaffold().responseFrame()).isNull();
+        // projection 不携带评分答案：steps 与 scaffold 字段集在上一测试中封闭断言。
+        assertThat(view.steps())
+                .allSatisfy(step -> assertThat(step.toString()).doesNotContain("acceptedAnswers"));
     }
 
     // --- submit ---
@@ -735,18 +785,27 @@ class PracticeSessionApplicationServiceTests {
     }
 
     private static LearningTask task(LearningTask.Status status) {
+        return task(status, CAFE_IDENTITY, CAFE_OBJECTIVE);
+    }
+
+    private static LearningTask task(LearningTask.Status status, MaterialIdentity materialIdentity) {
+        return task(status, materialIdentity, CAFE_OBJECTIVE);
+    }
+
+    private static LearningTask task(
+            LearningTask.Status status, MaterialIdentity materialIdentity, String primaryGoal) {
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-09-04T10:10:00.000Z");
         return new LearningTask(
                 TASK_ID,
                 USER_ID,
                 PROFILE_ID,
-                CAFE_IDENTITY,
+                materialIdentity,
                 "en",
                 "zh-cn",
                 MaterialDifficulty.FOUNDATION,
                 10,
                 "CAFE_SIMPLE_REQUEST",
-                "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.",
+                primaryGoal,
                 LearningTaskPlan.TaskType.TEXT_PRACTICE,
                 LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK,
                 status,
@@ -884,6 +943,48 @@ class PracticeSessionApplicationServiceTests {
                 original.readingInfo(), original.steps(), original.semanticRubricReference());
         return new PublishedLearningMaterial(
                 material.identity(), changed, material.supportScaffolds(), material.sourceLineage());
+    }
+
+    /** 与真实 en-builtin-cafe-request/v2 同构的 guided fixture：check → scaffolded → transfer。 */
+    private static PublishedLearningMaterial guidedCafeMaterial() {
+        TargetPracticeCore core = new TargetPracticeCore(
+                "en",
+                MaterialDifficulty.FOUNDATION,
+                "CAFE_SIMPLE_REQUEST",
+                GUIDED_CAFE_OBJECTIVE,
+                "You are at a coffee shop. The barista asks: \"What can I get for you?\" "
+                        + "The customer replies: \"Could I have a medium coffee, please?\"",
+                null,
+                List.of(
+                        new TextPracticeStep(
+                                "comprehension-check", TextStepKind.EXACT,
+                                TextLearningPurpose.COMPREHENSION_CHECK,
+                                "What does the customer order?",
+                                List.of("A medium coffee.")),
+                        new TextPracticeStep(
+                                "order-with-frame", TextStepKind.EXACT,
+                                TextLearningPurpose.SCAFFOLDED_USE,
+                                "Order a medium coffee using the frame.",
+                                List.of("Could I have a medium coffee, please?")),
+                        new TextPracticeStep(
+                                "order-water-freely", TextStepKind.SEMANTIC_ONLY,
+                                TextLearningPurpose.INDEPENDENT_TRANSFER,
+                                "Order a bottle of water in your own words.", List.of())),
+                "builtin-text-communication-rubric/v1");
+        return new PublishedLearningMaterial(
+                GUIDED_CAFE_IDENTITY,
+                core,
+                List.of(new SupportScaffold(
+                        "zh-cn", "guided 中文总指令", "场景解释", "提示", null,
+                        List.of(
+                                new GuidedStepScaffold(
+                                        "comprehension-check", "阅读对话，回答顾客点了什么。", null),
+                                new GuidedStepScaffold(
+                                        "order-with-frame", "用句型框架点一杯 medium coffee。",
+                                        "Could I have ___, please?"),
+                                new GuidedStepScaffold(
+                                        "order-water-freely", "不用框架，用自己的话点一瓶水。", null)))),
+                new MaterialSourceLineage("PROJECT_ORIGINAL", "v2", "AGPL-3.0", "sha256"));
     }
 
     private static PracticeMaterialView cafeMaterialView() {

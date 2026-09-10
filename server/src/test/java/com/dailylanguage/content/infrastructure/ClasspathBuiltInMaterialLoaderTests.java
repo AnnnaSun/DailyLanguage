@@ -65,11 +65,41 @@ class ClasspathBuiltInMaterialLoaderTests {
                 .extracting(PublishedLearningMaterial::identity)
                 .containsExactlyInAnyOrder(
                         new MaterialIdentity("en-builtin-greeting-intro", "v1"),
-                        new MaterialIdentity("en-builtin-cafe-request", "v1"));
+                        new MaterialIdentity("en-builtin-cafe-request", "v1"),
+                        new MaterialIdentity("en-builtin-cafe-request", "v2"));
         assertThat(pack.plannableMaterialIdentities())
                 .containsExactlyInAnyOrder(
                         new MaterialIdentity("en-builtin-greeting-intro", "v1"),
-                        new MaterialIdentity("en-builtin-cafe-request", "v1"));
+                        new MaterialIdentity("en-builtin-cafe-request", "v2"));
+    }
+
+    @Test
+    void loadsRealGuidedCafeV2WithTypedSequenceAndScaffoldCoverage() {
+        PublishedLearningMaterial v2 = new ClasspathBuiltInMaterialLoader().load().materials().stream()
+                .filter(loaded -> loaded.identity()
+                        .equals(new MaterialIdentity("en-builtin-cafe-request", "v2")))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(v2.targetCore().steps())
+                .extracting(step -> step.learningPurpose())
+                .containsExactly(
+                        TextLearningPurpose.COMPREHENSION_CHECK,
+                        TextLearningPurpose.SCAFFOLDED_USE,
+                        TextLearningPurpose.INDEPENDENT_TRANSFER);
+        assertThat(v2.targetCore().steps().get(2).acceptedAnswers()).isEmpty();
+        assertThat(v2.sourceLineage().sourceVersion()).isEqualTo("2");
+        assertThat(v2.sourceLineage().contentHash()).startsWith("sha256:");
+        List<GuidedStepScaffold> guidedSteps = v2.supportScaffolds().getFirst().guidedSteps();
+        assertThat(guidedSteps)
+                .extracting(GuidedStepScaffold::stepId)
+                .containsExactly("comprehension-check", "order-with-frame", "order-water-freely");
+        // responseFrame 只出现在 SCAFFOLDED_USE step 上，其余为 null。
+        assertThat(guidedSteps)
+                .extracting(GuidedStepScaffold::responseFrame)
+                .containsExactly(null, "Could I have ___, please?", null);
+        assertThat(guidedSteps)
+                .allSatisfy(guidedStep -> assertThat(guidedStep.instruction()).isNotBlank());
     }
 
     @Test

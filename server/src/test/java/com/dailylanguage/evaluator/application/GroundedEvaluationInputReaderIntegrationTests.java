@@ -52,9 +52,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class GroundedEvaluationInputReaderIntegrationTests {
 
-    private static final String ANSWER_TO_GO_TEXT = "To go, please. Thank you!";
+    // v2 guided cafe material 的第三个 step（INDEPENDENT_TRANSFER / SEMANTIC_ONLY）自由作答文本；
+    // MODEL_OUTPUT 的 exactQuote "Thank you" 必须出现在该文本中供 grounding offset 断言使用。
+    private static final String ORDER_WATER_TEXT = "A bottle of water, please. Thank you!";
     private static final String MODEL_OUTPUT = """
-            {"claims":[{"sourceTurnId":"answer-to-go","exactQuote":"Thank you","occurrenceIndex":-1,
+            {"claims":[{"sourceTurnId":"order-water-freely","exactQuote":"Thank you","occurrenceIndex":-1,
             "issueType":"NATURALNESS","explanation":"The quoted thanks reads as abrupt here.",
             "confidence":0.7}]}
             """;
@@ -112,9 +114,9 @@ class GroundedEvaluationInputReaderIntegrationTests {
             assertThat(input.responses())
                     .extracting(LearnerResponse::learnerText)
                     .containsExactlyInAnyOrder(
+                            "A medium coffee.",
                             "Could I have a medium coffee, please?",
-                            "How much is it?",
-                            ANSWER_TO_GO_TEXT);
+                            ORDER_WATER_TEXT);
             assertThat(input.responses())
                     .allSatisfy(response -> assertThat(response.sessionId()).isEqualTo(sessionId));
 
@@ -123,8 +125,8 @@ class GroundedEvaluationInputReaderIntegrationTests {
             assertThat(grounding).isInstanceOfSatisfying(Validated.class, validated -> {
                 assertThat(validated.candidate().sessionId()).isEqualTo(sessionId);
                 GroundedClaim claim = validated.candidate().claims().getFirst();
-                assertThat(claim.startOffset()).isEqualTo(ANSWER_TO_GO_TEXT.indexOf("Thank you"));
-                assertThat(ANSWER_TO_GO_TEXT.substring(claim.startOffset(), claim.endOffset()))
+                assertThat(claim.startOffset()).isEqualTo(ORDER_WATER_TEXT.indexOf("Thank you"));
+                assertThat(ORDER_WATER_TEXT.substring(claim.startOffset(), claim.endOffset()))
                         .isEqualTo("Thank you");
             });
         });
@@ -159,7 +161,7 @@ class GroundedEvaluationInputReaderIntegrationTests {
         UUID ownerId = userRepository.create();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
-        // startCafeSession 已接受 order-drink response；Session 保持 IN_PROGRESS（不再重复提交，
+        // startCafeSession 已接受 order-with-frame response；Session 保持 IN_PROGRESS（不再重复提交，
         // 相同 payload 的第二次 submit 是 Replayed 而非 Accepted）。
         UUID sessionId = startCafeSession(profile.id(), user);
 
@@ -230,12 +232,12 @@ class GroundedEvaluationInputReaderIntegrationTests {
         sqlSession.clearCache();
     }
 
-    /** plan → start → submit 全部 step → complete：全部走真实 durable 流程。 */
+    /** plan → start → submit 全部 step → complete：全部走真实 durable 流程（planner 选 guided cafe v2）。 */
     private UUID completeCafeSession(UUID profileId, UserContext user) {
         UUID sessionId = startCafeSession(profileId, user);
-        assertThat(practiceService.submit(profileId, sessionId, "ask-price", user, "How much is it?"))
-                .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "answer-to-go", user, ANSWER_TO_GO_TEXT))
+        assertThat(practiceService.submit(profileId, sessionId, "comprehension-check", user,
+                "A medium coffee.")).isInstanceOf(SubmitResult.Accepted.class);
+        assertThat(practiceService.submit(profileId, sessionId, "order-water-freely", user, ORDER_WATER_TEXT))
                 .isInstanceOf(SubmitResult.Accepted.class);
         assertThat(practiceService.complete(profileId, sessionId, user))
                 .isInstanceOf(CompletionResult.Created.class);
@@ -253,7 +255,7 @@ class GroundedEvaluationInputReaderIntegrationTests {
         assertThat(startResult).isInstanceOf(StartResult.Created.class);
         UUID sessionId = ((StartResult.Created) startResult).session().id();
 
-        assertThat(practiceService.submit(profileId, sessionId, "order-drink", user,
+        assertThat(practiceService.submit(profileId, sessionId, "order-with-frame", user,
                 "Could I have a medium coffee, please?")).isInstanceOf(SubmitResult.Accepted.class);
         return sessionId;
     }

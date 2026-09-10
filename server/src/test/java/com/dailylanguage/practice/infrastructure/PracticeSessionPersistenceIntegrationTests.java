@@ -53,6 +53,10 @@ class PracticeSessionPersistenceIntegrationTests {
     private static final String CAFE_SCENARIO = "CAFE_SIMPLE_REQUEST";
     private static final String CAFE_OBJECTIVE =
             "Make a polite request, ask about price, and answer a follow-up question in a coffee shop.";
+    // 与真实 v2 artifact 的 communicationObjective 逐字一致：start 的 exact snapshot guard 会比较该值。
+    private static final String GUIDED_CAFE_OBJECTIVE =
+            "Understand a modeled cafe order, use the polite request frame with support, "
+                    + "then order something new on your own.";
 
     @Autowired
     private UserRepository userRepository;
@@ -365,6 +369,28 @@ class PracticeSessionPersistenceIntegrationTests {
         assertThat(learningTaskRepository.findOwned(owned.taskId(), owned.ownerId(), owned.profileId()))
                 .hasValueSatisfying(task -> assertThat(task.status())
                         .isEqualTo(LearningTask.Status.STARTED));
+    }
+
+    @Test
+    void startResolvesGuidedCafeV2TaskWithFullTeachingProjection() {
+        // v2 task 的 snapshot 必须与 v2 artifact 完全一致（含 communicationObjective），
+        // 才能通过 start 的 exact material consistency guard。
+        OwnedTask owned = createOwnedPlannedTask(
+                new MaterialIdentity("en-builtin-cafe-request", "v2"),
+                CAFE_SCENARIO,
+                GUIDED_CAFE_OBJECTIVE);
+
+        StartResult.Created started = (StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), new UserContext(owned.ownerId()));
+
+        assertThat(started.material().materialId()).isEqualTo("en-builtin-cafe-request");
+        assertThat(started.material().publishedVersion()).isEqualTo("v2");
+        assertThat(started.material().steps())
+                .extracting(PracticeSessionApplicationService.PracticeMaterialView.StepView::learningPurpose)
+                .containsExactly("COMPREHENSION_CHECK", "SCAFFOLDED_USE", "INDEPENDENT_TRANSFER");
+        assertThat(started.material().steps().get(1).guidedScaffold().responseFrame())
+                .isEqualTo("Could I have ___, please?");
+        assertThat(started.material().steps().get(2).guidedScaffold().responseFrame()).isNull();
     }
 
     @Test
@@ -927,19 +953,27 @@ class PracticeSessionPersistenceIntegrationTests {
     }
 
     private OwnedTask createOwnedPlannedTask(String materialId, String scenario) {
+        return createOwnedPlannedTask(new MaterialIdentity(materialId, "v1"), scenario, CAFE_OBJECTIVE);
+    }
+
+    private OwnedTask createOwnedPlannedTask(MaterialIdentity identity, String scenario) {
+        return createOwnedPlannedTask(identity, scenario, CAFE_OBJECTIVE);
+    }
+
+    private OwnedTask createOwnedPlannedTask(MaterialIdentity identity, String scenario, String objective) {
         UUID ownerId = userRepository.create();
         LanguageProfileIdentity profile = languageProfileRepository
                 .create(ownerId, "en")
                 .orElseThrow();
         LearningTaskPlan plan = new LearningTaskPlan(
                 profile.id(),
-                new MaterialIdentity(materialId, "v1"),
+                identity,
                 "en",
                 "zh-cn",
                 MaterialDifficulty.FOUNDATION,
                 10,
                 scenario,
-                CAFE_OBJECTIVE,
+                objective,
                 LearningTaskPlan.TaskType.TEXT_PRACTICE,
                 LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK);
         LearningTask task = learningTaskRepository

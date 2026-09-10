@@ -15,11 +15,13 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dailylanguage.content.domain.GuidedStepScaffold;
 import com.dailylanguage.content.domain.LearningMaterialCatalog;
 import com.dailylanguage.content.domain.MaterialQueryResult;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
 import com.dailylanguage.content.domain.TargetPracticeCore;
+import com.dailylanguage.content.domain.TextLearningPurpose;
 import com.dailylanguage.content.domain.TextPracticeStep;
 import com.dailylanguage.content.domain.TextReadingInfo;
 import com.dailylanguage.content.domain.TextStepKind;
@@ -532,6 +534,8 @@ public class PracticeSessionApplicationService {
     /**
      * 启动 Session 时下发的安全 material projection：只含 learner 练习所需字段，
      * 不含 acceptedAnswers、semanticRubricReference、Content lineage 或任何 ownership identity。
+     * guided material 额外下发每个 step 的 learningPurpose 与 support-language 支架
+     * （instruction / responseFrame）；legacy PRACTICE step 的 guidedScaffold 为 null。
      */
     public record PracticeMaterialView(
             String materialId,
@@ -556,6 +560,12 @@ public class PracticeSessionApplicationService {
             PublishedLearningMaterial material = available.material();
             SupportScaffold scaffold = available.selectedScaffold();
             TargetPracticeCore targetCore = material.targetCore();
+            // guidedSteps 与 step 的对应关系由 loader fail-closed 保证（每个 guided step 有且仅一项）；
+            // projection 只做查找，不重复校验 Content invariants。
+            Map<String, GuidedStepScaffold> guidedStepsByStepId = new HashMap<>();
+            for (GuidedStepScaffold guidedStep : scaffold.guidedSteps()) {
+                guidedStepsByStepId.put(guidedStep.stepId(), guidedStep);
+            }
             return new PracticeMaterialView(
                     material.identity().materialId(),
                     material.identity().publishedVersion(),
@@ -573,11 +583,36 @@ public class PracticeSessionApplicationService {
                             ? List.of()
                             : targetCore.steps().stream()
                                     .map(step -> new StepView(
-                                            step.stepId(), step.kind().name(), step.prompt()))
+                                            step.stepId(),
+                                            step.kind().name(),
+                                            step.learningPurpose().name(),
+                                            step.prompt(),
+                                            guidedScaffoldFor(step, guidedStepsByStepId)))
                                     .toList());
         }
 
-        public record StepView(String stepId, String kind, String prompt) {
+        /** 只有 guided step 携带支架投影；legacy PRACTICE step 一律为 null，即使 fixture 意外附带 guidedSteps。 */
+        private static GuidedScaffoldView guidedScaffoldFor(
+                TextPracticeStep step, Map<String, GuidedStepScaffold> guidedStepsByStepId) {
+            if (step.learningPurpose() == TextLearningPurpose.PRACTICE) {
+                return null;
+            }
+            GuidedStepScaffold guidedStep = guidedStepsByStepId.get(step.stepId());
+            return guidedStep == null
+                    ? null
+                    : new GuidedScaffoldView(guidedStep.instruction(), guidedStep.responseFrame());
+        }
+
+        public record StepView(
+                String stepId,
+                String kind,
+                String learningPurpose,
+                String prompt,
+                GuidedScaffoldView guidedScaffold) {
+        }
+
+        /** guided step 的 support-language 支架投影；responseFrame 仅 SCAFFOLDED_USE 非空（loader 保证）。 */
+        public record GuidedScaffoldView(String instruction, String responseFrame) {
         }
     }
 }

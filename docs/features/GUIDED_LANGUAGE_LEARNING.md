@@ -1,35 +1,41 @@
 # Guided Language Learning — 输入、理解与独立使用
 
-> Updated: 2026-09-07
+> Updated: 2026-09-10
 > Direction: APPROVED — 用户同意补充教学流程并复用现有模块
 > Product design / V1 phase allocation: APPROVED — 2026-09-07
-> Current Slice Contract: NOT_APPROVED；Implementation: NOT_STARTED
+> Current Slice Contract: APPROVED — S8T-A / S8T-B / S8T-C
+> Implementation: S8T-A COMPLETE (`71751f5`)；S8T-B COMPLETE (`f2eefa6`)；S8T-C implementation / Review /
+> external verification PASS，documentation COMPLETE，整体 Ownership PASS，`READY_TO_COMMIT`，未 commit
 
 ## 1. Goal and current evidence
 
 系统需要帮助用户接触并理解新语言内容，再逐步转为独立使用。输入包括可理解的对话、文章、
 例句和音频，也包括必要的词义、表达用途和简短规则说明；不能把输入仅等同于知识卡片或语法课。
 
-当前已有 `TargetPracticeCore.targetLanguageText` 与 `SupportScaffold` 的 explanation / hint，
-`en-builtin-cafe-request/v1` 包含点单表达和中文解释。它们证明内容支架已存在，不证明完整教学流程、
-支架使用记录或学习效果已实现。Reading / Listening / Language Fundamentals 的逻辑设计也不等于已交付。
+当前已发布 `en-builtin-cafe-request/v2`：`TargetPracticeCore` 通过 `learningPurpose` 区分理解检查、辅助使用与
+独立迁移，`SupportScaffold.guidedSteps` 为每个 guided step 提供中文 instruction，并只在
+`SCAFFOLDED_USE` 暴露答案性 `responseFrame`。Practice start 下发安全教学投影；`practice_response` 持久化
+四类 support-condition snapshot。当前 HTTP submit 无法确认真实暴露条件，因此显式保存 `UNKNOWN`，不伪造
+无辅助成功。Reading / Listening / Language Fundamentals 的逻辑设计仍不等于已交付。
 
 本设计补充 Practice 内的教学行为，不新增顶层 Learning module、独立 Learner Model 或第二套 Session。
-已批准更新 V1 范围及 Phase exit criteria；当前 M1-S8 Contract 不变。本次只同步文档，
-不修改材料版本、API、schema 或评分实现。
+已批准更新 V1 范围及 Phase exit criteria；M1-S8T 复用 Content、Planner、Practice Runtime 与 Evaluator input，
+没有新增顶层 Learning module、课程状态或长期学习 authority。M2 qualification / aggregation、S11 UI 暴露追踪、
+后续 Review 调度与完整课程体系仍未实现。
 
 ## 2. User learning flow
 
-以下为目标行为，尚未实现；环节名称不是新的持久化状态或强制 API enum。
+以下区分 M1 当前实现与后续目标；环节名称不是新的 Session 状态或课程进度 authority。
 
-| 环节 | 系统提供什么 | 用户做什么 |
+| 环节 | M1 当前实现 | 后续边界 |
 |---|---|---|
-| 接触新内容 | 与沟通目标相关的短示范，控制新词和表达数量 | 阅读或听取有意义的语言内容 |
-| 理解意思与用法 | 可按需查看的词义、解释、例句与少量规则说明 | 理解表达何时使用，选择需要的辅助 |
-| 理解检查 | 与原材料意义相关的问题 | 判断或回答信息，允许重看和重听 |
-| 辅助使用 | 示例、句型或局部提示 | 替换信息、模仿或完成受控沟通 |
-| 独立迁移 | 改变商品、人物或场景，减少答案性提示 | 在新条件下理解或完成沟通 |
-| 后续复习 | 后续再次出现的相关内容或任务 | 在间隔后重新理解、回忆或使用 |
+| 接触新内容 | v2 `targetLanguageText` 与中文 explanation 提供咖啡店示范 | S11 决定具体呈现和用户选择入口 |
+| 理解意思与用法 | start projection 下发 instruction / explanation / hint | 是否打开、何时打开由 UI/runtime 后续记录 |
+| 理解检查 | `comprehension-check`：`COMPREHENSION_CHECK + EXACT` | 当前只形成本次 deterministic result |
+| 辅助使用 | `order-with-frame`：`SCAFFOLDED_USE + EXACT`，下发 `responseFrame` | M2 才解释为有条件的学习 Evidence |
+| 独立迁移 | `order-water-freely`：`INDEPENDENT_TRANSFER + SEMANTIC_ONLY`，无 `responseFrame` | 当前不伪造 semantic correctness；由既有 Evaluator 产生候选诊断 |
+| 辅助条件 | response 首次写入时原子保存四类 exposure；当前 HTTP 路径均为 `UNKNOWN` | S11/runtime 才能提供可信的 `PROVIDED / OPENED / NOT_PROVIDED` |
+| 后续复习 | 尚未实现 | Review 与调度规则留给后续 Phase |
 
 这不是每次必走的线性课程。已有基础用户可以直接尝试；遇到困难可以选择“先教我”、
 查看解释、重试、降低难度或跳过。不能因为跳过教学就推断已掌握。
@@ -41,16 +47,16 @@ Planner 根据目标、已有能力证据和可用材料选择当前学习需要
 
 ## 3. Coffee-shop example
 
-目标：理解点单中的常见问答，并能礼貌提出自己的请求。以下为新设计示例，不是对现有 v1 材料的修改。
+目标：理解示范中的咖啡点单、在句型辅助下提出请求，再对新商品进行无句型迁移。当前通过新的 v2 发布；
+v1 内容保持 immutable，并转为 `HISTORICAL_ONLY`，仍可按 exact identity 解析。
 
-1. 示范：`What can I get for you?` / `Could I have a small tea, please?` /
-   `For here or to go?` / `To go, please.`
-2. 简短解释：`Could I have …?` 用于礼貌请求；`for here` 是店内用，`to go` 是带走。
-   解释服务于本次交流，不要求先学习完整情态动词体系。
-3. 理解检查：顾客点了什么？是在店内用还是带走？允许回看原文；答对只支持相应阅读理解判断。
-4. 辅助使用：保留 `Could I have ___, please?`，让用户改为点咖啡。
-5. 迁移尝试：隐藏示范和句型，换为购买一瓶水；若用户打开提示，仍可继续，但结果不能记为无辅助成功。
-6. 后续复习：在后续任务重新安排相关请求表达；时间间隔和调度规则留给 Review 的实现设计。
+1. 示范：咖啡师询问 `What can I get for you?`，顾客回答
+   `Could I have a medium coffee, please?`。
+2. 简短解释：`Could I have …, please?` 是常见且安全的礼貌点单表达。
+3. 理解检查：`comprehension-check` 询问顾客点了什么；它是 `EXACT`，不代表独立表达。
+4. 辅助使用：`order-with-frame` 展示 `Could I have ___, please?`，要求点一杯 medium coffee。
+5. 迁移尝试：`order-water-freely` 改为购买一瓶水，不下发 `responseFrame`；该步为 `SEMANTIC_ONLY`。
+6. 后续复习：尚未实现；时间间隔和调度规则留给 Review 的后续实现设计。
 
 文本示例不证明听力能力。未来提供音频必须按已批准的 Listening / Voice Scope 交付。
 一次隐藏示范后的成功也不证明稳定掌握；刚接触过的表达与隔日、跨场景使用需要区分。
@@ -65,9 +71,10 @@ Planner 根据目标、已有能力证据和可用材料选择当前学习需要
 | 新条件下无答案性辅助完成 | 本次相应任务的独立使用证据 | 稳定 Mastery 或长期 Weakness 关闭 |
 | 多次间隔、跨场景表现 | 可供既有 qualification / aggregation 判断的证据 | 绕过聚合规则直接改变长期状态 |
 
-未来实现至少需要可追溯的 material identity/version、任务目标、实际回答、评价来源，以及相关辅助条件。
-区分“提供了辅助”“用户请求或打开辅助”与 UNKNOWN；不能把缺失记录默认为未使用辅助，
-也不能把点击或停留时间当作认知事实。具体 event / schema / API 留待独立 implementation contract。
+当前已保留可追溯的 material identity/version、任务目标、实际回答、评价来源，以及与 response 同行首次写入的
+`ResponseSupportCondition`。四个独立维度为 demonstration、explanation、hint 与 responseFrame；每个维度取值
+`UNKNOWN / NOT_PROVIDED / PROVIDED / OPENED`。migration 前历史与当前 HTTP submit 均使用 `UNKNOWN`，不能把
+缺失或未知记录默认为未使用辅助，也不能把点击或停留时间当作认知事实。
 
 教学示范与评分答案的可见性应明确区分：可以展示为教学准备的例句，不因此暴露内部完整
 accepted answers / rubric。历史结果按当时材料版本和辅助条件解释，不重新标注旧 Session 为独立成功。
@@ -80,10 +87,10 @@ Learning Memory 负责聚合后的长期状态。不存在独立的“课程完�
 
 | 现有模块 | 目标职责增量 | 保留的边界 |
 |---|---|---|
-| Content | 组织示范、解释、理解问题与关联练习 | versioned、可追溯；Public Reference 仍只是参考 |
-| Planner | 选择接触新内容、辅助练习或迁移需要与支架强度 | 不生成完整课程，不直接写能力状态 |
-| Practice Runtime | 承载教学交互、用户选择及辅助条件记录 | 复用 Session 生命周期，不自行决定掌握 |
-| Evaluator | 结合表现条件解释理解与使用证据 | 不把模仿当独立表现，不直接修改长期状态 |
+| Content | 已承载 typed learning purpose、逐 step scaffold 与 cafe v2 | versioned、可追溯；Public Reference 仍只是参考 |
+| Planner | 已选择唯一 `PLANNABLE` cafe v2，并保留 exact identity | 不生成完整课程，不直接写能力状态 |
+| Practice Runtime | 已投影 guided scaffold，并持久化四类辅助条件 snapshot | 当前 HTTP 只写 `UNKNOWN`；不自行决定掌握 |
+| Evaluator | trusted input 已携带 durable response/support condition | 不把模仿当独立表现，不直接修改长期状态 |
 | Learning Memory | 按证据类型与条件聚合 | 不以看过内容或课程进度替代能力判断 |
 | Review | 安排值得再次出现的内容 | 不承担完整 Planner 或维护另一份 mastery truth |
 
@@ -102,7 +109,11 @@ Grammar Repair 继续用于真实使用后重复、高置信的问题。首次�
 - 评价失败时保留学习过程，能力结果为未确认；不把完成教学当作评价成功。
 - 没有 Provider 时，已发布的 Built-in 路径仍通过本地已验证内容执行；AI enrichment 不成为硬依赖。
 - 设计验收：咖啡店示例可走通；新手与直接尝试入口清晰；理解任务可独立结束；辅助成功与独立成功可区分。
-- 实现验收待定：材料验证、辅助记录、owner/profile isolation、失败路径与评价语义需在批准的 slice 中测试。
+- M1 工程验收：guided material validation、legacy default、exact-version planning/start、safe projection、
+  support-condition migration/round-trip、owner/profile isolation 与 Evaluator input regression 已由 unit/integration
+  tests 覆盖。
+- 当前能力限制：HTTP submit 只保存 `UNKNOWN`，因此 M1 不能宣称某次回答真实使用或未使用辅助；S11/runtime
+  暴露追踪、M2 qualification/aggregation 与后续 Review 尚未实现。
 - 学习有效性 UNKNOWN：未来通过减少辅助后的迁移与后续表现验证；工程测试和一次 dogfooding 不证明普遍有效。
 
 ## 7. Delivery gate
@@ -119,13 +130,19 @@ Grammar Repair 继续用于真实使用后重复、高置信的问题。首次�
 | M5 | 扩展音频输入、听力理解与听说任务 | 保留相应辅助条件，不跨能力维度推断成功 |
 | M6 | 教学回归与实际使用验证 | 核对证据语义，记录迁移表现及样本局限 |
 
-`M1-S8T` 独立于 S8A–E，在 S9 前安排，保留既有 S9–S12 编号。首个实现前必须设计最小辅助记录合同，
-不能等到 M2 才尝试补推历史条件；记录不意味着 M1 提前实现长期聚合。
-咖啡店作为首个设计用例，具体发布材料与起始能力要求在 Current Slice Contract 中确认。
+`M1-S8T` 独立于 S8A–E，在 S9 前交付，保留既有 S9–S12 编号。实现按三个已批准 slice 完成：
 
-当前允许的后续动作是在完整 S8 收口后设计 S8T Current Slice Contract：明确材料、交互、
-API / schema impact、评价兼容性与验证，必要时拆分，再批准实现。现有 S8 的剩余 Gate 继续按原合同执行。
-本次批准不授权立即创建 schema、修改旧材料、启动课程引擎或扩充全语言课程。
+- S8T-A `Guided Material Contract`：COMPLETE (`71751f5`)；
+- S8T-B `Response Support Condition Persistence`：COMPLETE (`f2eefa6`)；
+- S8T-C `Guided Cafe Material Delivery`：implementation / Critical Review / external verification /
+  documentation PASS，未 commit。
+
+Fresh closeout evidence（2026-09-09）：S8T targeted unit 168/168；disposable PostgreSQL 18.6 empty schema
+Flyway V1–V14；Planner 7/7、Practice 35/35、Grounded Evaluator Reader 5/5 integration，共 47/47 PASS；
+临时容器已删除，primary database 未使用。2026-09-10 完整 S8T Ownership Check PASS：用户能够解释
+`TextStepKind` 与 `TextLearningPurpose` 的正交语义、`UNKNOWN` 与 `NOT_PROVIDED` 的证据差异、首次 response/support
+snapshot 不可覆盖、exact material version 的历史可重现性，以及单次 candidate 不直接修改长期状态；Understanding
+`UNDERSTOOD`，Human Touch `NOT_REQUIRED`。当前下一 Gate 是 S8T-C Commit Decision；不自动 commit 或开始 M1-S9。
 
 ## 8. Reference
 

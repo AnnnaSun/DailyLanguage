@@ -85,6 +85,27 @@ class BuiltInLearningMaterialCatalogTests {
     }
 
     @Test
+    void keepsCafeV1HistoricalButStillResolvableWhileOnlyV2IsPlannable() {
+        // 真实 pack：cafe v1 已转 HISTORICAL_ONLY，仍可按 exact identity 解析供既有 task 重放；
+        // 新 Planner 候选只剩 cafe v2 + greeting v1。
+        assertThat(catalog.findByIdentity(
+                new MaterialIdentity("en-builtin-cafe-request", "v1"), "zh-cn"))
+                .isInstanceOfSatisfying(MaterialQueryResult.Available.class,
+                        available -> assertThat(available.material().identity().publishedVersion())
+                                .isEqualTo("v1"));
+        assertThat(catalog.findByIdentity(
+                new MaterialIdentity("en-builtin-cafe-request", "v2"), "zh-cn"))
+                .isInstanceOfSatisfying(MaterialQueryResult.Available.class,
+                        available -> assertThat(available.material().identity().publishedVersion())
+                                .isEqualTo("v2"));
+        assertThat(catalog.listAvailable("en", "zh-cn"))
+                .extracting(AvailableMaterialSummary::identity)
+                .containsExactly(
+                        new MaterialIdentity("en-builtin-cafe-request", "v2"),
+                        new MaterialIdentity("en-builtin-greeting-intro", "v1"));
+    }
+
+    @Test
     void rejectsPackWithMultiplePlannableVersionsForSameMaterialId() {
         BuiltInMaterialPack loadedPack = new ClasspathBuiltInMaterialLoader().load();
         PublishedLearningMaterial v1 = loadedPack.materials().getFirst();

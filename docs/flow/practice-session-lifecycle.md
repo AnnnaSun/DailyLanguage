@@ -1,8 +1,8 @@
 # PracticeSession Lifecycle Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M1-S5 / M1-S6`
-- Last Verified: `2026-09-04`
+- Feature / Slice: `M1-S5 / M1-S6 / M1-S8T`
+- Last Verified: `2026-09-09`
 - Entry:
   - `POST /api/language-profiles/{languageProfileId}/learning-tasks/{taskId}/practice-sessions`
   - `PUT /api/language-profiles/{languageProfileId}/practice-sessions/{sessionId}/responses/{stepId}`
@@ -20,9 +20,11 @@ exact `materialId + publishedVersion` 为每个 material step 提交一条 respo
 
 - `PLANNED` Task 与唯一 `IN_PROGRESS` Session 的原子创建；
 - repeated / concurrent start 返回数据库中同一个 durable Session；
-- 每个 `(sessionId, stepId)` 只接受首次 learner text，相同 exact payload 可幂等重放，不同 payload 冲突；
+- 每个 `(sessionId, stepId)` 只接受首次 learner text 与四类 support-condition snapshot；相同 exact payload
+  可幂等重放，不同 payload 冲突，replay/conflict 不覆盖首次 snapshot；
 - learner text 原样保存，不 trim、不改大小写、不做 Unicode normalization；
-- start 时只下发 learner 练习所需的安全 material projection；
+- start 时只下发 learner 练习所需的安全 material projection；guided step additive 携带 `learningPurpose` 与
+  support-language instruction / responseFrame，legacy `PRACTICE` step 的 guided scaffold 为 null；
 - completion 根据 Task 保存的 exact material identity 取得完整 step 定义，要求每个 material step 都已有 response；
 - `EXACT` step 按 `strip → NFC → case-sensitive exact` 产生 `MATCHED / NOT_MATCHED`，`SEMANTIC_ONLY`
   只产生 `NOT_APPLICABLE`；
@@ -37,6 +39,8 @@ exact `materialId + publishedVersion` 为每个 material step 提交一条 respo
 - 不调用 LLM / Model Gateway，不生成 Evidence，不修改 Weakness、Level、Mastery 或 Learning Memory；
 - 不保存 Prompt、Credential、accepted answers、semantic rubric 或 Content lineage；
 - 不提供 response 修改、删除或覆盖语义。
+- 当前 HTTP submit 不接受客户端自报 support condition，四类 exposure 均显式保存 `UNKNOWN`；真实
+  `PROVIDED / OPENED / NOT_PROVIDED` capture、M2 qualification / aggregation 与 Review scheduling 不在本 Flow。
 
 ## 2. Main Call Chain
 
@@ -93,6 +97,7 @@ sequenceDiagram
             DB-->>SessionRepo: UUIDv7 IN_PROGRESS Session + durable reread
             SessionRepo-->>Service: PracticeSession
             Service-->>Controller: Created → 201 + Location + safe material projection
+            Note over Service,Controller: guided step includes learningPurpose + instruction/responseFrame<br/>legacy PRACTICE guidedScaffold = null
         end
     end
 ```
@@ -143,8 +148,9 @@ sequenceDiagram
     alt Session is no longer IN_PROGRESS
         Service-->>Controller: SessionNotAcceptingResponses → 409
     else locked IN_PROGRESS Session
-        Service->>SessionRepo: insertOwnedAcceptedResponse(..., userId, profileId)
-        SessionRepo->>DB: INSERT ... SELECT owned IN_PROGRESS Session ON CONFLICT DO NOTHING
+        Service->>Service: supportCondition = UNKNOWN x4
+        Service->>SessionRepo: insertOwnedAcceptedResponse(..., supportCondition, userId, profileId)
+        SessionRepo->>DB: INSERT text + four exposure values via owned IN_PROGRESS gate<br/>ON CONFLICT DO NOTHING
         alt first accepted response
             DB-->>SessionRepo: submittedAt
             Service-->>Controller: Accepted → 201
@@ -161,6 +167,11 @@ sequenceDiagram
         end
     end
 ```
+
+S8T-B 将 demonstration、explanation、hint、responseFrame 四类 exposure 作为 immutable
+`ResponseSupportCondition` 与 learner text 同行首次写入。Flyway V14 把 migration 前历史回填为 `UNKNOWN` 后移除
+column defaults，所有新 insert 必须显式提供四类值。当前 HTTP runtime 无法确认浏览器中的真实暴露，因此 Java
+明确写入四个 `UNKNOWN`；它不等于 `NOT_PROVIDED`，也不能作为无辅助成功证据。
 
 ### 2.3 Complete PracticeSession
 
@@ -246,11 +257,16 @@ step 创建一条 `deterministic_step_assessment`。这些结果只表示本次�
   wrong-owner 和 wrong-profile 均 fail closed。
 - Task 锁定的 `(materialId, publishedVersion)` 是练习材料 identity。start、submit 和首次 completion 都只解析 exact version，
   并复核 target/support language、difficulty、scenario 与 communication goal，不 fallback 到其他版本或语言。
+- cafe v2 是当前唯一 `PLANNABLE` 版本，v1 保持 immutable `HISTORICAL_ONLY` 且可按 exact identity 解析。
+  `TextLearningPurpose` 表达教学目的，`TextStepKind` 表达评价方式，两者正交；只有 `SCAFFOLDED_USE` 可以携带
+  答案性 responseFrame，`INDEPENDENT_TRANSFER` 必须没有该 frame。
 - PostgreSQL 是 Session/response/assessment identity、status、timestamp、uniqueness 和 durable constraint authority：
   `UNIQUE(task_id)` 保证一个 Task 最多一个 Session，`PRIMARY KEY(session_id, step_id)` 保证一个 step
   只保存首次 response，`deterministic_assessment.session_id` 主键保证一个 Session 只有一个 assessment。
 - response write 先锁定 owned Session row，再检查 `IN_PROGRESS` 并写入；数据库 insert gate 再次复核
   owner/profile/status，避免 terminal Session 接受迟到 response。
+- PostgreSQL V14 的 NOT NULL/CHECK 约束保证四类 support exposure 均来自 closed vocabulary；migration 前历史、
+  legacy constructor 与当前 HTTP submit 都保守解释为 `UNKNOWN`，而不是 `NOT_PROVIDED`。
 - learner text 是 private learning data，只能 owner-scoped 读取；HTTP success response 只返回
   `sessionId + stepId + submittedAt`，不回显 learner text。
 - start 的 material projection 不包含 `acceptedAnswers`、`semanticRubricReference`、Content lineage 或 ownership
@@ -311,7 +327,7 @@ lifecycle vocabulary，当前没有公开 transition。wrong answer 只改变 st
 | stepId 不属于 exact material | 404 | `PRACTICE_STEP_NOT_FOUND` | none |
 | exact material missing / inconsistent | 503 | `PRACTICE_MATERIAL_UNAVAILABLE` | none |
 | Session 已 terminal | 409 | `PRACTICE_SESSION_NOT_ACCEPTING_RESPONSES` | none |
-| first valid payload | 201 | success | one exact response |
+| first valid payload | 201 | success | one exact response + first support-condition snapshot |
 | same exact payload replay | 200 | success replay | none；返回首次 submittedAt |
 | same step、different payload | 409 | `PRACTICE_RESPONSE_CONFLICT` | none；首次 response 不变 |
 | unexpected database / infrastructure failure | generic 5xx | sanitized framework response | transaction rollback |
@@ -333,6 +349,18 @@ lifecycle vocabulary，当前没有公开 transition。wrong answer 只改变 st
 | assessment / step insert、Task transition 或 durable reread 失败 | generic 5xx | sanitized framework response | transaction rollback；不留下部分完成状态 |
 
 ## 6. Verification Evidence
+
+2026-09-09 S8T fresh closeout evidence：
+
+- targeted unit：Content material/loader/catalog、Planner、Practice Domain/Application/HTTP 与 Grounded Evaluator
+  Reader 共 168/168 PASS；
+- disposable PostgreSQL 18.6 empty schema：Flyway V1–V14 14/14 PASS；
+- affected integration：`LearningTaskPlanningIntegrationTests` 7/7、
+  `PracticeSessionPersistenceIntegrationTests` 35/35、
+  `GroundedEvaluationInputReaderIntegrationTests` 5/5，共 47/47 PASS，0 failures / 0 errors / 0 skipped；
+- `git diff --check` PASS；temporary container 已删除，primary database 未使用。
+
+以下是原 M1-S5 / M1-S6 baseline evidence：
 
 以下均为 2026-09-04 fresh 运行：
 
@@ -362,13 +390,19 @@ lifecycle vocabulary，当前没有公开 transition。wrong answer 只改变 st
 - `server/src/main/java/com/dailylanguage/planner/infrastructure/LearningTaskRepository.java`
 - `server/src/main/java/com/dailylanguage/content/domain/LearningMaterialCatalog.java`
 - `server/src/main/java/com/dailylanguage/content/domain/TextPracticeStep.java`
+- `server/src/main/java/com/dailylanguage/content/domain/TextLearningPurpose.java`
+- `server/src/main/java/com/dailylanguage/content/domain/GuidedStepScaffold.java`
+- `server/src/main/java/com/dailylanguage/content/domain/SupportScaffold.java`
 - `server/src/main/java/com/dailylanguage/content/infrastructure/BuiltInLearningMaterialCatalog.java`
 - `server/src/main/resources/mapper/PracticeSessionMapper.xml`
 - `server/src/main/resources/db/migration/V9__add_practice_session.sql`
 - `server/src/main/resources/db/migration/V10__add_deterministic_assessment.sql`
+- `server/src/main/resources/db/migration/V14__add_practice_response_support_condition.sql`
+- `server/src/main/resources/content/builtin/materials/en-builtin-cafe-request/v2.json`
 - `server/src/test/java/com/dailylanguage/practice/domain/DeterministicAssessmentTests.java`
 - `server/src/test/java/com/dailylanguage/practice/domain/DeterministicTextAssessmentPolicyTests.java`
 - `server/src/test/java/com/dailylanguage/practice/domain/PracticeSessionTests.java`
 - `server/src/test/java/com/dailylanguage/practice/application/PracticeSessionApplicationServiceTests.java`
 - `server/src/test/java/com/dailylanguage/practice/api/PracticeSessionControllerTests.java`
 - `server/src/test/java/com/dailylanguage/practice/infrastructure/PracticeSessionPersistenceIntegrationTests.java`
+- `server/src/test/java/com/dailylanguage/evaluator/application/GroundedEvaluationInputReaderIntegrationTests.java`

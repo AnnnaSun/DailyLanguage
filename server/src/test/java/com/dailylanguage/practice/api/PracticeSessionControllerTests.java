@@ -146,11 +146,37 @@ class PracticeSessionControllerTests {
                 .andExpect(jsonPath("$.material.steps[0].stepId").value("order-drink"))
                 .andExpect(jsonPath("$.material.steps[0].kind").value("EXACT"))
                 .andExpect(jsonPath("$.material.steps[0].prompt").value("Order a medium coffee politely."))
+                // additive 字段：legacy PRACTICE step 显式下发 purpose，guidedScaffold 为 null。
+                .andExpect(jsonPath("$.material.steps[0].learningPurpose").value("PRACTICE"))
+                .andExpect(jsonPath("$.material.steps[0].guidedScaffold").value(nullValue()))
                 // 安全 projection：不下发 ownership identity、accepted answers 或 rubric 引用。
                 .andExpect(jsonPath("$.userId").doesNotExist())
                 .andExpect(jsonPath("$.material.semanticRubricReference").doesNotExist())
                 .andExpect(jsonPath("$.material.sourceLineage").doesNotExist())
                 .andExpect(jsonPath("$.material.steps[0].acceptedAnswers").doesNotExist());
+    }
+
+    @Test
+    void createdStartReturnsGuidedProjectionWithStepScaffoldAndFrame() throws Exception {
+        when(practiceSessionApplicationService.start(eq(PROFILE_ID), eq(TASK_ID), any(UserContext.class)))
+                .thenReturn(new StartResult.Created(inProgressSession(), guidedCafeMaterialView()));
+
+        mockMvc.perform(authenticatedStartPost())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.material.publishedVersion").value("v2"))
+                .andExpect(jsonPath("$.material.steps[0].learningPurpose").value("COMPREHENSION_CHECK"))
+                .andExpect(jsonPath("$.material.steps[0].guidedScaffold.instruction")
+                        .value("阅读对话，回答顾客点了什么。"))
+                .andExpect(jsonPath("$.material.steps[0].guidedScaffold.responseFrame").value(nullValue()))
+                .andExpect(jsonPath("$.material.steps[1].learningPurpose").value("SCAFFOLDED_USE"))
+                .andExpect(jsonPath("$.material.steps[1].guidedScaffold.responseFrame")
+                        .value("Could I have ___, please?"))
+                .andExpect(jsonPath("$.material.steps[2].learningPurpose").value("INDEPENDENT_TRANSFER"))
+                .andExpect(jsonPath("$.material.steps[2].guidedScaffold.responseFrame").value(nullValue()))
+                // 评分字段在任何 step 上都不出现。
+                .andExpect(jsonPath("$.material.steps[0].acceptedAnswers").doesNotExist())
+                .andExpect(jsonPath("$.material.steps[1].acceptedAnswers").doesNotExist())
+                .andExpect(jsonPath("$.material.steps[2].acceptedAnswers").doesNotExist());
     }
 
     @Test
@@ -500,6 +526,38 @@ class PracticeSessionControllerTests {
                 "提示",
                 "对比提示",
                 List.of(new PracticeMaterialView.StepView(
-                        "order-drink", "EXACT", "Order a medium coffee politely.")));
+                        "order-drink", "EXACT", "PRACTICE", "Order a medium coffee politely.", null)));
+    }
+
+    private static PracticeMaterialView guidedCafeMaterialView() {
+        return new PracticeMaterialView(
+                "en-builtin-cafe-request",
+                "v2",
+                "en",
+                "zh-cn",
+                "CAFE_SIMPLE_REQUEST",
+                "Understand a modeled cafe order, use the frame with support, then order freely.",
+                "You are at a coffee shop.",
+                null,
+                "guided 中文总指令",
+                "场景解释",
+                "提示",
+                null,
+                List.of(
+                        new PracticeMaterialView.StepView(
+                                "comprehension-check", "EXACT", "COMPREHENSION_CHECK",
+                                "What does the customer order?",
+                                new PracticeMaterialView.GuidedScaffoldView(
+                                        "阅读对话，回答顾客点了什么。", null)),
+                        new PracticeMaterialView.StepView(
+                                "order-with-frame", "EXACT", "SCAFFOLDED_USE",
+                                "Order a medium coffee using the frame.",
+                                new PracticeMaterialView.GuidedScaffoldView(
+                                        "用句型框架点一杯 medium coffee。", "Could I have ___, please?")),
+                        new PracticeMaterialView.StepView(
+                                "order-water-freely", "SEMANTIC_ONLY", "INDEPENDENT_TRANSFER",
+                                "Order a bottle of water in your own words.",
+                                new PracticeMaterialView.GuidedScaffoldView(
+                                        "不用框架，用自己的话点一瓶水。", null))));
     }
 }

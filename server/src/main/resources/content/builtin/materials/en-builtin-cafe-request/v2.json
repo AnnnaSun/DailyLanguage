@@ -1,0 +1,74 @@
+{
+  "materialId": "en-builtin-cafe-request",
+  "publishedVersion": "v2",
+  "targetCore": {
+    "targetLanguage": "en",
+    "difficulty": "FOUNDATION",
+    "scenario": "CAFE_SIMPLE_REQUEST",
+    "communicationObjective": "Understand a modeled cafe order, use the polite request frame with support, then order something new on your own.",
+    "targetLanguageText": "You are at a coffee shop. The barista looks up and asks: \"Hi there! What can I get for you?\" The customer replies: \"Could I have a medium coffee, please?\" The barista says: \"Sure, one medium coffee coming up!\"",
+    "readingInfo": null,
+    "steps": [
+      {
+        "stepId": "comprehension-check",
+        "kind": "EXACT",
+        "learningPurpose": "COMPREHENSION_CHECK",
+        "prompt": "Read the dialogue above. What does the customer order?",
+        "acceptedAnswers": [
+          "A medium coffee.",
+          "A medium coffee",
+          "Medium coffee.",
+          "Medium coffee",
+          "One medium coffee.",
+          "One medium coffee"
+        ]
+      },
+      {
+        "stepId": "order-with-frame",
+        "kind": "EXACT",
+        "learningPurpose": "SCAFFOLDED_USE",
+        "prompt": "Now it is your turn. Order a medium coffee using the frame below.",
+        "acceptedAnswers": [
+          "Could I have a medium coffee, please?",
+          "Could I get a medium coffee, please?",
+          "Can I have a medium coffee, please?",
+          "Could I have one medium coffee, please?"
+        ]
+      },
+      {
+        "stepId": "order-water-freely",
+        "kind": "SEMANTIC_ONLY",
+        "learningPurpose": "INDEPENDENT_TRANSFER",
+        "prompt": "This time you want a bottle of water instead. Order it in your own words — no frame this time.",
+        "acceptedAnswers": []
+      }
+    ],
+    "semanticRubricReference": "builtin-text-communication-rubric/v1"
+  },
+  "supportScaffolds": [
+    {
+      "supportLanguage": "zh-cn",
+      "instruction": "先读懂上面的示范对话，然后借助句型框架自己点单，最后不用任何辅助、用自己的话完成一次新的点单。前两步有标准答案，第三步请自由作答。",
+      "explanation": "场景：你在咖啡店。顾客用 Could I have ..., please? 礼貌地点了一杯中杯咖啡——这是英语里最常用、最安全的点单句型之一，理解它并能在帮助下使用，是这个练习的教学目标。",
+      "hint": "点单用 Could I have ... / Can I have ... / I'd like ...，句尾加 please 更礼貌；\"一瓶水\"是 a bottle of water。",
+      "contrastiveNote": "英语点单不需要中文里常见的客气铺垫（如\"不好意思，麻烦一下\"），一句 Could I have ..., please? 已经足够礼貌；需要引起注意时先说 Excuse me 即可。",
+      "guidedSteps": [
+        {
+          "stepId": "comprehension-check",
+          "instruction": "阅读上面的对话，回答：顾客点了什么？",
+          "responseFrame": null
+        },
+        {
+          "stepId": "order-with-frame",
+          "instruction": "用下面的句型框架，自己点一杯 medium coffee。",
+          "responseFrame": "Could I have ___, please?"
+        },
+        {
+          "stepId": "order-water-freely",
+          "instruction": "这次你想买一瓶水。不用句型框架，用自己的话完成点单。",
+          "responseFrame": null
+        }
+      ]
+    }
+  ]
+}

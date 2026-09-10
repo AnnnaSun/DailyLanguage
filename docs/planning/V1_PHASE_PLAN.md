@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.6
 > Approved: 2026-08-20  
-> Last updated: 2026-09-09 — M1-S8E-API documentation closeout
+> Last updated: 2026-09-10 — M1-S8T documentation closeout
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -151,16 +151,17 @@ integration、failure invariant 与完整 slices 见
 | M1-S5 | PracticeSession lifecycle | COMPLETE (`b6cde9d`) — Review / PostgreSQL-Flyway-Integration verification PASS；Ownership `UNDERSTOOD` |
 | M1-S6 | Deterministic completion / assessment | COMPLETE (`82aced2`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS |
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
-| M1-S8 | Evaluator ModelCallJob integration | READY_TO_COMMIT — S8A COMPLETE (`226b804`)；S8B COMPLETE (`2d46df6`)；S8C COMPLETE (`de29ada`)；S8D COMPLETE (`8228d64`)；S8E-R COMPLETE (`bf02aed`)；S8E-API implementation/review/external/docs/ownership PASS，未 commit |
-| M1-S8T | Minimum guided text learning | PLANNED — 在完整 M1-S8 后、M1-S9 前；交付范围已批准，Current Slice Contract 未批准 |
+| M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
+| M1-S8T | Minimum guided text learning | READY_TO_COMMIT — S8T-A COMPLETE (`71751f5`)；S8T-B COMPLETE (`f2eefa6`)；S8T-C implementation/review/external/docs/ownership PASS，未 commit |
 | M1-S9 | Optional Planner enrichment | SCOPE_NOT_APPROVED |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
 
 2026-09-07 批准的教学增量见 [`GUIDED_LANGUAGE_LEARNING.md`](../features/GUIDED_LANGUAGE_LEARNING.md)。
-`M1-S8T` 是独立教学 slice 标识，不属于 S8A–E，也不重编号既有 S9–S12。
-S8T 先明确最小材料、交互与辅助条件记录合同，避免 M2 无法解释历史表现；长期聚合仍在 M2。
+`M1-S8T` 是独立教学 slice 标识，不属于 S8A–E，也不重编号既有 S9–S12。S8T 已按三个批准的
+implementation slice 交付 guided material contract、response support-condition persistence 与首个 cafe v2；
+长期 qualification / aggregation 仍在 M2。
 M1-S11 同时承接该场景的最小可用界面，M4 才补齐完整学习选择与迁移体验。
 如实现超过认知预算，在 Current Slice Contract 阶段拆成可 Review 子 slice，不一次实现整个教学体系。
 
@@ -291,7 +292,31 @@ evaluator integration 31/31 PASS；临时容器已删除，primary database 未�
 recovery、SSE/WebSocket 与 M2 qualification 未实现。2026-09-09 完整 S8 Ownership Check PASS：用户能够区分
 `ModelCallJob` 的 execution/consumption 状态与 `EvaluationRun` 业务 outcome，并正确解释 Provider execution
 成功仍可能因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`。Understanding `UNDERSTOOD`，
-Human Touch `NOT_REQUIRED`；当前 Gate 为 M1-S8 `READY_TO_COMMIT`。
+Human Touch `NOT_REQUIRED`；M1-S8 已 merged to main as `7776111`。
+
+M1-S8T-A `Guided Material Contract` 已提交为 `71751f5`：`TextLearningPurpose` 与 evaluation `kind` 正交，
+`SupportScaffold.guidedSteps` 按 step 提供 instruction / responseFrame；legacy artifact 缺失新字段时分别解释为
+`PRACTICE` 与空 guided steps。Loader fail closed 校验 guided step 完整对应 target step、stepId 唯一，且只有
+`SCAFFOLDED_USE` 可以携带答案性 responseFrame。
+
+M1-S8T-B `Response Support Condition Persistence` 已提交为 `f2eefa6`：每条首次接受的 learner response 与
+demonstration / explanation / hint / responseFrame 四类 exposure snapshot 同行、同事务写入；状态 vocabulary 为
+`UNKNOWN / NOT_PROVIDED / PROVIDED / OPENED`。Flyway V14 将 migration 前历史回填 `UNKNOWN` 后移除 default，
+要求新写入显式提供全部值；replay/conflict 不覆盖首次 snapshot。当前 HTTP submit 不接受客户端自报条件，
+因此显式写 `UNKNOWN`。
+
+M1-S8T-C `Guided Cafe Material Delivery` 已发布 `en-builtin-cafe-request/v2`，并将 v1 保留为
+`HISTORICAL_ONLY`、v2 设为唯一 `PLANNABLE`。v2 顺序为理解检查、句型辅助使用与无 responseFrame 的独立迁移；
+Practice start additive 下发 `learningPurpose` 与 guided scaffold，不暴露 accepted answers / rubric / lineage；
+legacy `PRACTICE` step 的 guided scaffold 为 null。该 slice implementation、Critical/delta Review、external
+verification 与 documentation PASS，未 commit。
+
+2026-09-09 fresh closeout evidence：targeted unit 168/168；disposable PostgreSQL 18.6 empty schema Flyway
+V1–V14 14/14；LearningTaskPlanning 7/7、PracticeSession 35/35、GroundedEvaluationInputReader 5/5，共
+47/47 integration PASS；临时容器已删除，primary database 未使用。2026-09-10 完整 S8T Ownership Check PASS：
+Understanding `UNDERSTOOD`，Human Touch `NOT_REQUIRED`；用户能够解释 learning purpose / evaluation kind、
+support-condition evidence、immutable response snapshot、exact-version history 与长期状态 authority 边界。
+当前 Gate 为 S8T-C `READY_TO_COMMIT`，等待用户 Commit Decision，不自动开始 M1-S9。
 
 ### M2 — Persistent Adaptation Loop
 

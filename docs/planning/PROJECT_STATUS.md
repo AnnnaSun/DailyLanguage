@@ -1,10 +1,11 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-09
+> Last updated: 2026-09-10
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S8 READY_TO_COMMIT
-> Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
-> Current candidate: M1-S8E-API；implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation PASS；未 commit
+> Current Gate: M1-S8T READY_TO_COMMIT
+> Production baseline: M1-S8T-B COMPLETE (`f2eefa6`)
+> Current candidate: M1-S8T-C；implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation /
+> Ownership PASS；未 commit
 
 ## Approved Decisions
 
@@ -12,7 +13,8 @@
   Phase Plan 为 v1.6。完整 M1-S8 后、S9 前增加 `M1-S8T` 最小文本教学，包含必要辅助条件记录，
   S11 承接最小 UX；M2 聚合适应、M3 内容生产、M4 完整迁移复习、M5 音频、M6 验证。
   详细设计见 `docs/features/GUIDED_LANGUAGE_LEARNING.md`；Phase exit criteria 已更新。
-  S8T 为 `PLANNED / CONTRACT_NOT_APPROVED`，本次未实现；该 Scope Decision 不改变 M1-S8 Contract。
+  S8T 后续已批准拆分为 S8T-A Guided Material Contract、S8T-B Response Support Condition Persistence、
+  S8T-C Guided Cafe Material Delivery；三者 implementation 与 Critical Review 均已完成，整体 Ownership PASS。
 
 - M1-S8 整体设计方向 D1–D4、S8A–S8D 与 S8E Current Slice Contract 已批准：显式触发可选 evaluation、Run / Job 原子关联后
   在事务外 dispatch、业务 outcome 与 Job consumption 原子完成、首版限制重复评估并区分迟到与 expiry。
@@ -21,6 +23,8 @@
   Current Slice Contract 已批准并完成 implementation、Critical Review、external verification 与 documentation。
 - M1-S8 Ownership 节奏已批准：每个子 slice 保留 Critical Review 与相关验证；S8A 不单独 Explain Back，
   S8B–S8E 只在关键事务或并发边界存在理解缺口时简短确认；正式 Ownership Check 留到 S8 完整闭环完成。
+- M1-S8T Ownership 节奏已批准：S8T-A/B/C 分别完成 Critical/delta Review 与相关验证，不逐 slice 执行
+  Explain Back；三部分全部实现并完成文档收口后执行一次完整 S8T Ownership Check。
 - M1-S8A 已完成 implementation、Critical / delta Review 与适用验证：新增 owner-scoped Reader，零写入、无新
   schema / API / Model 调用；Codex unit regression 73/73 PASS；正常配置下 Reader integration 5/5 与 S7
   integration 3/3 PASS（0 failures / 0 errors / 0 skipped），disposable PostgreSQL 18.6 empty schema Flyway
@@ -311,21 +315,22 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S8 READY_TO_COMMIT
+Gate: M1-S8T READY_TO_COMMIT
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
-Behavior Flow: CURRENT (`docs/flow/evaluation-api-orchestration.md`；S8A–S8E-R flows remain current)
+Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`；
+  `docs/flow/grounded-semantic-validation.md`；S8 evaluator flows remain current)
 M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
 M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
 S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database integration 3 SKIPPED because
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
-Compose infrastructure: S8E-API disposable PostgreSQL removed after verification
-Documentation reconciliation: COMPLETE for M1-S8E-API
-Primary local database: NOT USED for S8E-API verification；current migration level not rechecked
+Compose infrastructure: S8T disposable PostgreSQL removed after verification
+Documentation reconciliation: COMPLETE for M1-S8T
+Primary local database: NOT USED for S8T verification；current migration level not rechecked
 M0 integrated closeout: PASS
-Production baseline: M1-S8E-R COMPLETE (`bf02aed`)
+Production baseline: M1-S8T-B COMPLETE (`f2eefa6`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -434,7 +439,7 @@ M1-S8E-R findings: NONE BLOCKING
 M1-S8E-R Behavior Flow: CURRENT (`docs/flow/evaluation-result-consumption.md`)
 M1-S8E-R standalone Ownership Check: NOT_REQUIRED by approved cadence；formal check deferred to completed S8 loop
 M1-S8E-API Current Slice Contract: APPROVED
-M1-S8E-API implementation / Critical Diff Review / Architecture: PASS；uncommitted
+M1-S8E-API implementation / Critical Diff Review / Architecture: PASS；merged to main in `7776111`
 M1-S8E-API local verification: PASS — targeted 45 discovered / 43 executed / 2 database-conditional skipped；full server
   727 tests / 0 failures / 0 errors / 162 environment-conditional skips（实际执行 565）；git diff --check PASS
 M1-S8E-API external verification: PASS (2026-09-09) — disposable PostgreSQL 18.6；empty schema Flyway V1–V13
@@ -448,19 +453,41 @@ M1-S8 full-loop Ownership Check: PASS (2026-09-09) — Understanding `UNDERSTOOD
   `SUCCEEDED + CONSUMED` 仍可因 Java grounding rejection 形成 Run `FAILED + GROUNDING_REJECTED`；Human Touch
   `NOT_REQUIRED`
 M1-S8 deferred scope: scheduler / automatic retry / legacy CREATED-RUNNING recovery / SSE-WebSocket NOT_IMPLEMENTED
+M1-S8 integration / merge: COMPLETE (`7776111` on main)
+M1-S8T-A Current Slice Contract: APPROVED
+M1-S8T-A Guided Material Contract: COMPLETE (`71751f5`)；Critical / delta Review PASS
+M1-S8T-B Current Slice Contract: APPROVED
+M1-S8T-B Response Support Condition Persistence: COMPLETE (`f2eefa6`)；Critical / delta Review PASS
+M1-S8T-C Current Slice Contract: APPROVED
+M1-S8T-C Guided Cafe Material Delivery: implementation / Critical / delta Review PASS；uncommitted
+M1-S8T-C finding: CLOSED — v2 `communicationObjective` fixture exact match
+M1-S8T affected regression finding: CLOSED — Grounded Evaluator Reader integration fixture migrated from v1 step ids
+M1-S8T fresh local verification: PASS (2026-09-09) — targeted unit 168/168；`git diff --check` PASS
+M1-S8T fresh external verification: PASS (2026-09-09) — disposable PostgreSQL 18.6；empty schema Flyway V1–V14
+  14/14；LearningTaskPlanning 7/7 + PracticeSession 35/35 + GroundedEvaluationInputReader 5/5 = 47/47；
+  0 failures / 0 errors / 0 skipped；temporary container deleted；primary database not used
+M1-S8T Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`；
+  `docs/flow/grounded-semantic-validation.md`)
+M1-S8T full-loop Ownership Check: PASS (2026-09-10) — Understanding `UNDERSTOOD`；用户能够解释
+  learning purpose / evaluation kind、support-condition evidence、immutable snapshot、exact-version history 与
+  single-candidate / long-term-state authority 边界；Human Touch `NOT_REQUIRED`
+M1-S8T deferred scope: actual support exposure capture、M2 qualification/aggregation、S11 UX、Review scheduling
+  NOT_IMPLEMENTED
 M1-S9+ implementation scope: NOT_APPROVED
 ```
 
 ## Next Action
 
-用户执行 S8E-API Commit Decision。M1-S8 implementation、Critical Review、external verification、documentation
-与完整 Ownership 均已收口为 `READY_TO_COMMIT`；不自动 commit、push、merge 或开始 M1-S8T。
+用户执行 S8T-C Commit Decision。S8T-A/B 已提交，S8T-C implementation、Critical/delta Review、external
+verification、documentation 与完整 S8T Ownership 均已收口为 `READY_TO_COMMIT`。不自动 commit、push、merge
+或开始 M1-S9。
 
 ## Blockers
 
-M1-S8E-API 无剩余 Code Review / Verification / Documentation / Ownership blocker，当前只剩 Commit Decision。
-S8E-API external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema 与完整 S8 evaluator
-integration；临时容器已删除，未将 primary database 作为测试目标。
+M1-S8T 无剩余 Code Review / Verification / Documentation / Ownership blocker；当前只剩 S8T-C Commit Decision。
+S8T external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema Flyway V1–V14，以及 Planner、
+Practice 与 Grounded Evaluator Reader 的 47 项 integration regression；临时容器已删除，未将 primary database
+作为测试目标。
 M1-S7 baseline external verification 使用 disposable
 PostgreSQL 18.6 empty database，未修改 primary database；临时容器已停止。source extraction 按用户要求没有重跑
 外部验证。本次没有执行 `Flyway repair` 或直接修改
