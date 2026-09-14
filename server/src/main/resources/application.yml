@@ -27,6 +27,8 @@ app:
   planner:
     enrichment:
       result-ttl: ${PLANNER_ENRICHMENT_RESULT_TTL:5m}
+      interactive-wait: ${PLANNER_ENRICHMENT_INTERACTIVE_WAIT:2s}
+      poll-interval: ${PLANNER_ENRICHMENT_POLL_INTERVAL:50ms}
   security:
     password-hashing:
       max-concurrent: ${PASSWORD_HASH_MAX_CONCURRENT:1}

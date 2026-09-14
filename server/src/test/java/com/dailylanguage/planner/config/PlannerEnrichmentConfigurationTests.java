@@ -28,6 +28,70 @@ class PlannerEnrichmentConfigurationTests {
     }
 
     @Test
+    void bindsDefaultInteractiveWaitAndPollIntervalFromClasspathConfiguration() {
+        contextRunner.run(context -> {
+            assertThat(context).hasNotFailed().hasSingleBean(PlannerEnrichmentProperties.class);
+
+            PlannerEnrichmentProperties properties = context.getBean(PlannerEnrichmentProperties.class);
+            // S9 dossier 批准的等待循环默认：interactive 2s、poll 50ms；
+            // 与 Gateway execution timeout 语义分离。
+            assertThat(properties.interactiveWait()).isEqualTo(Duration.ofSeconds(2));
+            assertThat(properties.pollInterval()).isEqualTo(Duration.ofMillis(50));
+        });
+    }
+
+    @Test
+    void overridesInteractiveWaitAndPollIntervalFromProperty() {
+        contextRunner
+                .withPropertyValues(
+                        "app.planner.enrichment.interactive-wait=25s",
+                        "app.planner.enrichment.poll-interval=5s")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+
+                    PlannerEnrichmentProperties properties =
+                            context.getBean(PlannerEnrichmentProperties.class);
+                    assertThat(properties.interactiveWait()).isEqualTo(Duration.ofSeconds(25));
+                    assertThat(properties.pollInterval()).isEqualTo(Duration.ofSeconds(5));
+                });
+    }
+
+    @Test
+    void rejectsPollIntervalExceedingInteractiveWait() {
+        contextRunner
+                .withPropertyValues(
+                        "app.planner.enrichment.interactive-wait=1s",
+                        "app.planner.enrichment.poll-interval=2s")
+                .run(context -> assertThat(context).hasFailed());
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ofMinutes(5), Duration.ofSeconds(1), Duration.ofSeconds(2)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pollInterval must not exceed interactiveWait");
+    }
+
+    @Test
+    void rejectsNonPositiveInteractiveWaitOrPollIntervalAtBinding() {
+        contextRunner
+                .withPropertyValues("app.planner.enrichment.interactive-wait=0s")
+                .run(context -> assertThat(context).hasFailed());
+        contextRunner
+                .withPropertyValues("app.planner.enrichment.poll-interval=-1s")
+                .run(context -> assertThat(context).hasFailed());
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ofMinutes(5), Duration.ZERO, Duration.ofSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("interactiveWait must be positive");
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ofMinutes(5), Duration.ofSeconds(1), Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pollInterval must be positive");
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ofMinutes(5), null, Duration.ofSeconds(1)))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("interactiveWait must not be null");
+    }
+
+    @Test
     void overridesResultTtlFromProperty() {
         contextRunner
                 .withPropertyValues("app.planner.enrichment.result-ttl=42s")
@@ -51,13 +115,16 @@ class PlannerEnrichmentConfigurationTests {
 
     @Test
     void rejectsNonPositiveResultTtlOnDirectConstruction() {
-        assertThatThrownBy(() -> new PlannerEnrichmentProperties(null))
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                null, Duration.ofSeconds(10), Duration.ofSeconds(1)))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("resultTtl must not be null");
-        assertThatThrownBy(() -> new PlannerEnrichmentProperties(Duration.ZERO))
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ZERO, Duration.ofSeconds(10), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("resultTtl must be positive");
-        assertThatThrownBy(() -> new PlannerEnrichmentProperties(Duration.ofSeconds(-1)))
+        assertThatThrownBy(() -> new PlannerEnrichmentProperties(
+                Duration.ofSeconds(-1), Duration.ofSeconds(10), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("resultTtl must be positive");
     }

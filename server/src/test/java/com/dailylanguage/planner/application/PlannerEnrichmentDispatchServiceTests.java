@@ -77,7 +77,7 @@ class PlannerEnrichmentDispatchServiceTests {
     private final TextGenerationJobDispatch jobDispatch = mock(TextGenerationJobDispatch.class);
     private final PlannerEnrichmentDispatchService service = new PlannerEnrichmentDispatchService(
             requestFactory, runCreationService, jobDispatch,
-            new PlannerEnrichmentProperties(RESULT_TTL));
+            new PlannerEnrichmentProperties(RESULT_TTL, Duration.ofSeconds(30), Duration.ofSeconds(1)));
 
     @Test
     void nullArgumentsAreProgrammingErrors() {

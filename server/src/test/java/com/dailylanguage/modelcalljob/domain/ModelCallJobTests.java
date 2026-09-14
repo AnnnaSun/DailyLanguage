@@ -1,5 +1,6 @@
 package com.dailylanguage.modelcalljob.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -17,6 +18,19 @@ import com.dailylanguage.modelgateway.routing.ModelPurpose;
 import com.dailylanguage.modelgateway.routing.ProviderId;
 
 class ModelCallJobTests {
+
+    @Test
+    void executionStatusTerminalPartitionIsPublicAndClosed() {
+        // S9E1 起 isTerminal 是跨 module 的公开判断：只有 CREATED / RUNNING 可继续等待，
+        // 其余（含 SUBMISSION_REJECTED）全部 terminal。
+        assertThat(ModelCallJob.ExecutionStatus.CREATED.isTerminal()).isFalse();
+        assertThat(ModelCallJob.ExecutionStatus.RUNNING.isTerminal()).isFalse();
+        assertThat(ModelCallJob.ExecutionStatus.SUCCEEDED.isTerminal()).isTrue();
+        assertThat(ModelCallJob.ExecutionStatus.FAILED.isTerminal()).isTrue();
+        assertThat(ModelCallJob.ExecutionStatus.TIMED_OUT.isTerminal()).isTrue();
+        assertThat(ModelCallJob.ExecutionStatus.OUTCOME_UNKNOWN.isTerminal()).isTrue();
+        assertThat(ModelCallJob.ExecutionStatus.SUBMISSION_REJECTED.isTerminal()).isTrue();
+    }
 
     @Test
     void rejectsPartialRouteBeforePersistence() {
