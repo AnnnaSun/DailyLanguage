@@ -85,7 +85,13 @@ class TextGenerationGatewayConfigurationTests {
             assertThat(evaluationRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
             assertThat(evaluationRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
             assertThat(evaluationRoute.adapter()).isSameAs(conversationRoute.adapter());
-            assertThat(routes.findRoute(ModelPurpose.PLANNING)).isEmpty();
+            // S9D 新增的 fixed PLANNING route：默认 deepseek / deepseek-v4-flash / 30s。
+            TextGenerationRoute planningRoute = routes.findRoute(ModelPurpose.PLANNING)
+                    .orElseThrow();
+            assertThat(planningRoute.providerId()).isEqualTo(new ProviderId("deepseek"));
+            assertThat(planningRoute.modelId()).isEqualTo(new ModelId("deepseek-v4-flash"));
+            assertThat(planningRoute.executionTimeout()).isEqualTo(Duration.ofSeconds(30));
+            assertThat(planningRoute.adapter()).isSameAs(conversationRoute.adapter());
 
             HttpClient httpClient = context.getBean(
                     TextGenerationGatewayConfiguration.MODEL_PROVIDER_HTTP_CLIENT,
@@ -142,9 +148,10 @@ class TextGenerationGatewayConfigurationTests {
     void unconfiguredPurposeReturnsCapabilityUnavailableWithoutSubmittingProviderCall() {
         contextRunner.run(context -> {
             TextGenerationPort port = context.getBean(TextGenerationPort.class);
+            // PLANNING 自 S9D 起有 fixed route；用仍无 route 的 CONTENT_DESIGN 验证未配置 purpose。
             TextGenerationRequest request = new TextGenerationRequest(
-                    ModelPurpose.PLANNING,
-                    List.of(new TextMessage(TextMessage.Role.USER, "Plan today's practice.")),
+                    ModelPurpose.CONTENT_DESIGN,
+                    List.of(new TextMessage(TextMessage.Role.USER, "Design today's reading material.")),
                     TextOutputSpecification.plainText());
             TransientProviderCredential credential = new TransientProviderCredential(
                     new ProviderId("deepseek"),
