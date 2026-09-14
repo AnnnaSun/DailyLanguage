@@ -101,7 +101,7 @@ class PlanningRunCreationIntegrationTests {
         PlanningRun run = created.run();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",
-                String.class)).isEqualTo("16");
+                String.class)).isEqualTo("17");
         assertThat(run.id().version()).isEqualTo(7);
         assertThat(run.userId()).isEqualTo(ownerId);
         assertThat(run.languageProfileId()).isEqualTo(profile.id());

@@ -21,6 +21,13 @@ interface PlanningRunMapper {
             @Param("trustedUserId") UUID trustedUserId,
             @Param("languageProfileId") UUID languageProfileId);
 
+    StoredPlanningRun findOwnedForUpdate(
+            @Param("planningRunId") UUID planningRunId,
+            @Param("trustedUserId") UUID trustedUserId,
+            @Param("languageProfileId") UUID languageProfileId);
+
+    StoredPlanningRun tryFinalizeOwnedAndReturn(FinalizePlanningRunRow finalize);
+
     List<StoredPlanningRunCandidate> findOwnedCandidates(
             @Param("planningRunId") UUID planningRunId,
             @Param("trustedUserId") UUID trustedUserId,

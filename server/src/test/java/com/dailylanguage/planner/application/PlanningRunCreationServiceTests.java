@@ -258,6 +258,8 @@ class PlanningRunCreationServiceTests {
                 PlanningRunCreationService.WORKFLOW_VERSION,
                 0L,
                 CREATED_AT,
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 }

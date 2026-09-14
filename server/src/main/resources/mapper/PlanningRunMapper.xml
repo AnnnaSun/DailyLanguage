@@ -24,6 +24,10 @@
             <arg column="row_version" javaType="_long"/>
             <arg column="created_at" javaType="java.time.OffsetDateTime"/>
             <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="learning_task_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="fallback_reason" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -38,7 +42,8 @@
 
     <sql id="runColumns">
         run.id, run.user_id, run.language_profile_id, run.model_call_job_id, run.status,
-        run.workflow_version, run.row_version, run.created_at, run.completed_at
+        run.workflow_version, run.row_version, run.created_at, run.completed_at,
+        run.learning_task_id, run.fallback_reason
     </sql>
 
     <select id="nextRunId" resultType="java.util.UUID">
@@ -74,7 +79,50 @@
           AND job.consumption_status = 'NOT_READY'
           AND job.row_version = 0
         RETURNING id, user_id, language_profile_id, model_call_job_id, status,
-                  workflow_version, row_version, created_at, completed_at
+                  workflow_version, row_version, created_at, completed_at,
+                  learning_task_id, fallback_reason
+    </select>
+
+    <!-- 只锁定 planning_run 行：消费串行化点，后到者在提交后读取 terminal outcome；
+         wrong owner/profile 不可见（零行）。 -->
+    <select id="findOwnedForUpdate" resultMap="storedPlanningRunResult">
+        SELECT <include refid="runColumns"/>
+        FROM planning_run run
+        WHERE run.id = #{planningRunId, jdbcType=OTHER}
+          AND run.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND run.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        FOR UPDATE OF run
+    </select>
+
+    <!-- PENDING → terminal 的 CAS：status 与 row_version guard 由数据库原子裁决，并核对绑定
+         task 属于同一 owner/profile 且 planningReason 与目标 status 配对
+         （MODEL_APPLIED → MODEL_ENRICHED；FALLBACK_APPLIED → DETERMINISTIC_BUILT_IN_FALLBACK）。
+         FALLBACK_APPLIED 原子推进 workflow_version。零行由调用方以异常 fail closed，
+         与外层事务一起回滚，保证 outcome 与 task 绑定原子提交。 -->
+    <select id="tryFinalizeOwnedAndReturn" resultMap="storedPlanningRunResult" affectData="true" flushCache="true">
+        UPDATE planning_run run
+        SET status = #{status, jdbcType=VARCHAR},
+            learning_task_id = #{learningTaskId, jdbcType=OTHER},
+            fallback_reason = #{fallbackReason, jdbcType=VARCHAR},
+            completed_at = CURRENT_TIMESTAMP,
+            row_version = row_version + 1,
+            workflow_version = CASE WHEN #{status, jdbcType=VARCHAR} = 'FALLBACK_APPLIED'
+                THEN workflow_version + 1 ELSE workflow_version END
+        WHERE run.id = #{planningRunId, jdbcType=OTHER}
+          AND run.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND run.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND run.status = 'PENDING'
+          AND run.row_version = #{expectedRowVersion, jdbcType=BIGINT}
+          AND EXISTS (
+              SELECT 1
+              FROM learning_task task
+              WHERE task.id = #{learningTaskId, jdbcType=OTHER}
+                AND task.user_id = run.user_id
+                AND task.language_profile_id = run.language_profile_id
+                AND task.planning_reason = CASE WHEN #{status, jdbcType=VARCHAR} = 'MODEL_APPLIED'
+                    THEN 'MODEL_ENRICHED' ELSE 'DETERMINISTIC_BUILT_IN_FALLBACK' END
+          )
+        RETURNING <include refid="runColumns"/>
     </select>
 
     <!-- 每条 candidate 都在同一事务内、Run 之后按原顺序插入；ownership 经 run 行重校验，

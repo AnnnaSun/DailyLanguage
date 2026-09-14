@@ -110,6 +110,64 @@ public class PlanningRunRepository {
     }
 
     /**
+     * 消费串行化点：锁定 owner-scoped Run 行，finalization 裁决才有稳定前提；wrong owner/profile
+     * 返回 empty（不可见）。调用方必须在事务内使用。
+     */
+    public Optional<PlanningRun> findOwnedForUpdate(
+            UUID planningRunId, UUID trustedUserId, UUID languageProfileId) {
+        validateOwnedArguments(planningRunId, trustedUserId, languageProfileId);
+        return Optional.ofNullable(planningRunMapper
+                .findOwnedForUpdate(planningRunId, trustedUserId, languageProfileId))
+                .map(PlanningRunRepository::toDomain);
+    }
+
+    /**
+     * PENDING → terminal 的 CAS：status 与 row_version guard 由数据库原子裁决；同一事务内同时
+     * 验证绑定 task 属于同一 owner/profile 且 planningReason 与目标 status 配对
+     * （MODEL_APPLIED → MODEL_ENRICHED；FALLBACK_APPLIED → DETERMINISTIC_BUILT_IN_FALLBACK）。
+     * FALLBACK_APPLIED 原子推进 workflow_version，MODEL_APPLIED 保持创建时 version。
+     * 零行（版本竞争 / gate 不匹配 / wrong owner、profile 或 task）以异常 fail closed。
+     */
+    public PlanningRun tryFinalizeOwned(
+            UUID planningRunId,
+            UUID trustedUserId,
+            UUID languageProfileId,
+            PlanningRun.Status status,
+            Optional<PlanningRun.FallbackReason> fallbackReason,
+            UUID learningTaskId,
+            long expectedRowVersion) {
+        validateOwnedArguments(planningRunId, trustedUserId, languageProfileId);
+        Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(fallbackReason, "fallbackReason must not be null");
+        Objects.requireNonNull(learningTaskId, "learningTaskId must not be null");
+        if (status == PlanningRun.Status.PENDING) {
+            throw new IllegalArgumentException("planning run can only finalize to a terminal status");
+        }
+        if (status == PlanningRun.Status.MODEL_APPLIED && fallbackReason.isPresent()) {
+            throw new IllegalArgumentException("model applied planning run cannot have a fallback reason");
+        }
+        if (status == PlanningRun.Status.FALLBACK_APPLIED && fallbackReason.isEmpty()) {
+            throw new IllegalArgumentException("fallback applied planning run requires a fallback reason");
+        }
+        if (expectedRowVersion < 0) {
+            throw new IllegalArgumentException("expectedRowVersion must not be negative");
+        }
+        StoredPlanningRun finalized = planningRunMapper.tryFinalizeOwnedAndReturn(
+                new FinalizePlanningRunRow(
+                        planningRunId,
+                        trustedUserId,
+                        languageProfileId,
+                        status.name(),
+                        learningTaskId,
+                        fallbackReason.map(PlanningRun.FallbackReason::name).orElse(null),
+                        expectedRowVersion));
+        if (finalized == null) {
+            throw new IllegalStateException("planning run finalize transition was not recorded");
+        }
+        return toDomain(finalized);
+    }
+
+    /**
      * owned read：按 candidate_index 升序还原完整 snapshot，并通过 Snapshot 构造器重新裁决
      * non-empty、dense ordered index 与 identity 唯一性；损坏的 durable rows（空、稀疏、重复）
      * 在读取时 fail closed，而不是作为正常结果返回。
@@ -140,7 +198,10 @@ public class PlanningRunRepository {
                 run.workflowVersion(),
                 run.rowVersion(),
                 run.createdAt(),
-                Optional.ofNullable(run.completedAt()));
+                Optional.ofNullable(run.completedAt()),
+                Optional.ofNullable(run.learningTaskId()),
+                Optional.ofNullable(run.fallbackReason())
+                        .map(PlanningRun.FallbackReason::valueOf));
     }
 
     private static void validateOwnedArguments(
@@ -171,7 +232,19 @@ record StoredPlanningRun(
         long workflowVersion,
         long rowVersion,
         OffsetDateTime createdAt,
-        OffsetDateTime completedAt) {
+        OffsetDateTime completedAt,
+        UUID learningTaskId,
+        String fallbackReason) {
+}
+
+record FinalizePlanningRunRow(
+        UUID planningRunId,
+        UUID trustedUserId,
+        UUID languageProfileId,
+        String status,
+        UUID learningTaskId,
+        String fallbackReason,
+        long expectedRowVersion) {
 }
 
 record NewPlanningRunCandidateRow(

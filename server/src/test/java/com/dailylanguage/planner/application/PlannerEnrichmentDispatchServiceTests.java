@@ -239,7 +239,8 @@ class PlannerEnrichmentDispatchServiceTests {
     private static PlanningRun run() {
         return new PlanningRun(
                 RUN_ID, USER_ID, PROFILE_ID, JOB_ID, PlanningRun.Status.PENDING,
-                PlanningRun.CURRENT_WORKFLOW_VERSION, 0L, CREATED_AT, Optional.empty());
+                PlanningRun.CURRENT_WORKFLOW_VERSION, 0L, CREATED_AT, Optional.empty(),
+                Optional.empty(), Optional.empty());
     }
 
     private static ModelCallJob job() {

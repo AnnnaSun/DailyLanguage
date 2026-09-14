@@ -20,7 +20,9 @@ class PlanningRunTests {
     private static final UUID PROFILE_ID = UUID.randomUUID();
     private static final UUID OTHER_PROFILE_ID = UUID.randomUUID();
     private static final UUID JOB_ID = UUID.randomUUID();
+    private static final UUID TASK_ID = UUID.randomUUID();
     private static final OffsetDateTime CREATED_AT = OffsetDateTime.now();
+    private static final OffsetDateTime COMPLETED_AT = CREATED_AT.plusSeconds(3);
 
     @Test
     void acceptsPendingRunSnapshot() {
@@ -28,6 +30,72 @@ class PlanningRunTests {
 
         assertThat(run.status()).isEqualTo(PlanningRun.Status.PENDING);
         assertThat(run.completedAt()).isEmpty();
+        assertThat(run.learningTaskId()).isEmpty();
+        assertThat(run.fallbackReason()).isEmpty();
+    }
+
+    @Test
+    void acceptsTerminalRunWithBoundTaskAndCompletion() {
+        PlanningRun modelApplied = run(PlanningRun.Status.MODEL_APPLIED, 0L, 1L,
+                Optional.of(COMPLETED_AT), Optional.of(TASK_ID), Optional.empty());
+
+        assertThat(modelApplied.learningTaskId()).contains(TASK_ID);
+        assertThat(modelApplied.fallbackReason()).isEmpty();
+
+        PlanningRun fallbackApplied = run(PlanningRun.Status.FALLBACK_APPLIED, 1L, 1L,
+                Optional.of(COMPLETED_AT), Optional.of(TASK_ID),
+                Optional.of(PlanningRun.FallbackReason.WAIT_BUDGET_EXHAUSTED));
+
+        assertThat(fallbackApplied.fallbackReason())
+                .contains(PlanningRun.FallbackReason.WAIT_BUDGET_EXHAUSTED);
+    }
+
+    @Test
+    void rejectsPendingRunWithAnyTerminalFact() {
+        assertThatThrownBy(() -> run(PlanningRun.Status.PENDING, 0L, 0L,
+                Optional.empty(), Optional.of(TASK_ID), Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("learningTaskId must be empty while status is PENDING");
+        assertThatThrownBy(() -> run(PlanningRun.Status.PENDING, 0L, 0L,
+                Optional.empty(), Optional.empty(),
+                Optional.of(PlanningRun.FallbackReason.MODEL_CALL_FAILED)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("fallbackReason must be empty while status is PENDING");
+    }
+
+    @Test
+    void rejectsModelAppliedWithoutTaskCompletionOrWithReason() {
+        assertThatThrownBy(() -> run(PlanningRun.Status.MODEL_APPLIED, 0L, 1L,
+                Optional.of(COMPLETED_AT), Optional.empty(), Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("learningTaskId must be present while status is MODEL_APPLIED");
+        assertThatThrownBy(() -> run(PlanningRun.Status.MODEL_APPLIED, 0L, 1L,
+                Optional.of(COMPLETED_AT), Optional.of(TASK_ID),
+                Optional.of(PlanningRun.FallbackReason.MODEL_CALL_FAILED)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("fallbackReason must be empty while status is MODEL_APPLIED");
+        assertThatThrownBy(() -> run(PlanningRun.Status.MODEL_APPLIED, 0L, 1L,
+                Optional.empty(), Optional.of(TASK_ID), Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("completedAt must be present while status is MODEL_APPLIED");
+    }
+
+    @Test
+    void rejectsFallbackAppliedWithoutTaskReasonOrCompletion() {
+        assertThatThrownBy(() -> run(PlanningRun.Status.FALLBACK_APPLIED, 1L, 1L,
+                Optional.of(COMPLETED_AT), Optional.empty(),
+                Optional.of(PlanningRun.FallbackReason.MODEL_CALL_FAILED)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("learningTaskId must be present while status is FALLBACK_APPLIED");
+        assertThatThrownBy(() -> run(PlanningRun.Status.FALLBACK_APPLIED, 1L, 1L,
+                Optional.of(COMPLETED_AT), Optional.of(TASK_ID), Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("fallbackReason must be present while status is FALLBACK_APPLIED");
+        assertThatThrownBy(() -> run(PlanningRun.Status.FALLBACK_APPLIED, 1L, 1L,
+                Optional.empty(), Optional.of(TASK_ID),
+                Optional.of(PlanningRun.FallbackReason.MODEL_CALL_FAILED)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("completedAt must be present while status is FALLBACK_APPLIED");
     }
 
     @Test
@@ -44,7 +112,7 @@ class PlanningRunTests {
                 .hasMessage("completedAt must be empty while status is PENDING");
         assertThatThrownBy(() -> new PlanningRun(
                 UUID.randomUUID(), USER_ID, PROFILE_ID, JOB_ID, PlanningRun.Status.PENDING,
-                0L, 0L, CREATED_AT, null))
+                0L, 0L, CREATED_AT, null, Optional.empty(), Optional.empty()))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("completedAt must not be null");
     }
@@ -166,9 +234,18 @@ class PlanningRunTests {
     private static PlanningRun run(
             PlanningRun.Status status, long workflowVersion, long rowVersion,
             Optional<OffsetDateTime> completedAt) {
+        return run(status, workflowVersion, rowVersion, completedAt,
+                Optional.empty(), Optional.empty());
+    }
+
+    private static PlanningRun run(
+            PlanningRun.Status status, long workflowVersion, long rowVersion,
+            Optional<OffsetDateTime> completedAt,
+            Optional<UUID> learningTaskId, Optional<PlanningRun.FallbackReason> fallbackReason) {
         return new PlanningRun(
                 UUID.randomUUID(), USER_ID, PROFILE_ID, JOB_ID, status,
-                workflowVersion, rowVersion, CREATED_AT, completedAt);
+                workflowVersion, rowVersion, CREATED_AT, completedAt,
+                learningTaskId, fallbackReason);
     }
 
     private static PlanningCandidateSet candidateSet(UUID profileId, int count) {

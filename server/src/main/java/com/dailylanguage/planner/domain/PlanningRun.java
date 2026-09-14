@@ -13,8 +13,11 @@ import com.dailylanguage.content.domain.MaterialIdentity;
 /**
  * 已持久化 PlanningRun 的 durable 快照。PostgreSQL 是 id、status 与 lifecycle timestamp 的
  * authority；本类型只还原数据库已裁决的行，不提供任何 transition 操作。ownership 直接落列
- * （planner 没有父 Session），经 composite FK 与 language_profile 绑定为同一 owner。创建期
- * candidate snapshot 由 {@link Snapshot} 独立裁决后按原顺序持久化。
+ * （planner 没有父 Session），经 composite FK 与 language_profile 绑定为同一 owner。生命周期：
+ * PENDING（尚无 durable outcome）→ MODEL_APPLIED（绑定唯一 MODEL_ENRICHED task）或
+ * FALLBACK_APPLIED（绑定唯一 deterministic task + closed FallbackReason；transition 原子推进
+ * workflowVersion，使迟到 Model success 不再适用）。创建期 candidate snapshot 由
+ * {@link Snapshot} 独立裁决后按原顺序持久化。
  */
 public record PlanningRun(
         UUID id,
@@ -25,7 +28,9 @@ public record PlanningRun(
         long workflowVersion,
         long rowVersion,
         OffsetDateTime createdAt,
-        Optional<OffsetDateTime> completedAt) {
+        Optional<OffsetDateTime> completedAt,
+        Optional<UUID> learningTaskId,
+        Optional<FallbackReason> fallbackReason) {
 
     /** S9 Planner enrichment workflow 第一版；绑定 Job 必须持有同一 version。 */
     public static final long CURRENT_WORKFLOW_VERSION = 0L;
@@ -50,22 +55,76 @@ public record PlanningRun(
         }
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         Objects.requireNonNull(completedAt, "completedAt must not be null");
+        Objects.requireNonNull(learningTaskId, "learningTaskId must not be null");
+        Objects.requireNonNull(fallbackReason, "fallbackReason must not be null");
         if (completedAt.filter(value -> value.isBefore(createdAt)).isPresent()) {
             throw new IllegalArgumentException("completedAt must not be before createdAt");
         }
         switch (status) {
-            case PENDING -> requireNoTerminalFact(completedAt);
+            case PENDING -> requirePendingOutcome(completedAt, learningTaskId, fallbackReason);
+            case MODEL_APPLIED ->
+                    requireModelAppliedOutcome(completedAt, learningTaskId, fallbackReason);
+            case FALLBACK_APPLIED ->
+                    requireFallbackAppliedOutcome(completedAt, learningTaskId, fallbackReason);
         }
     }
 
-    private static void requireNoTerminalFact(Optional<OffsetDateTime> completedAt) {
+    private static void requirePendingOutcome(
+            Optional<OffsetDateTime> completedAt,
+            Optional<UUID> learningTaskId,
+            Optional<FallbackReason> fallbackReason) {
         if (completedAt.isPresent()) {
             throw new IllegalArgumentException("completedAt must be empty while status is PENDING");
+        }
+        if (learningTaskId.isPresent()) {
+            throw new IllegalArgumentException("learningTaskId must be empty while status is PENDING");
+        }
+        if (fallbackReason.isPresent()) {
+            throw new IllegalArgumentException("fallbackReason must be empty while status is PENDING");
+        }
+    }
+
+    private static void requireModelAppliedOutcome(
+            Optional<OffsetDateTime> completedAt,
+            Optional<UUID> learningTaskId,
+            Optional<FallbackReason> fallbackReason) {
+        if (learningTaskId.isEmpty()) {
+            throw new IllegalArgumentException("learningTaskId must be present while status is MODEL_APPLIED");
+        }
+        if (fallbackReason.isPresent()) {
+            throw new IllegalArgumentException("fallbackReason must be empty while status is MODEL_APPLIED");
+        }
+        if (completedAt.isEmpty()) {
+            throw new IllegalArgumentException("completedAt must be present while status is MODEL_APPLIED");
+        }
+    }
+
+    private static void requireFallbackAppliedOutcome(
+            Optional<OffsetDateTime> completedAt,
+            Optional<UUID> learningTaskId,
+            Optional<FallbackReason> fallbackReason) {
+        if (learningTaskId.isEmpty()) {
+            throw new IllegalArgumentException("learningTaskId must be present while status is FALLBACK_APPLIED");
+        }
+        if (fallbackReason.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "fallbackReason must be present while status is FALLBACK_APPLIED");
+        }
+        if (completedAt.isEmpty()) {
+            throw new IllegalArgumentException("completedAt must be present while status is FALLBACK_APPLIED");
         }
     }
 
     public enum Status {
-        PENDING
+        PENDING, MODEL_APPLIED, FALLBACK_APPLIED
+    }
+
+    /** FALLBACK_APPLIED 的 closed safe reason；不包含 generated text 或 Provider detail。 */
+    public enum FallbackReason {
+        WAIT_BUDGET_EXHAUSTED,
+        MODEL_CALL_FAILED,
+        MODEL_RESULT_UNAVAILABLE,
+        MODEL_OUTPUT_REJECTED
     }
 
     /**
