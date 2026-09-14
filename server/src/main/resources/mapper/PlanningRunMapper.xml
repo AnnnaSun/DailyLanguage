@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.planner.infrastructure.PlanningRunMapper">
+
+    <resultMap id="storedPlanningRunResult"
+               type="com.dailylanguage.planner.infrastructure.StoredPlanningRun">
+        <constructor>
+            <idArg column="id"
+                   javaType="java.util.UUID"
+                   typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="user_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="language_profile_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="model_call_job_id"
+                 javaType="java.util.UUID"
+                 typeHandler="com.dailylanguage.persistence.PostgreSqlUuidTypeHandler"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="workflow_version" javaType="_long"/>
+            <arg column="row_version" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="storedPlanningRunCandidateResult"
+               type="com.dailylanguage.planner.infrastructure.StoredPlanningRunCandidate">
+        <constructor>
+            <arg column="candidate_index" javaType="_int"/>
+            <arg column="material_id" javaType="java.lang.String"/>
+            <arg column="published_version" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="runColumns">
+        run.id, run.user_id, run.language_profile_id, run.model_call_job_id, run.status,
+        run.workflow_version, run.row_version, run.created_at, run.completed_at
+    </sql>
+
+    <select id="nextRunId" resultType="java.util.UUID">
+        SELECT uuidv7()
+    </select>
+
+    <!-- INSERT … SELECT：insert 时在数据库内原子重校验 profile 归属同一 owner，并 JOIN
+         model_call_job 核对完整创建期 identity——owner/profile、PLANNING / TEXT_GENERATION、
+         workflow_id = run id、workflow_step_id、workflow_version，以及 route-unresolved
+         （providerId/modelId 双空）与创建态（CREATED + NOT_READY + rowVersion=0）。
+         任一不匹配产生零行，由调用方以异常 fail closed 并回滚同事务内已创建的 Job。 -->
+    <select id="insertOwnedAndReturn" resultMap="storedPlanningRunResult" affectData="true" flushCache="true">
+        INSERT INTO planning_run (id, user_id, language_profile_id, model_call_job_id, workflow_version)
+        SELECT #{id, jdbcType=OTHER},
+               profile.user_id,
+               profile.id,
+               #{modelCallJobId, jdbcType=OTHER},
+               #{workflowVersion, jdbcType=BIGINT}
+        FROM language_profile profile
+        JOIN model_call_job job ON job.id = #{modelCallJobId, jdbcType=OTHER}
+        WHERE profile.id = #{languageProfileId, jdbcType=OTHER}
+          AND profile.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND job.user_id = profile.user_id
+          AND job.language_profile_id = profile.id
+          AND job.model_purpose = #{modelPurpose, jdbcType=VARCHAR}
+          AND job.model_operation = #{modelOperation, jdbcType=VARCHAR}
+          AND job.workflow_id = #{id, jdbcType=OTHER}
+          AND job.workflow_step_id = #{workflowStepId, jdbcType=VARCHAR}
+          AND job.workflow_version = #{workflowVersion, jdbcType=BIGINT}
+          AND job.provider_id IS NULL
+          AND job.model_id IS NULL
+          AND job.execution_status = 'CREATED'
+          AND job.consumption_status = 'NOT_READY'
+          AND job.row_version = 0
+        RETURNING id, user_id, language_profile_id, model_call_job_id, status,
+                  workflow_version, row_version, created_at, completed_at
+    </select>
+
+    <!-- 每条 candidate 都在同一事务内、Run 之后按原顺序插入；ownership 经 run 行重校验，
+         PK(run_id, candidate_index) 与 UNIQUE(run_id, material identity) 在数据库层封闭。 -->
+    <insert id="insertCandidate" flushCache="true">
+        INSERT INTO planning_run_candidate (run_id, candidate_index, material_id, published_version)
+        SELECT run.id,
+               #{candidateIndex, jdbcType=SMALLINT},
+               #{materialId, jdbcType=VARCHAR},
+               #{publishedVersion, jdbcType=VARCHAR}
+        FROM planning_run run
+        WHERE run.id = #{planningRunId, jdbcType=OTHER}
+          AND run.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND run.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+          AND run.status = 'PENDING'
+    </insert>
+
+    <select id="findOwned" resultMap="storedPlanningRunResult">
+        SELECT <include refid="runColumns"/>
+        FROM planning_run run
+        WHERE run.id = #{planningRunId, jdbcType=OTHER}
+          AND run.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND run.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+    </select>
+
+    <select id="findOwnedCandidates" resultMap="storedPlanningRunCandidateResult">
+        SELECT candidate.candidate_index, candidate.material_id, candidate.published_version
+        FROM planning_run_candidate candidate
+        JOIN planning_run run ON run.id = candidate.run_id
+        WHERE run.id = #{planningRunId, jdbcType=OTHER}
+          AND run.user_id = #{trustedUserId, jdbcType=OTHER}
+          AND run.language_profile_id = #{languageProfileId, jdbcType=OTHER}
+        ORDER BY candidate.candidate_index
+    </select>
+</mapper>
