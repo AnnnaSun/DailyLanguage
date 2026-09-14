@@ -13,6 +13,8 @@ import com.dailylanguage.content.domain.MaterialIdentity;
  * 已持久化 LearningTask 的 durable 快照。PostgreSQL 是 id、status 与 lifecycle timestamp 的
  * authority；本类型只还原数据库已裁决的行，不提供任何 transition 操作。target language 不在
  * learning_task 中重复存储，读取时通过 language_profile.language_code 还原。
+ * recommendationReason 是 optional enrichment 投影：只有 MODEL_ENRICHED 行携带 reason，
+ * 与 planningReason 的 pairing 在还原快照时重新裁决。
  */
 public record LearningTask(
         UUID id,
@@ -27,6 +29,7 @@ public record LearningTask(
         String primaryGoal,
         LearningTaskPlan.TaskType taskType,
         LearningTaskPlan.PlanningReason planningReason,
+        Optional<String> recommendationReason,
         Status status,
         OffsetDateTime createdAt,
         Optional<OffsetDateTime> startedAt,
@@ -34,6 +37,32 @@ public record LearningTask(
 
     static final int MINIMUM_ESTIMATED_DURATION_MINUTES = 5;
     static final int MAXIMUM_ESTIMATED_DURATION_MINUTES = 10;
+
+    /**
+     * deterministic row 的 legacy 构造入口：recommendationReason 固定为 empty，供既有
+     * deterministic 读取方与测试无需随本 slice 改动；enriched row 必须走 canonical 构造器。
+     */
+    public LearningTask(
+            UUID id,
+            UUID userId,
+            UUID languageProfileId,
+            MaterialIdentity materialIdentity,
+            String targetLanguage,
+            String supportLanguage,
+            MaterialDifficulty difficulty,
+            int estimatedDurationMinutes,
+            String scenario,
+            String primaryGoal,
+            LearningTaskPlan.TaskType taskType,
+            LearningTaskPlan.PlanningReason planningReason,
+            Status status,
+            OffsetDateTime createdAt,
+            Optional<OffsetDateTime> startedAt,
+            Optional<OffsetDateTime> completedAt) {
+        this(id, userId, languageProfileId, materialIdentity, targetLanguage, supportLanguage, difficulty,
+                estimatedDurationMinutes, scenario, primaryGoal, taskType, planningReason,
+                Optional.empty(), status, createdAt, startedAt, completedAt);
+    }
 
     public LearningTask {
         Objects.requireNonNull(id, "id must not be null");
@@ -59,6 +88,8 @@ public record LearningTask(
         requireTrimmedText(primaryGoal, "primaryGoal");
         Objects.requireNonNull(taskType, "taskType must not be null");
         Objects.requireNonNull(planningReason, "planningReason must not be null");
+        Objects.requireNonNull(recommendationReason, "recommendationReason must not be null");
+        LearningTaskPlan.requireReasonPairing(planningReason, recommendationReason);
         Objects.requireNonNull(status, "status must not be null");
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         Objects.requireNonNull(startedAt, "startedAt must not be null");
