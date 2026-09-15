@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.dailylanguage.content.domain.AvailableMaterialSummary;
 import com.dailylanguage.content.domain.LearningMaterialCatalog;
+import com.dailylanguage.content.domain.MaterialIdentity;
 import com.dailylanguage.content.domain.MaterialQueryResult;
 import com.dailylanguage.content.domain.PublishedLearningMaterial;
 import com.dailylanguage.content.domain.SupportScaffold;
@@ -17,6 +18,7 @@ import com.dailylanguage.planner.domain.LearningTaskPlan;
 import com.dailylanguage.planner.domain.PlanningCandidateSet;
 import com.dailylanguage.planner.domain.PlanningCandidateSetResult;
 import com.dailylanguage.planner.domain.PlanningRequest;
+import com.dailylanguage.planner.domain.PlanningRun;
 
 import static com.dailylanguage.planner.domain.PlanningResult.UnavailableReason.AVAILABLE_TIME_TOO_SHORT;
 import static com.dailylanguage.planner.domain.PlanningResult.UnavailableReason.NO_ELIGIBLE_MATERIAL;
@@ -65,25 +67,61 @@ public final class EligibleLearningTaskCandidateReader {
             MaterialQueryResult queryResult = materialCatalog.findByIdentity(
                     summary.identity(), request.supportLanguage());
             if (!(queryResult instanceof MaterialQueryResult.Available available)
-                    || !isResolvedMaterialValid(summary, available, request)) {
+                    || !isResolvedMaterialValid(summary.identity(), available, request)) {
                 // list 与 resolve 的任何不一致都 fail closed；损坏的 secondary candidate 也使整个
                 // shortlist 失效，不能把 partial set 交给后续流程。
                 return new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE);
             }
-            plans.add(toTaskPlan(summary, available, request));
+            plans.add(toTaskPlan(summary.identity(), available, request));
+        }
+        return new PlanningCandidateSetResult.Available(new PlanningCandidateSet(plans));
+    }
+
+    /**
+     * S9E2B 的 durable snapshot re-resolution：按 {@link PlanningRun.Snapshot} 的原始顺序对每个
+     * candidate identity 重新执行 exact resolve 与同一套 metadata drift 校验。Snapshot 只证明创建期
+     * offered 过该 identity，不是 Content authority——任何 candidate 缺失、identity 漂移或 metadata
+     * 与当前 request 不一致都使整组 fail closed，调用方不得基于 partial 结果创建任何 task。
+     * 不重新排序、不重新过滤 shortlist：index 0 仍是唯一 deterministic fallback。
+     */
+    public PlanningCandidateSetResult resolveSnapshot(PlanningRequest request, PlanningRun.Snapshot snapshot) {
+        Objects.requireNonNull(request, "request must not be null");
+        Objects.requireNonNull(snapshot, "snapshot must not be null");
+        if (!snapshot.languageProfileId().equals(request.languageProfile().id())) {
+            throw new IllegalArgumentException(
+                    "snapshot languageProfileId must match the planning request language profile");
+        }
+        if (request.availableMinutes() < MINIMUM_AVAILABLE_MINUTES) {
+            return new PlanningCandidateSetResult.Unavailable(AVAILABLE_TIME_TOO_SHORT);
+        }
+
+        List<LearningTaskPlan> plans = new ArrayList<>(snapshot.candidates().size());
+        for (PlanningRun.Candidate candidate : snapshot.candidates()) {
+            // 与创建期 shortlist 相同的 Java hard constraint：被 request 排除的 identity 不得
+            // 重新进入 planning；snapshot 固定不可裁剪，命中即整组 fail closed。
+            if (request.excludedMaterials().contains(candidate.identity())) {
+                return new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE);
+            }
+            MaterialQueryResult queryResult = materialCatalog.findByIdentity(
+                    candidate.identity(), request.supportLanguage());
+            if (!(queryResult instanceof MaterialQueryResult.Available available)
+                    || !isResolvedMaterialValid(candidate.identity(), available, request)) {
+                return new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE);
+            }
+            plans.add(toTaskPlan(candidate.identity(), available, request));
         }
         return new PlanningCandidateSetResult.Available(new PlanningCandidateSet(plans));
     }
 
     private static LearningTaskPlan toTaskPlan(
-            AvailableMaterialSummary summary,
+            MaterialIdentity identity,
             MaterialQueryResult.Available available,
             PlanningRequest request
     ) {
         TargetPracticeCore targetCore = available.material().targetCore();
         return new LearningTaskPlan(
                 request.languageProfile().id(),
-                summary.identity(),
+                identity,
                 targetCore.targetLanguage(),
                 available.selectedScaffold().supportLanguage(),
                 targetCore.difficulty(),
@@ -108,7 +146,7 @@ public final class EligibleLearningTaskCandidateReader {
     }
 
     private static boolean isResolvedMaterialValid(
-            AvailableMaterialSummary selectedSummary,
+            MaterialIdentity requestedIdentity,
             MaterialQueryResult.Available available,
             PlanningRequest request
     ) {
@@ -118,7 +156,7 @@ public final class EligibleLearningTaskCandidateReader {
             return false;
         }
         TargetPracticeCore targetCore = material.targetCore();
-        return material.identity().equals(selectedSummary.identity())
+        return material.identity().equals(requestedIdentity)
                 && request.languageProfile().languageCode().equals(targetCore.targetLanguage())
                 && request.requestedDifficulty() == targetCore.difficulty()
                 && request.supportLanguage().equals(scaffold.supportLanguage())

@@ -24,6 +24,7 @@ import com.dailylanguage.planner.domain.LearningTaskPlan;
 import com.dailylanguage.planner.domain.PlanningCandidateSet;
 import com.dailylanguage.planner.domain.PlanningCandidateSetResult;
 import com.dailylanguage.planner.domain.PlanningRequest;
+import com.dailylanguage.planner.domain.PlanningRun;
 
 import static com.dailylanguage.content.domain.MaterialDifficulty.FOUNDATION;
 import static com.dailylanguage.planner.domain.PlanningResult.UnavailableReason.AVAILABLE_TIME_TOO_SHORT;
@@ -334,6 +335,165 @@ class EligibleLearningTaskCandidateReaderTests {
                 .isEqualTo(candidateSet.candidates().getFirst().materialIdentity());
     }
 
+    @Test
+    void resolveSnapshotReResolvesEveryCandidateInDurableSnapshotOrder() {
+        // durable snapshot 顺序（GREETING 在前）与 catalog stable order 相反，re-resolution 必须保持
+        // snapshot 顺序，而不是重新排序。
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
+                summary(GREETING, "GREETING_INTRODUCTION"),
+                summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        PlanningRun.Snapshot snapshot = snapshot(GREETING, CAFE);
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result = reader.resolveSnapshot(request(10, Set.of()), snapshot);
+
+        assertThat(result).isInstanceOfSatisfying(PlanningCandidateSetResult.Available.class, available -> {
+            PlanningCandidateSet candidateSet = available.candidateSet();
+            assertThat(candidateSet.candidates())
+                    .extracting(LearningTaskPlan::materialIdentity)
+                    .containsExactly(GREETING, CAFE);
+            assertThat(candidateSet.deterministicFallback().materialIdentity()).isEqualTo(GREETING);
+            LearningTaskPlan greetingPlan = candidateSet.candidates().getFirst();
+            assertThat(greetingPlan.languageProfileId()).isEqualTo(PROFILE_ID);
+            assertThat(greetingPlan.targetLanguage()).isEqualTo("en");
+            assertThat(greetingPlan.supportLanguage()).isEqualTo("zh-cn");
+            assertThat(greetingPlan.difficulty()).isEqualTo(FOUNDATION);
+            assertThat(greetingPlan.scenario()).isEqualTo("GREETING_INTRODUCTION");
+            assertThat(greetingPlan.primaryGoal()).isEqualTo("Goal for GREETING_INTRODUCTION");
+            assertThat(greetingPlan.reason())
+                    .isEqualTo(LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK);
+            assertThat(greetingPlan.recommendationReason()).isEmpty();
+        });
+        assertThat(catalog.resolvedIdentities).containsExactly(GREETING, CAFE);
+        assertThat(catalog.resolvedSupportLanguages).containsExactly("zh-cn", "zh-cn");
+    }
+
+    @Test
+    void resolveSnapshotCapsEstimatedDurationAtPlannedMaximum() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result =
+                reader.resolveSnapshot(request(30, Set.of()), snapshot(CAFE));
+
+        assertThat(result).isInstanceOfSatisfying(PlanningCandidateSetResult.Available.class, available ->
+                assertThat(available.candidateSet().deterministicFallback().estimatedDurationMinutes())
+                        .isEqualTo(10));
+    }
+
+    @Test
+    void resolveSnapshotReturnsUnavailableWhenAvailableTimeIsTooShort() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of());
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result =
+                reader.resolveSnapshot(request(4, Set.of()), snapshot(CAFE));
+
+        assertThat(result).isEqualTo(new PlanningCandidateSetResult.Unavailable(AVAILABLE_TIME_TOO_SHORT));
+        assertThat(catalog.resolvedIdentities).isEmpty();
+    }
+
+    @Test
+    void resolveSnapshotFailsClosedWhenAnyCandidateCannotBeResolved() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
+                summary(GREETING, "GREETING_INTRODUCTION"),
+                summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        catalog.results.put(CAFE, new MaterialQueryResult.Unavailable(
+                MaterialUnavailableReason.MATERIAL_NOT_PUBLISHED));
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result =
+                reader.resolveSnapshot(request(10, Set.of()), snapshot(GREETING, CAFE));
+
+        // index 0 仍可解析，但 index 1 缺失时整组 fail closed，不能把 partial set 交给 finalization。
+        assertThat(result).isEqualTo(new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE));
+        assertThat(catalog.resolvedIdentities).containsExactly(GREETING, CAFE);
+    }
+
+    @Test
+    void resolveSnapshotFailsClosedWhenResolvedIdentityDrifts() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
+                summary(GREETING, "GREETING_INTRODUCTION"),
+                summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        // 请求 GREETING 却解析回 CAFE identity 的 material：exact identity 不一致必须 fail closed。
+        catalog.results.put(GREETING, new MaterialQueryResult.Available(
+                material(CAFE, "en", "GREETING_INTRODUCTION"), scaffold("zh-cn")));
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result =
+                reader.resolveSnapshot(request(10, Set.of()), snapshot(GREETING));
+
+        assertThat(result).isEqualTo(new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE));
+    }
+
+    @Test
+    void resolveSnapshotFailsClosedWhenResolvedMaterialViolatesRequestConstraints() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        catalog.results.put(CAFE, new MaterialQueryResult.Available(
+                material(CAFE, "ja", "CAFE_SIMPLE_REQUEST"), scaffold("zh-cn")));
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+        PlanningCandidateSetResult wrongTargetLanguage =
+                reader.resolveSnapshot(request(10, Set.of()), snapshot(CAFE));
+
+        FakeMaterialCatalog wrongScaffoldCatalog = new FakeMaterialCatalog(
+                List.of(summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        wrongScaffoldCatalog.results.put(CAFE, new MaterialQueryResult.Available(
+                material(CAFE, "en", "CAFE_SIMPLE_REQUEST"), scaffold("ja")));
+        EligibleLearningTaskCandidateReader wrongScaffoldReader =
+                new EligibleLearningTaskCandidateReader(wrongScaffoldCatalog);
+        PlanningCandidateSetResult wrongSupportLanguage =
+                wrongScaffoldReader.resolveSnapshot(request(10, Set.of()), snapshot(CAFE));
+
+        assertThat(wrongTargetLanguage)
+                .isEqualTo(new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE));
+        assertThat(wrongSupportLanguage)
+                .isEqualTo(new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE));
+    }
+
+    @Test
+    void resolveSnapshotFailsClosedWhenSnapshotMemberIsExcludedByRequest() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of(
+                summary(GREETING, "GREETING_INTRODUCTION"),
+                summary(CAFE, "CAFE_SIMPLE_REQUEST")));
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+
+        PlanningCandidateSetResult result =
+                reader.resolveSnapshot(request(10, Set.of(GREETING)), snapshot(GREETING, CAFE));
+
+        // exclusion 是创建期 shortlist 的 Java hard constraint：snapshot member 命中即整组
+        // fail closed，且不触发任何 catalog resolve。
+        assertThat(result)
+                .isEqualTo(new PlanningCandidateSetResult.Unavailable(SELECTED_MATERIAL_UNAVAILABLE));
+        assertThat(catalog.resolvedIdentities).isEmpty();
+    }
+
+    @Test
+    void resolveSnapshotRejectsProfileMismatchAndNullArguments() {
+        FakeMaterialCatalog catalog = new FakeMaterialCatalog(List.of());
+        EligibleLearningTaskCandidateReader reader = new EligibleLearningTaskCandidateReader(catalog);
+        PlanningRequest request = new PlanningRequest(
+                new LanguageProfileIdentity(UUID.randomUUID(), USER_ID, "en"),
+                "zh-cn", FOUNDATION, 10, Set.of());
+
+        assertThatThrownBy(() -> reader.resolveSnapshot(request, snapshot(CAFE)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("snapshot languageProfileId must match the planning request language profile");
+        assertThatThrownBy(() -> reader.resolveSnapshot(null, snapshot(CAFE)))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("request must not be null");
+        assertThatThrownBy(() -> reader.resolveSnapshot(request(10, Set.of()), null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("snapshot must not be null");
+    }
+
+    private static PlanningRun.Snapshot snapshot(MaterialIdentity... identities) {
+        List<PlanningRun.Candidate> candidates = new ArrayList<>();
+        for (MaterialIdentity identity : identities) {
+            candidates.add(new PlanningRun.Candidate(candidates.size(), identity));
+        }
+        return new PlanningRun.Snapshot(PROFILE_ID, candidates);
+    }
+
     private static PlanningRequest request(int availableMinutes, Set<MaterialIdentity> excludedMaterials) {
         return new PlanningRequest(
                 new LanguageProfileIdentity(PROFILE_ID, USER_ID, "en"),
@@ -427,6 +587,7 @@ class EligibleLearningTaskCandidateReaderTests {
         private final List<AvailableMaterialSummary> summaries;
         private final Map<MaterialIdentity, MaterialQueryResult> results = new HashMap<>();
         private final List<MaterialIdentity> resolvedIdentities = new ArrayList<>();
+        private final List<String> resolvedSupportLanguages = new ArrayList<>();
         private int listCalls;
 
         private FakeMaterialCatalog(List<AvailableMaterialSummary> summaries) {
@@ -441,6 +602,7 @@ class EligibleLearningTaskCandidateReaderTests {
         @Override
         public MaterialQueryResult findByIdentity(MaterialIdentity identity, String supportLanguage) {
             resolvedIdentities.add(identity);
+            resolvedSupportLanguages.add(supportLanguage);
             return results.getOrDefault(identity, new MaterialQueryResult.Unavailable(
                     MaterialUnavailableReason.MATERIAL_NOT_PUBLISHED));
         }
