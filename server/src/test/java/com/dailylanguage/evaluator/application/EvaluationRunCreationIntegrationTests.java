@@ -159,7 +159,7 @@ class EvaluationRunCreationIntegrationTests {
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",
-                String.class)).isEqualTo("13");
+                String.class)).isEqualTo("17");
         assertThat(result).isInstanceOfSatisfying(CreationResult.Created.class, created -> {
             EvaluationRun run = created.run();
             ModelCallJob job = created.job();
@@ -446,10 +446,10 @@ class EvaluationRunCreationIntegrationTests {
 
     private UUID completeCafeSession(UUID profileId, UserContext user) {
         UUID sessionId = startCafeSession(profileId, user);
-        assertThat(practiceService.submit(profileId, sessionId, "ask-price", user, "How much is it?"))
-                .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "answer-to-go", user,
-                "To go, please. Thank you!")).isInstanceOf(SubmitResult.Accepted.class);
+        assertThat(practiceService.submit(profileId, sessionId, "comprehension-check", user,
+                "A medium coffee.")).isInstanceOf(SubmitResult.Accepted.class);
+        assertThat(practiceService.submit(profileId, sessionId, "order-water-freely", user,
+                "A bottle of water, please. Thank you!")).isInstanceOf(SubmitResult.Accepted.class);
         assertThat(practiceService.complete(profileId, sessionId, user))
                 .isInstanceOf(CompletionResult.Created.class);
         return sessionId;
@@ -466,7 +466,7 @@ class EvaluationRunCreationIntegrationTests {
         assertThat(startResult).isInstanceOf(StartResult.Created.class);
         UUID sessionId = ((StartResult.Created) startResult).session().id();
 
-        assertThat(practiceService.submit(profileId, sessionId, "order-drink", user,
+        assertThat(practiceService.submit(profileId, sessionId, "order-with-frame", user,
                 "Could I have a medium coffee, please?")).isInstanceOf(SubmitResult.Accepted.class);
         return sessionId;
     }

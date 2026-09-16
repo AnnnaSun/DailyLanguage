@@ -18,6 +18,9 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +46,8 @@ class PlannerEnrichmentJobAwaiterTests {
     private static final UserContext USER = new UserContext(USER_ID);
 
     private final ModelCallJobRepository modelCallJobRepository = mock(ModelCallJobRepository.class);
+    /** mock tx manager：getTransaction 返回 null status，callback 直通后 commit 为 no-op。 */
+    private final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
 
     /** fake monotonic clock：delayer 记录每次 delay 并推进 fake time。 */
     private final List<Duration> recordedDelays = new ArrayList<>();
@@ -56,6 +61,7 @@ class PlannerEnrichmentJobAwaiterTests {
     private PlannerEnrichmentJobAwaiter awaiter(Duration interactiveWait, Duration pollInterval) {
         return new PlannerEnrichmentJobAwaiter(
                 modelCallJobRepository,
+                transactionManager,
                 new PlannerEnrichmentProperties(Duration.ofMinutes(5), interactiveWait, pollInterval),
                 clock,
                 recordingDelayer);
@@ -125,6 +131,26 @@ class PlannerEnrichmentJobAwaiterTests {
     }
 
     @Test
+    void eachPollRunsInItsOwnRequiresNewReadTransaction() {
+        when(modelCallJobRepository.findByIdAndUserId(JOB_ID, USER_ID))
+                .thenReturn(Optional.of(job(ModelCallJob.ExecutionStatus.CREATED)),
+                        Optional.of(job(ModelCallJob.ExecutionStatus.SUCCEEDED)));
+
+        PlannerEnrichmentJobAwaiter.AwaitResult result =
+                awaiter(Duration.ofSeconds(5), Duration.ofSeconds(2)).await(JOB_ID, USER);
+
+        assertThat(result).isInstanceOf(PlannerEnrichmentJobAwaiter.AwaitResult.Terminal.class);
+        // 每次 poll 都开启独立 REQUIRES_NEW 读事务：外层 empty-transaction synchronization 下
+        // 共享 SqlSessionTemplate 的 first-level cache 不得跨 poll 复用（S9F polling 可见性回归）。
+        ArgumentCaptor<TransactionDefinition> definitionCaptor =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager, org.mockito.Mockito.times(2)).getTransaction(definitionCaptor.capture());
+        assertThat(definitionCaptor.getAllValues())
+                .allSatisfy(definition -> assertThat(definition.getPropagationBehavior())
+                        .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW));
+    }
+
+    @Test
     void notFoundReturnsImmediately() {
         when(modelCallJobRepository.findByIdAndUserId(JOB_ID, USER_ID))
                 .thenReturn(Optional.empty());
@@ -153,6 +179,7 @@ class PlannerEnrichmentJobAwaiterTests {
                 .thenReturn(Optional.of(job(ModelCallJob.ExecutionStatus.CREATED)));
         PlannerEnrichmentJobAwaiter realDelayerAwaiter = new PlannerEnrichmentJobAwaiter(
                 modelCallJobRepository,
+                transactionManager,
                 new PlannerEnrichmentProperties(
                         Duration.ofMinutes(5), Duration.ofSeconds(30), Duration.ofSeconds(1)),
                 System::nanoTime,

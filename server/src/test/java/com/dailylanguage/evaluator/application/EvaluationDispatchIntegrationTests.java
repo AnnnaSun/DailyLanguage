@@ -216,7 +216,7 @@ class EvaluationDispatchIntegrationTests {
         assertThat(routes.findRoute(ModelPurpose.EVALUATION)).isPresent();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",
-                String.class)).isEqualTo("13");
+                String.class)).isEqualTo("17");
     }
 
     @Test
@@ -298,14 +298,14 @@ class EvaluationDispatchIntegrationTests {
         StartResult startResult = practiceService.start(profileId, task.id(), user);
         assertThat(startResult).isInstanceOf(StartResult.Created.class);
         UUID sessionId = ((StartResult.Created) startResult).session().id();
-        assertThat(practiceService.submit(profileId, sessionId, "order-drink", user,
+        assertThat(practiceService.submit(profileId, sessionId, "order-with-frame", user,
                 "Could I have a medium coffee, please?"))
                 .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "ask-price", user,
-                "How much is it?"))
+        assertThat(practiceService.submit(profileId, sessionId, "comprehension-check", user,
+                "A medium coffee."))
                 .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "answer-to-go", user,
-                "To go, please. Thank you!"))
+        assertThat(practiceService.submit(profileId, sessionId, "order-water-freely", user,
+                "A bottle of water, please. Thank you!"))
                 .isInstanceOf(SubmitResult.Accepted.class);
         assertThat(practiceService.complete(profileId, sessionId, user))
                 .isInstanceOf(CompletionResult.Created.class);

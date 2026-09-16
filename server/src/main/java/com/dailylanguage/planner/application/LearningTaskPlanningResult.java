@@ -22,6 +22,18 @@ public sealed interface LearningTaskPlanningResult {
     record InvalidRequest() implements LearningTaskPlanningResult {
     }
 
+    /** optional enrichment 的 providerId 非法或与 Credential 不成对；在读取 Profile 前裁决。 */
+    record InvalidProviderId() implements LearningTaskPlanningResult {
+    }
+
+    /** providerId 已提供但 Credential 缺失或 blank；在读取 Profile 前裁决。 */
+    record InvalidProviderCredential() implements LearningTaskPlanningResult {
+    }
+
+    /** requested provider 与 fixed PLANNING route 不一致；零 Provider 调用、零 task。 */
+    record ProviderMismatch() implements LearningTaskPlanningResult {
+    }
+
     /** Profile 不存在或不属于 caller；两者不可区分，避免资源枚举。 */
     record LanguageProfileNotFound() implements LearningTaskPlanningResult {
     }
