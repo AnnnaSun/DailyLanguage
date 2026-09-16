@@ -1,28 +1,29 @@
 # M1-S9 Optional Planner Enrichment
 
-> Status: APPROVED DESIGN — S9A_IMPLEMENTATION
-> Updated: 2026-09-10
+> Status: IMPLEMENTED — OWNERSHIP_PENDING
+> Updated: 2026-09-16
 > Architecture-sensitive Feature: YES
 > Design / Slice Plan: APPROVED — 2026-09-10
-> Current Slice Contract: APPROVED — S9A Deterministic Candidate Set — 2026-09-10
-> Implementation: NOT_STARTED
+> Current Gate: M1-S9 FULL-FEATURE OWNERSHIP
+> Implementation: COMPLETE — S9A–S9F (`d68d70f`…`786f124`)
 
-本文定义 M1-S9 已批准的整体 Design / Scope 与 slice breakdown。2026-09-10，用户批准 recommended
+本文定义 M1-S9 已批准并实现的整体 Design / Scope 与 slice breakdown。2026-09-10，用户批准 recommended
 `PlanningRun + candidate snapshot + recommendationReason` 方向、当前受控 two-candidate soft decision 价值及
-S9A–S9F 拆分顺序。用户随后批准 S9A Current Slice Contract 交由 Zcode 实现；该授权只覆盖本文第 11 节，后续
-slice 仍需一次只批准并实现一个 Current Slice Contract。
+S9A–S9F 拆分顺序；随后各 slice 按 Current Slice Contract 逐项批准、实现和 Review。当前实现与 external
+verification 已完成，Feature 停在一次完整 Ownership Check，不开始 M1-S10。
 
 ## 1. Current situation
 
-当前 `LearningTaskPlanningService` 在完成 owner-scoped `LanguageProfile` 读取后，调用
-`DeterministicLearningTaskPlanner` 从 `LearningMaterialCatalog` 生成合法 task，再通过
-`LearningTaskRepository.createOwned` 原子重校验 owner / profile / target language 并创建 durable `PLANNED`
-task。该路径已经能够在无 Provider 时稳定工作。
+当前 `LearningTaskPlanningService` 在完成 owner-scoped `LanguageProfile` 读取后，由 Java 生成 bounded、ordered
+candidate set。无 Provider / Credential 时直接创建 deterministic fallback；合法 optional pair 走 fixed
+`PLANNING` route，原子创建 `PlanningRun + ModelCallJob + candidate snapshot`，在事务外 dispatch，经 bounded
+wait 后由 finalizer 严格验证 durable result，并原子 consume Job、创建唯一 `LearningTask`、终结 Run。任何正常的
+Model failure、capacity、timeout 或 invalid output 都回到同一 deterministic fallback。
 
-M0-S9 已提供 PostgreSQL-backed `ModelCallJob`、独立 Job `TaskExecutor`、provider-neutral
-`TextGenerationPort`、transient Credential、typed result / failure 与 consume / stale CAS。M1-S8 已证明
-Application Workflow 可以原子绑定自己的 Run 与 Job，并在 transaction 外 dispatch。当前 Planner 尚未接入
-该能力，`PLANNING` fixed route 也尚未配置。
+该实现复用 PostgreSQL-backed `ModelCallJob`、provider-neutral `TextGenerationPort` 与 transient Credential
+boundary。Java 保持 candidate membership、exact material identity、schema / semantic validation 与 persistence
+authority；Credential 与 Prompt 不持久化，Planner API 不暴露 Job 或 generated output，只有 Java 验证后的
+`recommendationReason` 进入 task projection。
 
 当前真实 Content 有两个符合 `en + zh-CN + FOUNDATION` 的 `PLANNABLE` material：
 `en-builtin-greeting-intro/v1` 与 `en-builtin-cafe-request/v2`。因此 S9 可以真实验证 bounded two-candidate
@@ -30,7 +31,7 @@ selection 与用户可见推荐理由；但 M1 仍没有 Goal、Weakness、Recen
 request constraints 与 published candidate metadata 做 soft decision。S9 是受控 hybrid Planner 的 engineering
 walking skeleton，不声称已经实现 learner-state personalization。
 
-## 2. Problem
+## 2. Design-time problem
 
 M1 已批准 hybrid Planner 方向：Java 生成并过滤合法 candidate，Model 只做 soft selection / reason
 enrichment，最后仍由 Java 验证并持久化。缺少 S9 时：
@@ -276,11 +277,15 @@ Planner candidate / validator unit
    不宣称 learner-state personalization；
 3. `S9A → S9B → S9C1 → S9C2 → S9D → S9E1 → S9E2 → S9F` 的 slice 顺序。
 
-整体 Design / Scope approval 不等于所有 Production implementation approval。2026-09-10，用户批准 S9A Current
-Slice Contract 交由 Zcode 实现；后续每个 slice 仍需单独批准，且 S9A 完成 Review / Ownership / Commit Decision
-前不得自动开始 S9B。
+上述整体 Design / Scope approval 当时不等于所有 Production implementation approval。此后 S9A–S9F 均按各自
+Current Slice Contract 逐项批准并完成，commit 范围为 `d68d70f`…`786f124`。Critical / delta Review 与
+Architecture review 无 blocking finding；local targeted Planner tests 63/63 PASS。2026-09-15/16 使用 disposable
+PostgreSQL 18.6 + pgvector 0.8.6 验证 empty schema Flyway V1–V17、fake-worker planning integration 12/12 与
+19-class affected regression 186/186，临时容器已删除且 primary database 未使用。Behavior Flow 已同步到
+`docs/flow/owner-scoped-learning-task-planning.md`；live Provider 与 frontend `NOT_RUN`。当前 Gate 为
+`OWNERSHIP_PENDING`，M1-S10 未获 Scope approval。
 
-## 11. Approved S9A Current Slice Contract — Deterministic Candidate Set
+## 11. Historical Approved S9A Current Slice Contract — Deterministic Candidate Set
 
 ```text
 Task / Slice: M1-S9A — Deterministic Candidate Set
@@ -402,5 +407,6 @@ evidence 作为 fresh result。
 Human Review Focus：candidate set 的 defensive immutability、stable order / max-8 cap、secondary candidate
 fail-closed、现有 first fallback 完全兼容，以及 `DeterministicLearningTaskPlanner` 是否只剩清晰的 result mapping。
 
-当前 Stop Point：`S9A_IMPLEMENTATION`。Zcode 完成实现与 targeted verification 后必须停止在
-`REVIEW_PENDING`；S9B 未授权。
+Historical S9A Stop Point：`S9A_IMPLEMENTATION → REVIEW_PENDING`，已由 `d68d70f` 履行。本节保留当时的
+slice boundary 与授权记录，不再代表当前 Feature 状态；当前 Gate 以第 10 节的 M1-S9 full-feature
+`OWNERSHIP_PENDING` 为准。

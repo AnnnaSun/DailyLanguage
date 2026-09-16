@@ -1,10 +1,10 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-10
+> Last updated: 2026-09-16
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S9A IMPLEMENTATION
-> Production baseline: M1-S8T COMPLETE — PR #25 merged to main (`c2dbb4f`)
-> Current candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
+> Current Gate: M1-S9 OWNERSHIP_PENDING
+> Production baseline: M1-S8T COMPLETE on main (`c2dbb4f`)
+> Current candidate: M1-S9A–S9F implementation / review / external verification / Behavior Flow COMPLETE；full-feature Ownership pending
 
 ## Approved Decisions
 
@@ -25,6 +25,10 @@
 - 2026-09-10：用户批准 M1-S9A `Deterministic Candidate Set` Current Slice Contract 交由 Zcode 实现。授权仅覆盖
   planner 内 deterministic candidate boundary 与 targeted tests；S9B、schema、API、Model、Prompt、Credential
   均未授权。Zcode 完成后必须停在 `REVIEW_PENDING`，由 Codex 执行 Critical Diff Review。
+
+- 2026-09-16：M1-S9A–S9F 已按各自 Current Slice Contract 逐项批准并实现，commit 范围为
+  `d68d70f`…`786f124`。Critical / delta Review、PostgreSQL external verification 与 Behavior Flow 已完成；当前只剩
+  M1-S9 full-feature Ownership Gate，未授权开始 M1-S10。
 
 - 2026-09-07：用户批准 Guided Language Learning 纳入 V1 P0 及 M1–M6 分配；正式 Scope 为 v1.9，
   Phase Plan 为 v1.6。完整 M1-S8 后、S9 前增加 `M1-S8T` 最小文本教学，包含必要辅助条件记录，
@@ -334,22 +338,22 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S9A IMPLEMENTATION
+Gate: M1-S9 OWNERSHIP_PENDING
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
-Behavior Flow: CURRENT (`docs/flow/practice-session-lifecycle.md`；
-  `docs/flow/grounded-semantic-validation.md`；S8 evaluator flows remain current)
+Behavior Flow: CURRENT（含 `docs/flow/owner-scoped-learning-task-planning.md`；Practice / Evaluator flows remain current）
 M1-S7 baseline server verification: PRIOR PASS (622 tests / 0 failures / 0 errors / 11 Redis-related conditional skips)
 M1-S7 baseline migration verification: PRIOR PASS (PostgreSQL 18.6; Flyway V1-V10)
 S7 source extraction verification: PRIOR PASS — relevant unit 55/55；database integration 3 SKIPPED because
   RUN_DATABASE_TESTS was unset；external container verification NOT_RERUN by user direction
 Client production build: PRIOR PASS / NOT_RERUN for server-only M1-S7
-Compose infrastructure: S8T disposable PostgreSQL removed after verification
-Documentation reconciliation: COMPLETE for M1-S8T post-merge
-Primary local database: NOT USED for S8T verification；current migration level not rechecked
+Compose infrastructure: S9 disposable PostgreSQL containers removed after verification
+Documentation reconciliation: COMPLETE for M1-S9 implementation candidate
+Primary local database: NOT USED for S9 verification
 M0 integrated closeout: PASS
-Production baseline: M1-S8T COMPLETE (`c2dbb4f`)
+Production baseline: M1-S8T COMPLETE on main (`c2dbb4f`)
+M1-S9 branch candidate: implementation / review / external verification COMPLETE (`786f124`)
 M1 Architecture Decision: APPROVED
 M1 Phase Slice Plan: APPROVED
 M1-D1 Documentation Review: PASS (2026-09-03)
@@ -494,9 +498,14 @@ M1-S8T deferred scope: actual support exposure capture、M2 qualification/aggreg
   NOT_IMPLEMENTED
 M1-S8T integration / merge: COMPLETE（PR #25；`c2dbb4f` on main）
 M1-S9 Design / Scope: APPROVED（2026-09-10；`docs/features/PLANNER_ENRICHMENT.md`）
-M1-S9A Current Slice Contract: APPROVED（2026-09-10）— Deterministic Candidate Set
-M1-S9A implementation: NOT_STARTED — assigned to Zcode
-M1-S9B+: NOT_AUTHORIZED
+M1-S9A–S9F implementation / Critical Review / Architecture: PASS；COMPLETE（`d68d70f`…`786f124`）
+M1-S9 local verification: PASS — Planner Service 36/36、Controller 17/17、Awaiter 10/10
+M1-S9 external verification: PASS（2026-09-15/16）— disposable PostgreSQL 18.6 + pgvector 0.8.6；empty schema
+  Flyway V1–V17；fake-worker planning integration 12/12；19-class affected regression 186/186；临时容器已删除，
+  primary database 未使用
+M1-S9 Behavior Flow: CURRENT（`docs/flow/owner-scoped-learning-task-planning.md`）
+M1-S9 full-feature Ownership Check: PENDING
+M1-S9 deferred / not verified scope: live Provider、frontend、retry/recovery、M2 learner-state context NOT_RUN / NOT_IMPLEMENTED
 M2C Product / Architecture Scope: APPROVED（2026-09-10）
 M2C Phase allocation: APPROVED — after M2, before M3；does not renumber M3–M6
 M2C Current Slice Contract / implementation: NOT_APPROVED / NOT_STARTED
@@ -504,11 +513,15 @@ M2C Current Slice Contract / implementation: NOT_APPROVED / NOT_STARTED
 
 ## Next Action
 
-Zcode 按 `docs/features/PLANNER_ENRICHMENT.md` 第 11 节实现 S9A，执行 targeted verification，并携真实 Diff 与
-test evidence 停在 `REVIEW_PENDING`；随后 Codex 只对 S9A 执行 Critical Diff Review。不得自动开始 S9B。
+执行一次精简的 M1-S9 full-feature Ownership Check，确认用户能够解释 Java / Model authority、Run / Job / task
+finalization 与 fallback / late-result 边界；完成前不得开始 M1-S10。
 
 ## Blockers
 
+M1-S9 无已知 Code Review、Architecture、PostgreSQL verification 或 Documentation blocker；当前唯一未完成 Gate
+是 full-feature Ownership Check。S9F external verification 使用 disposable PostgreSQL 18.6 + pgvector 0.8.6
+验证 empty schema Flyway V1–V17、fake-worker planning integration 12/12 与 affected regression 186/186；临时容器
+已删除，primary database 未使用，live Provider 与 frontend 未验证。
 M1-S8T 无剩余 Code Review / Verification / Documentation / Ownership / merge blocker；PR #25 已 merge。
 S8T external verification 使用独立 disposable PostgreSQL 18.6 验证 empty schema Flyway V1–V14，以及 Planner、
 Practice 与 Grounded Evaluator Reader 的 47 项 integration regression；临时容器已删除，未将 primary database

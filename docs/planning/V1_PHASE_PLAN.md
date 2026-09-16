@@ -156,7 +156,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
 | M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
 | M1-S8T | Minimum guided text learning | COMPLETE — S8T-A/B/C merged to main in PR #25 (`c2dbb4f`)；review/external/docs/ownership PASS |
-| M1-S9 | Optional Planner enrichment | DESIGN_SCOPE_APPROVED — S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED |
+| M1-S9 | Optional Planner enrichment | OWNERSHIP_PENDING — S9A–S9F implementation/review/PostgreSQL/Behavior Flow COMPLETE (`d68d70f`…`786f124`) |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
@@ -321,8 +321,11 @@ Understanding `UNDERSTOOD`，Human Touch `NOT_REQUIRED`；用户能够解释 lea
 support-condition evidence、immutable response snapshot、exact-version history 与长期状态 authority 边界。
 PR #25 已于 2026-09-10 merge to main as `c2dbb4f`；以上测试是 merge candidate 的 prior evidence，本次
 post-merge 文档收口未重跑。S8T 状态为 `COMPLETE`。M1-S9 Design / Scope 与 slice breakdown 已于
-2026-09-10 批准；S9A Current Slice Contract 随后获批交由 Zcode 实现，见
-[`PLANNER_ENRICHMENT.md`](../features/PLANNER_ENRICHMENT.md)。S9A 完成后停在 `REVIEW_PENDING`，S9B 未授权。
+2026-09-10 批准，S9A–S9F 随后按 Current Slice Contract 逐项批准并实现，见
+[`PLANNER_ENRICHMENT.md`](../features/PLANNER_ENRICHMENT.md)。当前 implementation / Critical Review / Architecture
+与 Behavior Flow COMPLETE；local targeted 63/63、disposable PostgreSQL 18.6 empty-schema Flyway V1–V17、
+fake-worker integration 12/12、19-class affected regression 186/186 PASS。M1-S9 当前停在 full-feature
+`OWNERSHIP_PENDING`；M1-S10 仍为 `SCOPE_NOT_APPROVED`。
 
 ### M2 — Persistent Adaptation Loop
 
