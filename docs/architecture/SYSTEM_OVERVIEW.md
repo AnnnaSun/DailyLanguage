@@ -17,6 +17,8 @@
 >
 > 详细数据链路见 `DATA_FLOW.md`。
 >
+> PostgreSQL 表职责与关联关系见 `DATABASE_SCHEMA.md`。
+>
 > Agent / LLM / Tool 运行链路见 `AGENT_FLOW.md`。
 
 ---
