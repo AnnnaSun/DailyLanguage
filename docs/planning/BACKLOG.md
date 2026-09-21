@@ -337,3 +337,49 @@ AI 直接给出正确答案或更自然的改写，可以改善一次输出，�
 - 用 Eval 检查 correction correctness、counterexample validity、表达自然度与多样性、难度适配、交互负担和后续 Transfer，而不是只统计完成步骤数。
 
 本条目只保存候选 Practice enhancement，不代表进入 V1、当前 Phase，或批准新增 Agent、production dependency、长期状态类型与 Architecture Change。
+
+## IDEA-014 — Advanced adaptive spoken conversation coaching
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: POST_V1_REVIEW
+- Type: FUTURE_PRACTICE
+
+### Context
+
+V1 已批准 `M2C — Minimum Adaptive Text Conversation` 与 M5 turn-based Voice 的受控最小能力，但只验证一个
+有限 text scenario 的显式求助、渐进辅助、目标语言重新表达和变化场景 transfer。更自然的实时口语教练需要处理
+用户停顿、设备和网络延迟、STT endpoint、打断、音频质量、发音维度、隐私与异步评价；这些问题不能通过一个
+固定 silence threshold 或通用 LLM Prompt 安全解决。
+
+以下能力明确延期：
+
+- realtime full-duplex voice、streaming 与 barge-in；
+- semantic endpointing，以及按用户、语言、任务和语速调整 hesitation threshold；
+- 从声音推断紧张、自信、情绪或学习意愿；
+- phoneme、stress、linking、intonation、prosody 或 accent pronunciation scoring；
+- 对每个 turn 自动实时纠错，或根据回答长度机械要求展开；
+- 无限动态场景、大规模 topic graph、完整口语课程或 exam speaking curriculum；
+- Avatar、表情动作、复杂游戏化、排行榜或社交对练；
+- 从完整私人 Conversation 自动生成未经过 provenance / privacy review 的长期内容库。
+
+这些能力不得改变 V1 Evidence 边界：STT 只产生 transcript candidate，不证明 pronunciation；短回答可以是
+task-appropriate success；一次迟疑、提示请求或中文输入不能直接形成 Weakness；Conversation Model 不拥有长期状态
+mutation authority。相关已存在条目包括 IDEA-009 Shadow Reading、IDEA-010 Realtime Voice Runtime 与 IDEA-013
+Explanation / Alternative Expression Practice，本条目只统一保存其上的 advanced spoken coaching 产品边界，
+不替代这些条目的独立问题。
+
+### Post-V1 Review
+
+根据 V1 dogfooding、turn latency、assistance usage、abandon rate、STT correction、interaction Eval 与 transfer
+Evidence 决定：
+
+- turn-based interaction 是否真实阻碍自然沟通，是否值得承担 realtime runtime 复杂度；
+- 用户迟疑主要来自语言困难、思考、设备、网络还是交互设计，能否安全建立个体化阈值；
+- pronunciation feedback 是否解决首批用户问题，以及采用专用 Provider、保存何种 audio / derived Evidence；
+- realtime correction 是否改善学习结果，还是破坏 fluency、增加焦虑和 interruption burden；
+- dynamic scenario / topic generation 相对有限、版本化材料是否产生足够 Product Value；
+- 音频、transcript、private Conversation 的 retention、consent、deletion 与 trace boundary。
+
+本条目只批准未来评估，不批准新的 Voice runtime、Pronunciation Provider、production dependency、schema、
+长期能力类型、Prompt 或实现。

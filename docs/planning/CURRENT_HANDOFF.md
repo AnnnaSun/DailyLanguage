@@ -6,104 +6,89 @@
 ## Snapshot
 
 ```text
-Updated At: 2026-09-04 15:01 CST
+Updated At: 2026-09-16
 Updated By: Codex
-Handoff State: CURRENT — prior M1-S3 snapshot 已根据当前 Git 与 M1-S4 Diff 刷新
-Handoff Reason: 用户提供 Codex 剩余额度 5% 的明确 signal，并把 M1-S4 external verification 改交 Zcode
+Handoff State: CURRENT — docs-only M1-S9 reconciliation
+Handoff Reason: 用户明确要求同步 S9 final implementation / verification facts，并继续在 macOS 开发
 ```
 
 ## Branch / HEAD / Worktree
 
 ```text
-Branch: codex/m1s4-current-slice-contract
-HEAD: cfe9884（M1-S3 documentation closeout）
-Worktree Summary: DIRTY — 6 个 M1-S4 untracked implementation/test files + 本 handoff snapshot；无其他已发现修改
+Branch: architecture/M1S9-OptionalPlannerEnrichment
+HEAD: 786f124
+Remote: origin/architecture/M1S9-OptionalPlannerEnrichment at 786f124
+Worktree Summary: DIRTY — 仅本次 7 个 M1-S9 reconciliation docs；无 Production / Test change
 ```
 
 ## Current Product Gate
 
 ```text
 Current Phase: M1 — Minimum Text Practice Loop
-Current Slice: M1-S4 — Owner-scoped planning API
-Slice Gate: EXTERNAL_VERIFICATION_PENDING
-Stop Point: implementation complete；Codex Critical Review 与 HIGH finding delta Review PASS；
-  PostgreSQL/Flyway/Integration、Behavior Flow、Human Ownership 与 commit 尚未完成
+Current Feature: M1-S9 — Optional Planner Enrichment
+Feature Gate: OWNERSHIP_PENDING
+Stop Point: S9A–S9F implementation、Critical/delta Review、external verification、Behavior Flow 与
+  docs reconciliation COMPLETE；不开始 M1-S10
 ```
 
 ## Approved Scope / Explicit Non-scope
 
-- Approved：authenticated、CSRF-protected
-  `POST /api/language-profiles/{languageProfileId}/learning-tasks`；通过 explicit Application Service 串联
-  owned `LanguageProfile`、existing deterministic `LearningTaskPlanner` 与
-  `LearningTaskRepository.createOwned`，成功返回数据库创建后的 durable `PLANNED` task，失败返回 stable typed code。
-- Invariants：`userId` 只来自 authenticated `UserContext`；request Profile 与 Planner result Profile 必须相同；
-  Planner unavailable 不写数据库；Repository 继续以 `INSERT ... SELECT` 原子重校验 owner/profile/target language；
-  exact `materialId + publishedVersion` 不变；unknown 与 wrong-owner Profile 对外不可区分。
-- API decision：request 只含 `supportLanguage`、`requestedDifficulty`、`availableMinutes`；M1 difficulty 仅
-  `FOUNDATION`；support language 规范化为 lowercase BCP 47；成功返回 201 + Location；业务失败使用
-  400 / 404 / 422 / 503 contract。
-- Explicit Non-scope：GET/start/complete task API、PracticeSession、response、assessment、Evaluator、Model enrichment、
-  skip/replace、client UI、PlanningRun、idempotency/dedup、active-task uniqueness、schema/migration/Mapper change、
-  Evidence/Memory/Weakness/Level/Mastery、M1-S5+、commit/push/merge。
+- Implemented：Java 生成并持有合法 candidate truth；无 provider pair 时 deterministic planning；合法 optional
+  pair 走 fixed `PLANNING` route、durable Run/Job/candidate snapshot、transaction-free dispatch、bounded wait 与
+  atomic finalization，最终只返回 durable `LearningTask`。
+- Invariants：Model 只能选择 Java offered exact identity 并生成 bounded `recommendationReason`；Java 严格验证
+  schema、candidate membership、owner/profile identity 与 persistence transition；failure/timeout/invalid output
+  回到同一 deterministic fallback，late result 不覆盖 terminal Run，最多创建一个 task。
+- Explicit Non-scope：live Provider quality、frontend Credential UX、automatic retry / process-recovery、M2
+  learner-state context、Learning Memory / Weakness / Level mutation、M1-S10+。
 
 ## Completed Work
 
-1. M1-S4 Current Slice Contract 已由用户批准，并把 implementation owner 指定为 Zcode；
-2. Zcode 新增 3 个 Production files：`LearningTaskPlanningService`、`LearningTaskPlanningResult`、
-   `LearningTaskPlanningController`；
-3. Zcode 新增 3 个 test files：Service unit、HTTP contract/security、database-gated Application integration；
-4. Codex 首轮 Critical Diff Review 发现 HIGH：Application 未把 Planner result Profile 绑定到 URL/owned Profile；
-5. Zcode 已在持久化前增加 profile identity guard，并增加“同一 user 的另一 Profile”回归测试；
-6. Codex delta-only Review：Scope MATCH、Architecture PASS、HIGH finding CLOSED、无剩余 blocking code finding；
-7. 用户因 Codex 剩余额度 5%，明确把 PostgreSQL/Flyway/Integration verification 改交 Zcode。
+1. S9A–S9F 已按 Current Slice Contract 逐项批准、实现与 Review，commit 范围 `d68d70f`…`786f124`；
+2. versioned Prompt / strict output contract、candidate snapshot、PlanningRun lifecycle、dispatch/finalization、
+   recommendation projection 与 owner-scoped API wiring 已接通；
+3. Critical Review、所有修复的 delta-only Review、PostgreSQL fake-worker integration 与 affected regression 无
+   remaining blocking finding；
+4. `docs/flow/owner-scoped-learning-task-planning.md` 已记录当前真实调用链与验证证据；
+5. 本次只 reconciliation Project/Phase/Feature/Architecture inventory 与 handoff，不修改代码或测试。
 
 ## Verification Evidence
 
-- fresh Zcode test evidence（2026-09-04，Surefire reports 存在）：
-  - `LearningTaskPlanningServiceTests`：18/18 PASS，包含 mismatched same-user Profile fail-closed；
-  - `LearningTaskPlanningControllerTests`：12/12 PASS；
-  - `DeterministicLearningTaskPlannerTests`：14/14 PASS；
-  - Zcode reported affected regression：78/78 PASS；
-  - `LearningTaskPlanningIntegrationTests`：5 个因未设置 `RUN_DATABASE_TESTS=true` skipped。
-- fresh Codex read-only evidence（2026-09-04）：
-  - 实际范围仍为批准的 6 个 untracked files；
-  - delta guard 位于 `createOwned` 前，mismatch 返回 `SELECTED_MATERIAL_UNAVAILABLE` 且测试验证 Repository 零交互；
-  - delta-only Review PASS；两个增量文件未发现 whitespace error。
-- not run：真实 PostgreSQL M1-S4 integration、empty-database Flyway V1–V8、S3+S4 affected database regression、
-  wider server regression after final candidate、真实容器 sanitized 5xx 检查、client build。
+- fresh 2026-09-15 local targeted：Planner Service 36/36、Controller 17/17、Awaiter 10/10 PASS；
+- fresh 2026-09-15 disposable PostgreSQL 18.6 + pgvector 0.8.6：empty schema Flyway V1–V17，
+  `LearningTaskPlanningIntegrationTests` fake-worker 12/12 PASS；
+- fresh 2026-09-16 same PostgreSQL baseline：19-class affected regression 186/186 PASS；
+- prior candidate verification：`git diff --check` PASS；disposable containers 已删除，primary database 未使用；
+- current docs-only reconciliation：只执行 link / terminology consistency check 与 `git diff --check`；
+- NOT_RUN：live Provider、frontend/client；本次 docs-only reconciliation 未重跑 Java / PostgreSQL tests。
 
 ## Uncommitted Changes
 
-- M1-S4 Production（untracked）：
-  - `server/src/main/java/com/dailylanguage/planner/application/LearningTaskPlanningService.java`；
-  - `server/src/main/java/com/dailylanguage/planner/application/LearningTaskPlanningResult.java`；
-  - `server/src/main/java/com/dailylanguage/planner/api/LearningTaskPlanningController.java`。
-- M1-S4 tests（untracked）：
-  - `server/src/test/java/com/dailylanguage/planner/application/LearningTaskPlanningServiceTests.java`；
-  - `server/src/test/java/com/dailylanguage/planner/application/LearningTaskPlanningIntegrationTests.java`；
-  - `server/src/test/java/com/dailylanguage/planner/api/LearningTaskPlanningControllerTests.java`。
-- Handoff：`docs/planning/CURRENT_HANDOFF.md`（本次额度型交接刷新）。
-- 未发现接手前的其他未提交修改；不得覆盖或丢弃以上文件。
+- `docs/planning/PROJECT_STATUS.md`
+- `docs/planning/V1_PHASE_PLAN.md`
+- `docs/features/PLANNER_ENRICHMENT.md`
+- `docs/architecture/MODULE_MAP.md`
+- `docs/architecture/DATA_FLOW.md`
+- `docs/architecture/AGENT_FLOW.md`
+- `docs/planning/CURRENT_HANDOFF.md`
+
+以上均为本次 docs-only reconciliation；Production / Test worktree clean at `786f124`。
 
 ## Decisions / Blockers / Risks / UNKNOWN
 
-- Decisions：`InvalidRequest` 使用 typed Application result；Profile mismatch 映射
-  `SELECTED_MATERIAL_UNAVAILABLE` / HTTP 503；POST 当前非幂等，每次成功请求可创建新的 `PLANNED` task；
-  当前不新增 migration、共享 language abstraction、ControllerAdvice 或 generic workflow abstraction。
-- Blockers：没有已知 code-review blocker；external verification、Behavior Flow、Ownership 与 commit Gate 尚未完成。
-- Risks：真实容器 sanitized 5xx 尚未验证；非幂等 POST 的不确定响应不得自动 retry；当前 6 个实现/test files
-  仍是 untracked，操作 Git 时必须显式保护。
-- UNKNOWN：M1-S4 在 PostgreSQL 18 + Flyway V1–V8 下的实际 integration 结果、最终 wider regression 结果。
+- Decisions：M1-S9 implementation / review / external verification / Behavior Flow COMPLETE；Feature 整体尚未因
+  implementation 自动获得 Ownership PASS。
+- Blockers：无已知 code、architecture、verification 或 documentation blocker；当前唯一未完成 Gate 是
+  full-feature Ownership Check。
+- Accepted limitation：process crash / background completion 仍可能留下 `NOT_READY`，留待 M1-S12 重新评估；
+  当前不扩展 retry/recovery Scope。
+- UNKNOWN：live Provider quality 与 frontend integration 未验证。
 
 ## Next Action（单一）
 
-Zcode 按用户本轮明确分工执行 M1-S4 external verification：使用 disposable PostgreSQL 18 从 empty schema
-应用/验证 Flyway V1–V8，运行 `LearningTaskPlanningIntegrationTests` 与受影响的
-`LearningTaskPersistenceIntegrationTests`，检查 exact material version、owner/profile/language isolation、PLANNED row，
-再执行 final candidate 所需的 wider server regression；区分 PASS、failure 与 environment blocker，不自动修改
-Production、开始 M1-S5 或 commit。
+执行一次精简的 M1-S9 full-feature Ownership Check，聚焦 Java / Model authority、Run / Job / task finalization
+以及 fallback / late-result 边界；完成后由用户决定 docs commit。不得自动开始 M1-S10。
 
 ## 需要用户完成的 Decision
 
-1. external verification 完成后决定是否进入 Behavior Flow / Human Ownership Gate；
-2. Ownership 完成后决定是否 commit；不得自动 commit、push、merge 或开始 M1-S5。
+Ownership Check 通过后决定是否 commit / push 本次 docs-only reconciliation；M1-S10 仍需独立 Scope approval。

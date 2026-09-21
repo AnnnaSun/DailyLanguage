@@ -26,6 +26,7 @@
             <arg column="primary_goal" javaType="java.lang.String"/>
             <arg column="task_type" javaType="java.lang.String"/>
             <arg column="planning_reason" javaType="java.lang.String"/>
+            <arg column="recommendation_reason" javaType="java.lang.String"/>
             <arg column="status" javaType="java.lang.String"/>
             <arg column="created_at" javaType="java.time.OffsetDateTime"/>
             <arg column="started_at" javaType="java.time.OffsetDateTime"/>
@@ -38,7 +39,8 @@
         task.id, task.user_id, task.language_profile_id, task.material_id, task.published_version,
         profile.language_code AS target_language, task.support_language, task.difficulty,
         task.estimated_duration_minutes, task.scenario, task.primary_goal, task.task_type,
-        task.planning_reason, task.status, task.created_at, task.started_at, task.completed_at
+        task.planning_reason, task.recommendation_reason, task.status, task.created_at,
+        task.started_at, task.completed_at
     </sql>
 
     <!-- INSERT … SELECT：只有 owner、profile 与 target language 同时匹配同一 Profile 行时才落库；
@@ -49,7 +51,8 @@
             flushCache="true">
         INSERT INTO learning_task (
             user_id, language_profile_id, material_id, published_version, support_language,
-            difficulty, estimated_duration_minutes, scenario, primary_goal, task_type, planning_reason
+            difficulty, estimated_duration_minutes, scenario, primary_goal, task_type,
+            planning_reason, recommendation_reason
         )
         SELECT profile.user_id,
                profile.id,
@@ -61,7 +64,8 @@
                #{scenario, jdbcType=VARCHAR},
                #{primaryGoal, jdbcType=VARCHAR},
                #{taskType, jdbcType=VARCHAR},
-               #{planningReason, jdbcType=VARCHAR}
+               #{planningReason, jdbcType=VARCHAR},
+               #{recommendationReason, jdbcType=VARCHAR}
         FROM language_profile profile
         WHERE profile.id = #{languageProfileId, jdbcType=OTHER}
           AND profile.user_id = #{trustedUserId, jdbcType=OTHER}

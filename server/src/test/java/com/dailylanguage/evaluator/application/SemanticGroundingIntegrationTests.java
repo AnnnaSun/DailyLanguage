@@ -1,13 +1,15 @@
 package com.dailylanguage.evaluator.application;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -46,13 +48,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * input 只能来自 owner-scoped 读取”这一组装前提的回归。
  */
 @SpringBootTest(properties = "app.registration-enabled=true")
-@Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class SemanticGroundingIntegrationTests {
 
-    private static final String ANSWER_TO_GO_TEXT = "To go, please. Thank you!";
+    // v2 guided cafe material 的第三个 step（INDEPENDENT_TRANSFER / SEMANTIC_ONLY）自由作答文本；
+    // MODEL_OUTPUT 的 exactQuote "Thank you" 必须出现在该文本中供 grounding offset 断言使用。
+    private static final String ORDER_WATER_TEXT = "A bottle of water, please. Thank you!";
     private static final String MODEL_OUTPUT = """
-            {"claims":[{"sourceTurnId":"answer-to-go","exactQuote":"Thank you","occurrenceIndex":-1,
+            {"claims":[{"sourceTurnId":"order-water-freely","exactQuote":"Thank you","occurrenceIndex":-1,
             "issueType":"NATURALNESS","explanation":"The quoted thanks reads as abrupt here.",
             "confidence":0.7}]}
             """;
@@ -78,13 +81,53 @@ class SemanticGroundingIntegrationTests {
     @Autowired
     private LearningMaterialCatalog materialCatalog;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private final SemanticGroundingValidator validator = new SemanticGroundingValidator(
             new StructuredOutputValidator(JsonMapper.builder().build()),
             new ClasspathRubricSource());
 
+    private final List<UUID> createdUserIds = new ArrayList<>();
+
+    @AfterEach
+    void cleanupCreatedUsers() {
+        // planning 走真实非事务边界（plan() 为 NEVER），数据由本测试显式按 FK 依赖顺序清理。
+        for (UUID userId : createdUserIds) {
+            jdbcTemplate.update("""
+                    DELETE FROM practice_response WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM deterministic_step_assessment WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM deterministic_assessment WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM practice_session WHERE task_id IN (
+                        SELECT id FROM learning_task WHERE user_id = ?)""", userId);
+            jdbcTemplate.update("DELETE FROM learning_task WHERE user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM language_profile WHERE user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", userId);
+        }
+        createdUserIds.clear();
+    }
+
+    private UUID newUser() {
+        UUID userId = userRepository.create();
+        createdUserIds.add(userId);
+        return userId;
+    }
+
     @Test
     void groundsModelClaimAgainstDurableOwnerScopedCompletionData() {
-        UUID ownerId = userRepository.create();
+        UUID ownerId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);
@@ -104,10 +147,10 @@ class SemanticGroundingIntegrationTests {
             GroundedClaim claim = validated.candidate().claims().getFirst();
             // offsets 必须在数据库原样保存的 learner text 上可复原，而不是内存 fixture。
             String durableText = trustedInput.responses().stream()
-                    .filter(response -> response.stepId().equals("answer-to-go"))
+                    .filter(response -> response.stepId().equals("order-water-freely"))
                     .map(LearnerResponse::learnerText)
                     .findFirst().orElseThrow();
-            assertThat(durableText).isEqualTo(ANSWER_TO_GO_TEXT);
+            assertThat(durableText).isEqualTo(ORDER_WATER_TEXT);
             assertThat(claim.startOffset()).isEqualTo(durableText.indexOf("Thank you"));
             assertThat(durableText.substring(claim.startOffset(), claim.endOffset())).isEqualTo("Thank you");
         });
@@ -115,8 +158,8 @@ class SemanticGroundingIntegrationTests {
 
     @Test
     void wrongOwnerOrWrongProfileCannotAssemblePrivateResponses() {
-        UUID ownerId = userRepository.create();
-        UUID otherUserId = userRepository.create();
+        UUID ownerId = newUser();
+        UUID otherUserId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);
@@ -136,7 +179,7 @@ class SemanticGroundingIntegrationTests {
 
     @Test
     void groundingFailureLeavesDurableCompletionAndAssessmentUnchanged() {
-        UUID ownerId = userRepository.create();
+        UUID ownerId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);
@@ -147,7 +190,7 @@ class SemanticGroundingIntegrationTests {
         LearningTask taskBefore = trustedInput.task();
         DeterministicAssessment assessmentBefore = trustedInput.assessment();
 
-        assertThat(validator.validate("{\"claims\":[{\"sourceTurnId\":\"answer-to-go\","
+        assertThat(validator.validate("{\"claims\":[{\"sourceTurnId\":\"order-water-freely\","
                 + "\"exactQuote\":\"not in the durable text\",\"occurrenceIndex\":-1,"
                 + "\"issueType\":\"GRAMMAR\",\"explanation\":\"fabricated\",\"confidence\":0.9}]}",
                 trustedInput))
@@ -173,11 +216,11 @@ class SemanticGroundingIntegrationTests {
         assertThat(startResult).isInstanceOf(StartResult.Created.class);
         UUID sessionId = ((StartResult.Created) startResult).session().id();
 
-        assertThat(practiceService.submit(profileId, sessionId, "order-drink", user,
+        assertThat(practiceService.submit(profileId, sessionId, "order-with-frame", user,
                 "Could I have a medium coffee, please?")).isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "ask-price", user, "How much is it?"))
-                .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "answer-to-go", user, ANSWER_TO_GO_TEXT))
+        assertThat(practiceService.submit(profileId, sessionId, "comprehension-check", user,
+                "A medium coffee.")).isInstanceOf(SubmitResult.Accepted.class);
+        assertThat(practiceService.submit(profileId, sessionId, "order-water-freely", user, ORDER_WATER_TEXT))
                 .isInstanceOf(SubmitResult.Accepted.class);
 
         CompletionResult completion = practiceService.complete(profileId, sessionId, user);

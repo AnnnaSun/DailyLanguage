@@ -1287,38 +1287,77 @@ Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
 
 ---
 
-## 34. Codex / Zcode Collaboration Boundary / 项目内协作边界
+## 34. User / Codex / Zcode Collaboration Boundary / 项目内协作边界
 
-除非用户对当前 Task 明确另有分工，Codex 与 Zcode 按以下项目内边界协作。
+除非用户对当前 Task 明确另有分工，用户、Codex 与 Zcode 按以下项目内边界协作。
 
-### 34.1 Codex Responsibilities
+本协作方式的目标不仅是完成交付，还要保证用户实际参与高价值的 Architecture Decision 和核心代码实现。
+Agent 可以承担产量，但不得默认替代用户完成全部架构推导与关键实现，再仅通过事后的 Explain Back 补偿。
 
-- 负责 Architecture-sensitive Design、Critical Diff Review 和最终架构把关；
+### 34.1 User Engineering Participation / 用户工程参与
+
+- A 类 Task 默认采用共同开发：Codex 先提供真实代码 Evidence、约束、风险、备选方案和待决问题，用户先给出
+  核心边界、Invariant 或 trade-off 判断，Codex 再质疑、补充并共同收敛 Current Slice Contract；不得把用户参与
+  简化为只对完整成品方案回答“同意 / 不同意”；
+- 每个有意义的 A 类完整行为闭环，默认至少保留一个 `Human Core` 由用户亲自实现或实质修改；B 类是否保留
+  `Human Core` 在 Scope 阶段按学习价值和业务风险决定；C 类默认由 Agent 完成；
+- `Human Core` 必须触及真实工程判断，例如核心 Domain Rule、状态转换、Validator 关键分支、transaction /
+  concurrency failure behavior 或关键 Integration Test。rename、注释、格式化、机械 Mapper 和无关测试不能作为
+  `Human Core`；
+- Current Slice Contract 必须明确 `Human Core` 的代码位置或边界、目标行为、Invariant、Acceptance Criteria、
+  可用的最小 scaffolding 和验证方式，并在 Agent 接管其余实现前停在 `HUMAN_CORE_READY`；
+- Codex 可以解释调用链、提供代码地址、澄清概念和 Review 用户实现，但默认不得提前给出可直接替换
+  `Human Core` 的完整最终代码；如果用户实现中存在 Finding，优先说明证据并交回用户修改，除非用户明确
+  委托 Zcode 修复；
+- 用户可以针对某个 Slice 明确选择 delivery-first、全量委托或调整 `Human Core`；这是当前 Slice 的例外，
+  不自动改变后续 Task 的默认合作方式；
+- 本规则从后续新批准的重要行为闭环开始适用，不追溯要求重写已完成的历史 Slice，也不阻塞已经进入
+  Ownership / Commit Gate 的既有 Feature。
+
+### 34.2 Codex Responsibilities
+
+- 负责 Architecture-sensitive Design 的 Evidence、约束与备选方案整理，促进用户参与核心决策，并负责
+  Critical Diff Review 和最终架构把关；
+- 在实现前帮助把共同决策转换为可执行的 Current Slice Contract 和 `Human Core`，但不以输出一套完整
+  成品方案代替用户的关键 Architecture Decision；
 - 负责 Docker、PostgreSQL、Redis、Flyway、Integration / E2E 等外部环境验证与诊断；
-- 外部验证发现业务 Production Code 问题时，输出可定位的 Finding 并交回 Zcode 修复；除非用户明确重新分配实现责任，不在 Review 阶段接管 Zcode 的 Production Code；
+- 外部验证发现业务 Production Code 问题时，输出可定位的 Finding；属于 `Human Core` 的问题交回用户，
+  其余问题交回 Zcode。除非用户明确重新分配实现责任，不在 Review 阶段接管对应作者的 Production Code；
 - 有限额度优先用于 Architecture Decision、外部验证和 Critical Review，不重复实现已由 Zcode 完成的 Slice。
 
 Codex 可执行和诊断外部环境，但 Docker / deployment config、Flyway migration 或其他 repository file
 的修改仍必须属于当前已批准 Scope。涉及破坏性数据操作时，继续遵守本文档的授权与停止条件。
 
-### 34.2 Zcode Responsibilities
+### 34.3 Zcode Responsibilities
 
-- 负责已批准 Current Slice 的 Production Code、Unit / Module Tests 和实现内修复；
-- 负责修复 Codex Review 或外部验证发现的业务代码问题，保持同一 Slice 的实现 Ownership；
+- 负责已批准 Current Slice 中除预留 `Human Core` 外的 Production Code、Unit / Module Tests 和实现内修复；
+- 可以先完成 Current Slice Contract 明确允许的最小 scaffolding，使用户能够实现 `Human Core`；在
+  `HUMAN_CORE_READY` 后不得抢先完成或覆盖该核心部分；
+- 负责修复 Codex Review 或外部验证发现的非 `Human Core` 业务代码问题；只有用户明确委托时才修复
+  `Human Core`，保持同一 Slice 中清晰的实现 Ownership；
 - 开发阶段优先运行 targeted Unit / Module Tests；Docker / Database / Integration / E2E 的最终验证证据由 Codex 确认；
 - 不得因为外部验证未完成而把 Slice 描述为已通过最终验证。
 
-### 34.3 Review and Verification Loop
+### 34.4 Collaboration, Review and Verification Loop
 
 ```text
-Codex Design / Scope
-  → Zcode Implementation + Unit / Module Tests
+Codex Evidence / Constraints / Alternatives
+  → User + Codex Architecture Decision / Scope
+  → Current Slice Contract + Human Core
+  → optional minimal scaffolding
+  → HUMAN_CORE_READY
+  → User Human Core Implementation
+  → Zcode Remaining Implementation + Unit / Module Tests
   → Codex Critical Review + External Verification
-  → Zcode fixes application findings
+  → Responsible author fixes findings
   → Codex delta-only Review + affected external regression
   → User Ownership / Commit Decision
 ```
 
+- A 类完整行为闭环未完成已约定的 `Human Core` 时，不得进入 `READY_TO_COMMIT`，除非用户已经对该闭环
+  明确选择全量委托；
+- `Human Core` 是实现参与 Gate，不替代 Critical Review；正式 Explain Back / Ownership Check 仍默认放在有意义的
+  完整行为闭环后，不因每个小 Slice 重复举行；
 - Codex 应尽量一次性汇总 blocking findings；Zcode 批量修复后，Codex 优先只复查增量 Diff 与受影响 Critical Flow；
 - 外部验证在 candidate 稳定后集中执行；修复阶段先重跑受影响范围，最终 Diff 确认后再执行必要的 wider regression；
 - Review 发现 Current Slice Contract 本身有问题时，标记为 Design / Scope Issue 并请求用户决定，不由任一 Agent 静默改变架构；

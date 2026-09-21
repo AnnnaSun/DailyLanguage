@@ -22,8 +22,11 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.dailylanguage.content.domain.MaterialDifficulty;
 import com.dailylanguage.content.domain.MaterialIdentity;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.Created;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidProviderCredential;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidProviderId;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidRequest;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.LanguageProfileNotFound;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.ProviderMismatch;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.Unavailable;
 import com.dailylanguage.planner.application.LearningTaskPlanningService;
 import com.dailylanguage.planner.domain.LearningTask;
@@ -122,6 +125,35 @@ class LearningTaskPlanningControllerTests {
     }
 
     @Test
+    void invalidProviderPairReturnsStableErrorCodes() throws Exception {
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new InvalidProviderId());
+
+        mockMvc.perform(authenticatedPlanningPost())
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INVALID_PROVIDER_ID"));
+
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new InvalidProviderCredential());
+
+        mockMvc.perform(authenticatedPlanningPost())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PROVIDER_CREDENTIAL"));
+    }
+
+    @Test
+    void providerMismatchReturnsUnprocessableEntity() throws Exception {
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new ProviderMismatch());
+
+        mockMvc.perform(authenticatedPlanningPost())
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("PLANNING_PROVIDER_MISMATCH"));
+    }
+
+    @Test
     void inaccessibleProfileReturnsNotFoundWithoutOwnershipDisclosure() throws Exception {
         when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
                 .thenReturn(new LanguageProfileNotFound());
@@ -174,8 +206,48 @@ class LearningTaskPlanningControllerTests {
                 .andExpect(jsonPath("$.createdAt").value("2026-09-04T10:15:30.123Z"))
                 .andExpect(jsonPath("$.startedAt").value(nullValue()))
                 .andExpect(jsonPath("$.completedAt").value(nullValue()))
+                // deterministic fallback 不携带 recommendation reason。
+                .andExpect(jsonPath("$.recommendationReason").value(nullValue()))
                 // ownership identity 不回传给客户端。
                 .andExpect(jsonPath("$.userId").doesNotExist());
+    }
+
+    @Test
+    void projectsBoundedRecommendationReasonForEnrichedTasks() throws Exception {
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new Created(enrichedTask()));
+
+        mockMvc.perform(authenticatedPlanningPost())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.planningReason").value("MODEL_ENRICHED"))
+                .andExpect(jsonPath("$.materialId").value("en-builtin-greeting-intro"))
+                // 只有通过 S9B bounded validation 的 Model reason 进入响应；fallback 为 null。
+                .andExpect(jsonPath("$.recommendationReason").value("今天在咖啡馆练习点单，并追问今日特供。"));
+    }
+
+    @Test
+    void passesOptionalProviderFieldsIntoTheCommandWithoutLeakingCredential() throws Exception {
+        String credentialSecret = "header-provided-secret";
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new Created(durableTask()));
+
+        String body = mockMvc.perform(authenticatedPlanningPost()
+                        .header("X-Model-Provider-Credential", credentialSecret)
+                        .content("""
+                                {"supportLanguage":"zh-CN","requestedDifficulty":"FOUNDATION","availableMinutes":10,"providerId":"deepseek"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        org.mockito.ArgumentCaptor<LearningTaskPlanningService.PlanningCommand> commandCaptor =
+                org.mockito.ArgumentCaptor.forClass(LearningTaskPlanningService.PlanningCommand.class);
+        verify(planningService).plan(eq(PROFILE_ID), any(UserContext.class), commandCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().providerId()).isEqualTo("deepseek");
+        org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().providerCredentialSecret())
+                .isEqualTo(credentialSecret);
+        // Credential 只进入当前调用链，不进入响应。
+        org.assertj.core.api.Assertions.assertThat(body).doesNotContain(credentialSecret);
+        org.assertj.core.api.Assertions.assertThat(body).doesNotContain("providerCredential");
     }
 
     @Test
@@ -204,6 +276,28 @@ class LearningTaskPlanningControllerTests {
         org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().requestedDifficulty())
                 .isEqualTo("FOUNDATION");
         org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().availableMinutes()).isEqualTo(10);
+    }
+
+    @Test
+    void blankProviderFieldsReachTheServiceAsRawValues() throws Exception {
+        // blank 是"出现"而非"缺失"：Controller 原样传递 raw 值，pair 合法性由 Service 裁决为 400。
+        when(planningService.plan(eq(PROFILE_ID), any(UserContext.class), any()))
+                .thenReturn(new InvalidProviderId());
+
+        mockMvc.perform(authenticatedPlanningPost()
+                        .header("X-Model-Provider-Credential", " ")
+                        .content("""
+                                {"supportLanguage":"zh-CN","requestedDifficulty":"FOUNDATION","availableMinutes":10,"providerId":""}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PROVIDER_ID"));
+
+        org.mockito.ArgumentCaptor<LearningTaskPlanningService.PlanningCommand> commandCaptor =
+                org.mockito.ArgumentCaptor.forClass(LearningTaskPlanningService.PlanningCommand.class);
+        verify(planningService).plan(eq(PROFILE_ID), any(UserContext.class), commandCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().providerId()).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().providerCredentialSecret())
+                .isEqualTo(" ");
     }
 
     @Test
@@ -269,6 +363,27 @@ class LearningTaskPlanningControllerTests {
                 "Order a drink and ask a follow-up question",
                 LearningTaskPlan.TaskType.TEXT_PRACTICE,
                 LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK,
+                LearningTask.Status.PLANNED,
+                OffsetDateTime.parse("2026-09-04T10:15:30.123Z"),
+                Optional.empty(),
+                Optional.empty());
+    }
+
+    private static LearningTask enrichedTask() {
+        return new LearningTask(
+                TASK_ID,
+                AUTHENTICATED_USER_ID,
+                PROFILE_ID,
+                new MaterialIdentity("en-builtin-greeting-intro", "v1"),
+                "en",
+                "zh-cn",
+                MaterialDifficulty.FOUNDATION,
+                10,
+                "GREETING_INTRODUCTION",
+                "Introduce yourself and ask one follow-up question",
+                LearningTaskPlan.TaskType.TEXT_PRACTICE,
+                LearningTaskPlan.PlanningReason.MODEL_ENRICHED,
+                Optional.of("今天在咖啡馆练习点单，并追问今日特供。"),
                 LearningTask.Status.PLANNED,
                 OffsetDateTime.parse("2026-09-04T10:15:30.123Z"),
                 Optional.empty(),

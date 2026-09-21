@@ -8,9 +8,12 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dailylanguage.content.domain.MaterialDifficulty;
@@ -34,6 +37,9 @@ class LearningTaskPersistenceIntegrationTests {
 
     @Autowired
     private LearningTaskRepository learningTaskRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void createsPlannedOwnedTaskThatRoundTripsPlanExactly() {
@@ -61,12 +67,156 @@ class LearningTaskPersistenceIntegrationTests {
         assertThat(task.taskType()).isEqualTo(LearningTaskPlan.TaskType.TEXT_PRACTICE);
         assertThat(task.planningReason()).isEqualTo(
                 LearningTaskPlan.PlanningReason.DETERMINISTIC_BUILT_IN_FALLBACK);
+        assertThat(task.recommendationReason()).isEmpty();
         assertThat(task.status()).isEqualTo(LearningTask.Status.PLANNED);
         assertThat(task.createdAt()).isNotNull();
         assertThat(task.startedAt()).isEmpty();
         assertThat(task.completedAt()).isEmpty();
         assertThat(learningTaskRepository.findOwned(task.id(), ownerId, profile.id()))
                 .contains(task);
+    }
+
+    @Test
+    void createsModelEnrichedOwnedTaskThatRoundTripsRecommendationReason() {
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+        LearningTaskPlan enrichedPlan = new LearningTaskPlan(
+                profile.id(),
+                new MaterialIdentity("builtin:text-practice/morning-routine", "2026.03.1+snapshot"),
+                "en",
+                "zh",
+                MaterialDifficulty.FOUNDATION,
+                7,
+                "Ordering breakfast at a café",
+                "Ask the staff a follow-up question about today's specials",
+                LearningTaskPlan.TaskType.TEXT_PRACTICE,
+                LearningTaskPlan.PlanningReason.MODEL_ENRICHED,
+                Optional.of("今天在咖啡馆练习点单，并追问今日特供。"));
+
+        Optional<LearningTask> created = learningTaskRepository.createOwned(ownerId, enrichedPlan);
+
+        assertThat(created).isPresent();
+        LearningTask task = created.orElseThrow();
+        assertThat(task.planningReason()).isEqualTo(LearningTaskPlan.PlanningReason.MODEL_ENRICHED);
+        assertThat(task.recommendationReason()).contains("今天在咖啡馆练习点单，并追问今日特供。");
+        assertThat(task.status()).isEqualTo(LearningTask.Status.PLANNED);
+        assertThat(learningTaskRepository.findOwned(task.id(), ownerId, profile.id()))
+                .contains(task);
+    }
+
+    @Test
+    void roundTripsMaximumCodePointRecommendationReason() {
+        // 239 个 ASCII + 1 个 astral 字符：240 个 code points、241 个 UTF-16 chars，
+        // 证明列边界按 Unicode code points 而不是 Java chars 裁决。
+        String maximumReason = "x".repeat(239) + "\uD835\uDD4A";
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+        LearningTaskPlan enrichedPlan = new LearningTaskPlan(
+                profile.id(),
+                new MaterialIdentity("builtin:text-practice/morning-routine", "2026.03.1+snapshot"),
+                "en",
+                "zh",
+                MaterialDifficulty.FOUNDATION,
+                7,
+                "Ordering breakfast at a café",
+                "Ask the staff a follow-up question about today's specials",
+                LearningTaskPlan.TaskType.TEXT_PRACTICE,
+                LearningTaskPlan.PlanningReason.MODEL_ENRICHED,
+                Optional.of(maximumReason));
+
+        Optional<LearningTask> created = learningTaskRepository.createOwned(ownerId, enrichedPlan);
+
+        assertThat(created).isPresent();
+        assertThat(created.orElseThrow().recommendationReason()).contains(maximumReason);
+    }
+
+    @Test
+    void rejectsModelEnrichedRowWithoutRecommendationReasonAtDatabaseLevel() {
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+
+        // 绕过 Java domain 直写数据库：pairing 属于 durable constraint，必须在持久层同样 fail closed。
+        assertThatThrownBy(() -> insertRawLearningTaskRow(
+                ownerId, profile.id(), "MODEL_ENRICHED", null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void rejectsDeterministicRowWithRecommendationReasonAtDatabaseLevel() {
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+
+        assertThatThrownBy(() -> insertRawLearningTaskRow(
+                ownerId, profile.id(), "DETERMINISTIC_BUILT_IN_FALLBACK", "today's specials"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "",
+            " ",
+            " reason with leading whitespace",
+            "reason with trailing whitespace ",
+            "reason\twith tab",
+            "reason\nwith newline",
+            "reason\rwith carriage return",
+            "reason\u2028with line separator",
+            "reason\u2029with paragraph separator",
+            "cafe\u0301"
+    })
+    void rejectsInvalidRecommendationReasonTextAtDatabaseLevel(String invalidReason) {
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+
+        // 与 Domain tests 平行的 durable constraint regression：reason 文本边界由数据库层
+        // 独立裁决，防止 Java 校验与 ck_learning_task_recommendation_reason 漂移。
+        assertThatThrownBy(() -> insertRawLearningTaskRow(
+                ownerId, profile.id(), "MODEL_ENRICHED", invalidReason))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void rejectsRecommendationReasonExceedingColumnLimitAtDatabaseLevel() {
+        UUID ownerId = userRepository.create();
+        LanguageProfileIdentity profile = languageProfileRepository
+                .create(ownerId, "en")
+                .orElseThrow();
+
+        // 241 code points 由 VARCHAR(240) 列边界拒绝（SQLSTATE 22001），同样 fail closed。
+        assertThatThrownBy(() -> insertRawLearningTaskRow(
+                ownerId, profile.id(), "MODEL_ENRICHED", "x".repeat(241)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private void insertRawLearningTaskRow(
+            UUID ownerId, UUID languageProfileId, String planningReason, String recommendationReason) {
+        jdbcTemplate.update(
+                "INSERT INTO learning_task (user_id, language_profile_id, material_id, published_version,"
+                        + " support_language, difficulty, estimated_duration_minutes, scenario, primary_goal,"
+                        + " task_type, planning_reason, recommendation_reason)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ownerId,
+                languageProfileId,
+                "builtin:text-practice/morning-routine",
+                "2026.03.1+snapshot",
+                "zh",
+                "FOUNDATION",
+                7,
+                "Ordering breakfast at a café",
+                "Ask the staff a follow-up question about today's specials",
+                "TEXT_PRACTICE",
+                planningReason,
+                recommendationReason);
     }
 
     @Test

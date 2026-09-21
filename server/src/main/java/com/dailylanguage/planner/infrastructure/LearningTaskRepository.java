@@ -43,7 +43,8 @@ public class LearningTaskRepository {
                 plan.scenario(),
                 plan.primaryGoal(),
                 plan.taskType().name(),
-                plan.reason().name());
+                plan.reason().name(),
+                plan.recommendationReason().orElse(null));
 
         UUID taskId = learningTaskMapper.insertOwnedAndReturnId(insert);
         if (taskId == null) {
@@ -108,6 +109,7 @@ public class LearningTaskRepository {
                 task.primaryGoal(),
                 LearningTaskPlan.TaskType.valueOf(task.taskType()),
                 LearningTaskPlan.PlanningReason.valueOf(task.planningReason()),
+                Optional.ofNullable(task.recommendationReason()),
                 LearningTask.Status.valueOf(task.status()),
                 task.createdAt(),
                 Optional.ofNullable(task.startedAt()),
@@ -133,7 +135,8 @@ record NewLearningTaskRow(
         String scenario,
         String primaryGoal,
         String taskType,
-        String planningReason) {
+        String planningReason,
+        String recommendationReason) {
 }
 
 record StoredLearningTask(
@@ -150,6 +153,7 @@ record StoredLearningTask(
         String primaryGoal,
         String taskType,
         String planningReason,
+        String recommendationReason,
         String status,
         OffsetDateTime createdAt,
         OffsetDateTime startedAt,

@@ -11,12 +11,16 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.dailylanguage.planner.application.LearningTaskPlanningResult;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.Created;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidProviderCredential;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidProviderId;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.InvalidRequest;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.LanguageProfileNotFound;
+import com.dailylanguage.planner.application.LearningTaskPlanningResult.ProviderMismatch;
 import com.dailylanguage.planner.application.LearningTaskPlanningResult.Unavailable;
 import com.dailylanguage.planner.application.LearningTaskPlanningService;
 import com.dailylanguage.planner.domain.LearningTask;
@@ -26,10 +30,13 @@ import com.dailylanguage.security.domain.UserContext;
 /**
  * Owner-scoped planning 的 HTTP 入口。资源归属只接受 Spring Security 建立的 UserContext；
  * request body、query parameter 或 header 中的 userId 不参与授权判断，成功响应也来自数据库
- * 创建后的 durable LearningTask，且不回传 userId 或任何 Content 本体。
+ * 创建后的 durable LearningTask，且不回传 userId 或任何 Content 本体。optional enrichment 的
+ * Credential 只经 {@link #PROVIDER_CREDENTIAL_HEADER} 进入当前内存调用链，不进入响应。
  */
 @RestController
 public class LearningTaskPlanningController {
+
+    static final String PROVIDER_CREDENTIAL_HEADER = "X-Model-Provider-Credential";
 
     private final LearningTaskPlanningService planningService;
 
@@ -42,18 +49,27 @@ public class LearningTaskPlanningController {
     ResponseEntity<?> createLearningTask(
             @PathVariable UUID languageProfileId,
             @RequestBody CreateLearningTaskRequest request,
-            @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext) {
+            @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext,
+            @RequestHeader(value = PROVIDER_CREDENTIAL_HEADER, required = false) String providerCredentialSecret) {
         LearningTaskPlanningResult result = planningService.plan(
                 languageProfileId,
                 userContext,
                 new LearningTaskPlanningService.PlanningCommand(
                         request.supportLanguage(),
                         request.requestedDifficulty(),
-                        request.availableMinutes()));
+                        request.availableMinutes(),
+                        request.providerId(),
+                        providerCredentialSecret));
 
         return switch (result) {
             case InvalidRequest ignored ->
                     planningFailure(HttpStatus.BAD_REQUEST, "INVALID_PLANNING_REQUEST");
+            case InvalidProviderId ignored ->
+                    planningFailure(HttpStatus.BAD_REQUEST, "INVALID_PROVIDER_ID");
+            case InvalidProviderCredential ignored ->
+                    planningFailure(HttpStatus.BAD_REQUEST, "INVALID_PROVIDER_CREDENTIAL");
+            case ProviderMismatch ignored ->
+                    planningFailure(HttpStatus.UNPROCESSABLE_ENTITY, "PLANNING_PROVIDER_MISMATCH");
             case LanguageProfileNotFound ignored ->
                     planningFailure(HttpStatus.NOT_FOUND, "LANGUAGE_PROFILE_NOT_FOUND");
             case Unavailable unavailable ->
@@ -84,7 +100,11 @@ public class LearningTaskPlanningController {
                 .body(LearningTaskResponse.from(task));
     }
 
-    record CreateLearningTaskRequest(String supportLanguage, String requestedDifficulty, Integer availableMinutes) {
+    record CreateLearningTaskRequest(
+            String supportLanguage,
+            String requestedDifficulty,
+            Integer availableMinutes,
+            String providerId) {
     }
 
     record PlanningErrorResponse(String code) {
@@ -103,6 +123,7 @@ public class LearningTaskPlanningController {
             String primaryGoal,
             String taskType,
             String planningReason,
+            String recommendationReason,
             String status,
             OffsetDateTime createdAt,
             OffsetDateTime startedAt,
@@ -122,6 +143,9 @@ public class LearningTaskPlanningController {
                     task.primaryGoal(),
                     task.taskType().name(),
                     task.planningReason().name(),
+                    // 只有通过 S9B bounded validation 的 MODEL_ENRICHED reason 才会出现在 durable
+                    // task 上；deterministic fallback 为 null。
+                    task.recommendationReason().orElse(null),
                     task.status().name(),
                     task.createdAt(),
                     task.startedAt().orElse(null),

@@ -67,15 +67,17 @@ import static org.mockito.Mockito.doThrow;
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class EvaluationResultConsumptionIntegrationTests {
 
-    private static final String ANSWER_TO_GO_TEXT = "To go, please. Thank you!";
+    // v2 guided cafe material 的第三个 step（INDEPENDENT_TRANSFER / SEMANTIC_ONLY）自由作答文本；
+    // claim 的 exactQuote "Thank you" 必须出现在该文本中供 grounding offset 断言使用。
+    private static final String ORDER_WATER_TEXT = "A bottle of water, please. Thank you!";
     private static final String VALID_CLAIM_JSON = """
-            {"claims":[{"sourceTurnId":"answer-to-go","exactQuote":"Thank you","occurrenceIndex":-1,
+            {"claims":[{"sourceTurnId":"order-water-freely","exactQuote":"Thank you","occurrenceIndex":-1,
             "issueType":"NATURALNESS","explanation":"The quoted thanks reads as abrupt here.",
             "confidence":0.7}]}
             """;
     private static final String ZERO_CLAIM_JSON = "{\"claims\":[]}";
     private static final String REJECTED_CLAIM_JSON = """
-            {"claims":[{"sourceTurnId":"answer-to-go","exactQuote":"not in the durable text",
+            {"claims":[{"sourceTurnId":"order-water-freely","exactQuote":"not in the durable text",
             "occurrenceIndex":-1,"issueType":"GRAMMAR","explanation":"fabricated","confidence":0.9}]}
             """;
 
@@ -172,7 +174,7 @@ class EvaluationResultConsumptionIntegrationTests {
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",
-                String.class)).isEqualTo("13");
+                String.class)).isEqualTo("17");
         assertThat(result).isInstanceOfSatisfying(ConsumptionResult.Consumed.class, consumed -> {
             DurableOutcome outcome = consumed.outcome();
             assertThat(outcome.run().status()).isEqualTo(EvaluationRun.Status.SUCCEEDED);
@@ -182,8 +184,8 @@ class EvaluationResultConsumptionIntegrationTests {
                     ((Validated) outcome.groundingResult().orElseThrow()).candidate();
             assertThat(candidate.sessionId()).isEqualTo(prepared.sessionId);
             GroundedClaim claim = candidate.claims().getFirst();
-            assertThat(claim.startOffset()).isEqualTo(ANSWER_TO_GO_TEXT.indexOf("Thank you"));
-            assertThat(ANSWER_TO_GO_TEXT.substring(claim.startOffset(), claim.endOffset()))
+            assertThat(claim.startOffset()).isEqualTo(ORDER_WATER_TEXT.indexOf("Thank you"));
+            assertThat(ORDER_WATER_TEXT.substring(claim.startOffset(), claim.endOffset()))
                     .isEqualTo("Thank you");
         });
         sqlSession.clearCache();
@@ -195,7 +197,7 @@ class EvaluationResultConsumptionIntegrationTests {
                 prepared.runId);
         assertThat(header.get("session_id")).isEqualTo(prepared.sessionId);
         assertThat(header.get("material_id")).isEqualTo("en-builtin-cafe-request");
-        assertThat(header.get("material_published_version")).isEqualTo("v1");
+        assertThat(header.get("material_published_version")).isEqualTo("v2");
         assertThat(header.get("rubric_reference")).isEqualTo("builtin-text-communication-rubric/v1");
         assertThat(header.get("target_language")).isEqualTo("en");
         assertThat(header.get("grounding_policy_version")).isEqualTo("M1_GROUNDED_QUOTE_V1");
@@ -205,8 +207,8 @@ class EvaluationResultConsumptionIntegrationTests {
                         + " WHERE evaluation_run_id = ?",
                 prepared.runId);
         assertThat(claimRow.get("claim_index")).isEqualTo(0);
-        assertThat(claimRow.get("source_turn_id")).isEqualTo("answer-to-go");
-        assertThat(claimRow.get("start_offset")).isEqualTo(ANSWER_TO_GO_TEXT.indexOf("Thank you"));
+        assertThat(claimRow.get("source_turn_id")).isEqualTo("order-water-freely");
+        assertThat(claimRow.get("start_offset")).isEqualTo(ORDER_WATER_TEXT.indexOf("Thank you"));
         assertThat(claimRow.get("issue_type")).isEqualTo("NATURALNESS");
     }
 
@@ -542,11 +544,11 @@ class EvaluationResultConsumptionIntegrationTests {
         assertThat(startResult).isInstanceOf(StartResult.Created.class);
         UUID sessionId = ((StartResult.Created) startResult).session().id();
 
-        assertThat(practiceService.submit(profileId, sessionId, "order-drink", user,
+        assertThat(practiceService.submit(profileId, sessionId, "order-with-frame", user,
                 "Could I have a medium coffee, please?")).isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "ask-price", user, "How much is it?"))
-                .isInstanceOf(SubmitResult.Accepted.class);
-        assertThat(practiceService.submit(profileId, sessionId, "answer-to-go", user, ANSWER_TO_GO_TEXT))
+        assertThat(practiceService.submit(profileId, sessionId, "comprehension-check", user,
+                "A medium coffee.")).isInstanceOf(SubmitResult.Accepted.class);
+        assertThat(practiceService.submit(profileId, sessionId, "order-water-freely", user, ORDER_WATER_TEXT))
                 .isInstanceOf(SubmitResult.Accepted.class);
         assertThat(practiceService.complete(profileId, sessionId, user))
                 .isInstanceOf(CompletionResult.Created.class);

@@ -1,15 +1,16 @@
 package com.dailylanguage.evaluator.application;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -48,7 +49,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * S7 grounding validator 且 offsets 对应 durable learner text。
  */
 @SpringBootTest(properties = "app.registration-enabled=true")
-@Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class GroundedEvaluationInputReaderIntegrationTests {
 
@@ -92,9 +92,46 @@ class GroundedEvaluationInputReaderIntegrationTests {
             new StructuredOutputValidator(JsonMapper.builder().build()),
             new ClasspathRubricSource());
 
+    private final List<UUID> createdUserIds = new ArrayList<>();
+
+    @AfterEach
+    void cleanupCreatedUsers() {
+        // planning 走真实非事务边界（plan() 为 NEVER），数据由本测试显式按 FK 依赖顺序清理。
+        for (UUID userId : createdUserIds) {
+            jdbcTemplate.update("""
+                    DELETE FROM practice_response WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM deterministic_step_assessment WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM deterministic_assessment WHERE session_id IN (
+                        SELECT session.id FROM practice_session session
+                        JOIN learning_task task ON task.id = session.task_id
+                        WHERE task.user_id = ?)""", userId);
+            jdbcTemplate.update("""
+                    DELETE FROM practice_session WHERE task_id IN (
+                        SELECT id FROM learning_task WHERE user_id = ?)""", userId);
+            jdbcTemplate.update("DELETE FROM learning_task WHERE user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM language_profile WHERE user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", userId);
+        }
+        createdUserIds.clear();
+    }
+
+    private UUID newUser() {
+        UUID userId = userRepository.create();
+        createdUserIds.add(userId);
+        return userId;
+    }
+
     @Test
     void readyInputCarriesDurableLearnerTextAndFeedsGroundingValidator() {
-        UUID ownerId = userRepository.create();
+        UUID ownerId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);
@@ -134,8 +171,8 @@ class GroundedEvaluationInputReaderIntegrationTests {
 
     @Test
     void unknownWrongOwnerOrWrongProfileSessionsAreIndistinguishableNotFound() {
-        UUID ownerId = userRepository.create();
-        UUID otherUserId = userRepository.create();
+        UUID ownerId = newUser();
+        UUID otherUserId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         // 同一用户的另一 Profile（UNIQUE(user_id, language_code) 下不同语言）。
         LanguageProfileIdentity ownerOtherProfile =
@@ -158,7 +195,7 @@ class GroundedEvaluationInputReaderIntegrationTests {
 
     @Test
     void inProgressOwnedSessionIsNotCompleted() {
-        UUID ownerId = userRepository.create();
+        UUID ownerId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         // startCafeSession 已接受 order-with-frame response；Session 保持 IN_PROGRESS（不再重复提交，
@@ -170,8 +207,8 @@ class GroundedEvaluationInputReaderIntegrationTests {
 
     @Test
     void successfulAndFailedReadsLeaveDurableStateUnchanged() {
-        UUID ownerId = userRepository.create();
-        UUID otherUserId = userRepository.create();
+        UUID ownerId = newUser();
+        UUID otherUserId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);
@@ -210,7 +247,7 @@ class GroundedEvaluationInputReaderIntegrationTests {
 
     @Test
     void completedSessionWithoutDurableAssessmentIsInconsistentSnapshot() {
-        UUID ownerId = userRepository.create();
+        UUID ownerId = newUser();
         LanguageProfileIdentity profile = languageProfileRepository.create(ownerId, "en").orElseThrow();
         UserContext user = new UserContext(ownerId);
         UUID sessionId = completeCafeSession(profile.id(), user);

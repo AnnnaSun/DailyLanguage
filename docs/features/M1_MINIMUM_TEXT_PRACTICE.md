@@ -2,9 +2,9 @@
 
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
-> Production baseline: M1-S8E-R COMPLETE（`bf02aed`；S8D 为 `8228d64`，S8C 为 `de29ada`，S8B 为 `2d46df6`，S8A 为 `226b804`）
-> Current candidate: M1-S8E-API（implementation / Critical Review / PostgreSQL-Flyway-Integration / documentation PASS，未 commit）
-> Current gate: M1-S8 `READY_TO_COMMIT`
+> Production baseline: M1-S8T COMPLETE — PR #25 merged to main（`c2dbb4f`）
+> Current candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
+> Current gate: M1-S9A `IMPLEMENTATION`
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -81,8 +81,9 @@ completion / assessment、M1-S7 module-local Grounded Evaluator contract 与 M1-
 durable result grounding、candidate / safe rejection persistence 与 Job/Run 原子 terminal transition 已提交为
 `de29ada`（见 7.9）。M1-S8D 已提交 versioned prompt/request、EVALUATION route 与 transient dispatch（见 7.10，
 `8228d64`）。S8E-R 已实现 terminal failure 与 unavailable result reconciliation 并提交为 `bf02aed`（见 7.11）；
-S8E-API 已实现 owner-scoped HTTP trigger / reconciliation（见 7.12）。scheduler、automatic retry 与遗留
-CREATED/RUNNING recovery 未实现；长期 Evidence 从 M2 开始。
+S8E-API 已实现 owner-scoped HTTP trigger / reconciliation（见 7.12）。S8T-A/B/C 已随 PR #25 merge to main
+as `c2dbb4f`，完成最小 guided text learning。scheduler、automatic retry 与遗留 CREATED/RUNNING recovery
+未实现；长期 Evidence 从 M2 开始。
 
 ## 4. Target architecture
 
@@ -730,8 +731,8 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 | M1-S6 | Deterministic completion | Session completion 与 deterministic assessment 原子保存 | A / Review |
 | M1-S7 | Grounded Evaluator contract | fake turn、bad quote、ambiguous span 与 unsupported claim 被拒绝 | A / Review |
 | M1-S8 | Evaluator ModelCallJob integration | deterministic result 不受 Model failure；迟到结果按 version 消费或 stale | A / Review |
-| M1-S8T | Minimum guided text learning | 示范、解释、理解检查、辅助使用及必要辅助条件记录；具体合同待批准 | A / Review |
-| M1-S9 | Optional Planner enrichment | Model 只能选择合法 candidate；失败回到同一 deterministic path | A / Review |
+| M1-S8T | Minimum guided text learning | COMPLETE — 示范、解释、理解检查、辅助使用及必要辅助条件记录已随 PR #25 merge | A / Complete |
+| M1-S9 | Optional Planner enrichment | DESIGN APPROVED — S9A Deterministic Candidate Set APPROVED for Zcode | A / Implementation |
 | M1-S10 | Japanese validation pack | `ja + zh-CN` 使用同一 workflow，cross-language fallback / pollution 被拒绝 | A / Review |
 | M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | B / Review |
 | M1-S12 | M1 integrated closeout | E2E、DB、security、Eval、Trace、client build 与 docs evidence 满足 exit criteria | Phase Closeout |
@@ -740,6 +741,10 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 教学目标与证据边界见 [`GUIDED_LANGUAGE_LEARNING.md`](GUIDED_LANGUAGE_LEARNING.md)。本增量不改写
 S1–S8 的历史实现合同；新材料结构、API、schema、评价兼容性及支持的起始能力需在 S8T Current Slice
 Contract 中明确并批准，必要时拆分。S11 最小 UX 应支持该教学场景，S12 按更新后的 Phase criteria 验收。
+
+M1-S9 Design / Scope、Architecture alternatives 与 implementation slice breakdown 见
+[`PLANNER_ENRICHMENT.md`](PLANNER_ENRICHMENT.md)，已于 2026-09-10 获用户批准。S9A Current Slice Contract
+随后获批交由 Zcode 实现；该授权不包含 S9B 或其他后续 slice。
 
 ## 15. Verification strategy
 
@@ -784,13 +789,12 @@ Architecture Decision: APPROVED
 Architecture Impact: in-boundary physicalization of approved Learning Domain modules
 New ADR Required: NO
 Phase Slice Plan: APPROVED
-Production Baseline: M1-S8E-R COMPLETE（`bf02aed`；S8D 为 `8228d64`，S8C 为 `de29ada`，S8B 为 `2d46df6`，S8A 为 `226b804`）
-Current Candidate: M1-S8E-API（implementation / Critical Review / external verification / documentation PASS，未 commit）
+Production Baseline: M1-S8T COMPLETE（PR #25 merge `c2dbb4f`）
+Current Candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：M1-S8E-API implementation、Critical Diff Review、external verification、适用文档与完整 S8
-Ownership 已完成（见 7.12 与 `docs/flow/evaluation-api-orchestration.md`），进入 M1-S8 `READY_TO_COMMIT`，
-等待用户执行 S8E-API Commit Decision。不自动 commit、push、merge 或开始 M1-S8T。
+当前 Stop Point：`M1-S9A IMPLEMENTATION`。Zcode 只实现 S9A Deterministic Candidate Set，完成 targeted
+verification 后停在 `REVIEW_PENDING` 并交由 Codex Review；不得自动开始 S9B。

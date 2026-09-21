@@ -485,6 +485,10 @@ Tool Eval 后续应检查这种冗余行为。
 
 Conversation 是持续多轮 Agent Runtime。
 
+V1 将其与 M1 `Guided Scenario Practice` 和 M5 `Turn-based Voice` 明确区分。M2C 只批准一个受控
+Adaptive Text Conversation Product Proof；具体 Runtime / API / Prompt / persistence contract 尚未批准，见
+`docs/features/ADAPTIVE_SCENARIO_CONVERSATION.md`。
+
 启动：
 
     LearningTask
@@ -605,11 +609,11 @@ Summary 可以包含：
 
 用户卡住时，可以请求：
 
-    IDEA
+    TOPIC_DIRECTIONS
       ↓
     KEYWORDS
       ↓
-    PATTERN
+    RESPONSE_FRAME
       ↓
     HOW_TO_SAY
 
@@ -631,6 +635,11 @@ Summary 可以包含：
 但一次帮助请求不能直接形成：
 
     Weakness
+
+Text inactivity 最多触发非打断式 assistance offer；offer 不等于 opened support，也不表示用户不会。简短但
+task-appropriate 的回答可以完成基本 communication goal；只有任务明确要求 clarification / elaboration 时，
+Conversation 才通过自然追问继续挑战。中文 `HOW_TO_SAY` 后的目标语言回答属于 assisted production，后续变化
+场景中的更少辅助表现才可进入 independent transfer qualification。
 
 ---
 
@@ -2047,7 +2056,7 @@ Optimization / Self-improvement 当前保持受控：
 
 | Agent / Runtime | Source Path | Main Entry | Prompt | Context Policy | Tools | Output Schema | Tests |
 |---|---|---|---|---|---|---|---|
-| Planner | `server/src/main/java/com/dailylanguage/planner` | `LearningTaskPlanner`, `DeterministicLearningTaskPlanner` | N/A — M1-S2 deterministic only | Prevalidated `LanguageProfileIdentity` + task hard constraints；不读取完整历史或长期 Memory | `LearningMaterialCatalog` read boundary | `PlanningResult.Planned` / `PlanningResult.Unavailable` | `DeterministicLearningTaskPlannerTests` |
+| Planner | `server/src/main/java/com/dailylanguage/planner` | `LearningTaskPlanningController`, `LearningTaskPlanningService`, `EligibleLearningTaskCandidateReader`, `PlannerEnrichmentDispatchService`, `PlannerEnrichmentFinalizationService` | optional classpath `planner/prompts/enrichment/v1.txt`；deterministic path 无 Prompt | authenticated owner-scoped Profile + request hard constraints + Java offered exact candidate metadata；不读取完整历史、Weakness、Evidence 或长期 Memory；Credential 只在 trigger 内存链 | `LearningMaterialCatalog` read boundary、fixed `PLANNING` route、durable `ModelCallJob` dispatch / result；不是 Agent 任意写 Tool | durable `LearningTask` + `PlanningRun` outcome；Model output 仅 exact offered identity + bounded `recommendationReason`，由 Java strict validator / membership / persistence authority 控制 | candidate/request/validator/run/dispatch/finalizer/awaiter/service/controller tests；PostgreSQL fake-worker 12/12、affected regression 186/186 |
 | LearningTask Persistence Java Runtime | `server/src/main/java/com/dailylanguage/planner`, `server/src/main/resources/mapper/LearningTaskMapper.xml` | `LearningTaskRepository.createOwned / findOwned / tryStart / tryComplete` | N/A | trusted owner identity + S2 `LearningTaskPlan`；不读取 Prompt、Conversation、Evidence 或长期 Memory | PostgreSQL-bound MyBatis Mapper；不是 Agent Tool | durable `LearningTask` / `Optional.empty` | `LearningTaskTests`, `LearningTaskPersistenceIntegrationTests` |
 | Conversation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Evaluator | `server/src/main/java/com/dailylanguage/evaluator` | `EvaluationController.startEvaluation / reconcileEvaluation`; `PracticeSessionEvaluationService.start / reconcile`; `GroundedEvaluationInputReader.readOwned`; `EvaluationDispatchService.dispatchForReadyInput`; `EvaluationRunCreationService.createForReadyInput`; `EvaluationResultConsumptionService.consumeForReadyInput`; `SemanticGroundingValidator.validate` | classpath `evaluator/prompts/semantic-evaluation/v1.txt`；workflow version 0 显式选择 | authenticated + CSRF HTTP entry；owner-scoped completed Task / Session / assessment / exact material / complete response set；request 只带 task/material/response/deterministic result/rubric 必需字段；Credential 只在 trigger 内存链，reconciliation 不接收 Credential / Job id / raw output | classpath `RubricSource`、S8B PostgreSQL Run/Job creation、`TextGenerationJobDispatch` 与 provider-neutral `TextGenerationPort`；不是 Agent 任意写 Tool | `GroundedEvaluationInputResult`; `EvaluationResult`; `DispatchResult`; durable `EvaluationRun`; `ConsumptionResult` 携带 terminal `Validated / Rejected` outcome；HTTP `202 PENDING / 200 terminal` safe projection | HTTP security/response、orchestration、Reader、Run creation、request/dispatch、grounding、result consumption unit/integration tests；local full server 727/0/0（162 conditional skips）；PostgreSQL 18.6 Flyway V1–V13、S8 evaluator integration 31/31 |
