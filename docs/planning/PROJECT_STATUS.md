@@ -1,10 +1,10 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-09-16
+> Last updated: 2026-09-21
 > Current Phase: M1 — Minimum Text Practice Loop
-> Current Gate: M1-S9 OWNERSHIP_PENDING
+> Current Gate: M1-S10 SCOPE_NOT_APPROVED
 > Production baseline: M1-S8T COMPLETE on main (`c2dbb4f`)
-> Current candidate: M1-S9A–S9F implementation / review / external verification / Behavior Flow COMPLETE；full-feature Ownership pending
+> Current candidate: M1-S9 COMPLETE；M1-S10 未获 Scope approval
 
 ## Approved Decisions
 
@@ -29,6 +29,12 @@
 - 2026-09-16：M1-S9A–S9F 已按各自 Current Slice Contract 逐项批准并实现，commit 范围为
   `d68d70f`…`786f124`。Critical / delta Review、PostgreSQL external verification 与 Behavior Flow 已完成；当前只剩
   M1-S9 full-feature Ownership Gate，未授权开始 M1-S10。
+
+- 2026-09-21：M1-S9 full-feature Ownership Check PASS，Understanding `UNDERSTOOD`，Human Touch
+  `NOT_REQUIRED`（本 Feature 在新协作规则生效前已进入既有 delivery / ownership 流程）。用户能够解释 Java /
+  Model authority、candidate snapshot、Run / Job / Task 与 transaction boundary、bounded wait、Run row lock、
+  single-use result consumption、fallback / late-result 以及 `201` / `422` API 语义。M1-S9 状态推进为 `COMPLETE`；
+  M1-S10 保持 `SCOPE_NOT_APPROVED`。
 
 - 2026-09-07：用户批准 Guided Language Learning 纳入 V1 P0 及 M1–M6 分配；正式 Scope 为 v1.9，
   Phase Plan 为 v1.6。完整 M1-S8 后、S9 前增加 `M1-S8T` 最小文本教学，包含必要辅助条件记录，
@@ -338,7 +344,7 @@
 
 ```text
 Selected phase: M1 — Minimum Text Practice Loop
-Gate: M1-S9 OWNERSHIP_PENDING
+Gate: M1-S10 SCOPE_NOT_APPROVED
 M0-S9 implementation: COMPLETE (`b88606c`)
 M0-S9 Review: COMPLETE (no blocking Production finding)
 M0-S9 Ownership: COMPLETE (Model Call Job L3 — Explainable)
@@ -504,7 +510,7 @@ M1-S9 external verification: PASS（2026-09-15/16）— disposable PostgreSQL 18
   Flyway V1–V17；fake-worker planning integration 12/12；19-class affected regression 186/186；临时容器已删除，
   primary database 未使用
 M1-S9 Behavior Flow: CURRENT（`docs/flow/owner-scoped-learning-task-planning.md`）
-M1-S9 full-feature Ownership Check: PENDING
+M1-S9 full-feature Ownership Check: PASS（2026-09-21）— Understanding `UNDERSTOOD`；Human Touch `NOT_REQUIRED`
 M1-S9 deferred / not verified scope: live Provider、frontend、retry/recovery、M2 learner-state context NOT_RUN / NOT_IMPLEMENTED
 M2C Product / Architecture Scope: APPROVED（2026-09-10）
 M2C Phase allocation: APPROVED — after M2, before M3；does not renumber M3–M6
@@ -513,13 +519,12 @@ M2C Current Slice Contract / implementation: NOT_APPROVED / NOT_STARTED
 
 ## Next Action
 
-执行一次精简的 M1-S9 full-feature Ownership Check，确认用户能够解释 Java / Model authority、Run / Job / task
-finalization 与 fallback / late-result 边界；完成前不得开始 M1-S10。
+等待用户明确授权 M1-S10 Architecture / Current Slice Scope；未获批准前不开始 Production implementation。
 
 ## Blockers
 
-M1-S9 无已知 Code Review、Architecture、PostgreSQL verification 或 Documentation blocker；当前唯一未完成 Gate
-是 full-feature Ownership Check。S9F external verification 使用 disposable PostgreSQL 18.6 + pgvector 0.8.6
+M1-S9 无剩余 Code Review、Architecture、PostgreSQL verification、Documentation 或 Ownership blocker。
+S9F external verification 使用 disposable PostgreSQL 18.6 + pgvector 0.8.6
 验证 empty schema Flyway V1–V17、fake-worker planning integration 12/12 与 affected regression 186/186；临时容器
 已删除，primary database 未使用，live Provider 与 frontend 未验证。
 M1-S8T 无剩余 Code Review / Verification / Documentation / Ownership / merge blocker；PR #25 已 merge。

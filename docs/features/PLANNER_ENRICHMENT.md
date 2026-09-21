@@ -1,16 +1,17 @@
 # M1-S9 Optional Planner Enrichment
 
-> Status: IMPLEMENTED — OWNERSHIP_PENDING
-> Updated: 2026-09-16
+> Status: COMPLETE
+> Updated: 2026-09-21
 > Architecture-sensitive Feature: YES
 > Design / Slice Plan: APPROVED — 2026-09-10
-> Current Gate: M1-S9 FULL-FEATURE OWNERSHIP
+> Current Gate: M1-S9 COMPLETE
 > Implementation: COMPLETE — S9A–S9F (`d68d70f`…`786f124`)
 
 本文定义 M1-S9 已批准并实现的整体 Design / Scope 与 slice breakdown。2026-09-10，用户批准 recommended
 `PlanningRun + candidate snapshot + recommendationReason` 方向、当前受控 two-candidate soft decision 价值及
 S9A–S9F 拆分顺序；随后各 slice 按 Current Slice Contract 逐项批准、实现和 Review。当前实现与 external
-verification 已完成，Feature 停在一次完整 Ownership Check，不开始 M1-S10。
+verification 已完成；2026-09-21 full-feature Ownership Check `UNDERSTOOD`，M1-S9 已完成。M1-S10 仍需独立
+Scope approval。
 
 ## 1. Current situation
 
@@ -283,7 +284,10 @@ Architecture review 无 blocking finding；local targeted Planner tests 63/63 PA
 PostgreSQL 18.6 + pgvector 0.8.6 验证 empty schema Flyway V1–V17、fake-worker planning integration 12/12 与
 19-class affected regression 186/186，临时容器已删除且 primary database 未使用。Behavior Flow 已同步到
 `docs/flow/owner-scoped-learning-task-planning.md`；live Provider 与 frontend `NOT_RUN`。当前 Gate 为
-`OWNERSHIP_PENDING`，M1-S10 未获 Scope approval。
+`COMPLETE`。2026-09-21 full-feature Ownership Check `UNDERSTOOD`：用户能够解释 Java / Model authority、
+candidate snapshot、Run / Job / Task 边界、`REQUIRES_NEW → commit → dispatch`、bounded wait、Run row lock、
+single-use result consumption、fallback / late-result 语义，以及 `201` / `422` API 差异。Human Touch
+`NOT_REQUIRED`（本 Feature 在新协作规则生效前已进入既有 delivery / ownership 流程）。M1-S10 未获 Scope approval。
 
 ## 11. Historical Approved S9A Current Slice Contract — Deterministic Candidate Set
 
@@ -409,4 +413,4 @@ fail-closed、现有 first fallback 完全兼容，以及 `DeterministicLearning
 
 Historical S9A Stop Point：`S9A_IMPLEMENTATION → REVIEW_PENDING`，已由 `d68d70f` 履行。本节保留当时的
 slice boundary 与授权记录，不再代表当前 Feature 状态；当前 Gate 以第 10 节的 M1-S9 full-feature
-`OWNERSHIP_PENDING` 为准。
+`COMPLETE` 为准。

@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.7
 > Approved: 2026-08-20  
-> Last updated: 2026-09-10 — M2C Minimum Adaptive Text Conversation scope approved
+> Last updated: 2026-09-21 — M1-S9 full-feature Ownership complete
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -156,7 +156,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S7 | Grounded Evaluator contract | COMPLETE (`7deb720` + source extraction `e93f624`) — Review / PostgreSQL-Flyway-Integration / Behavior Flow / Ownership PASS；merge confirmed by user |
 | M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
 | M1-S8T | Minimum guided text learning | COMPLETE — S8T-A/B/C merged to main in PR #25 (`c2dbb4f`)；review/external/docs/ownership PASS |
-| M1-S9 | Optional Planner enrichment | OWNERSHIP_PENDING — S9A–S9F implementation/review/PostgreSQL/Behavior Flow COMPLETE (`d68d70f`…`786f124`) |
+| M1-S9 | Optional Planner enrichment | COMPLETE — S9A–S9F implementation/review/PostgreSQL/Behavior Flow/Ownership PASS (`d68d70f`…`786f124`) |
 | M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
@@ -324,8 +324,9 @@ post-merge 文档收口未重跑。S8T 状态为 `COMPLETE`。M1-S9 Design / Sco
 2026-09-10 批准，S9A–S9F 随后按 Current Slice Contract 逐项批准并实现，见
 [`PLANNER_ENRICHMENT.md`](../features/PLANNER_ENRICHMENT.md)。当前 implementation / Critical Review / Architecture
 与 Behavior Flow COMPLETE；local targeted 63/63、disposable PostgreSQL 18.6 empty-schema Flyway V1–V17、
-fake-worker integration 12/12、19-class affected regression 186/186 PASS。M1-S9 当前停在 full-feature
-`OWNERSHIP_PENDING`；M1-S10 仍为 `SCOPE_NOT_APPROVED`。
+fake-worker integration 12/12、19-class affected regression 186/186 PASS。M1-S9 full-feature Ownership Check
+PASS（2026-09-21），Understanding `UNDERSTOOD`，Human Touch `NOT_REQUIRED`；状态为
+`COMPLETE`。M1-S10 仍为 `SCOPE_NOT_APPROVED`。
 
 ### M2 — Persistent Adaptation Loop
 
