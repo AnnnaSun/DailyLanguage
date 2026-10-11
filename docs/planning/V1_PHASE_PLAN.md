@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.7
 > Approved: 2026-08-20  
-> Last updated: 2026-09-21 — M1-S9 full-feature Ownership complete
+> Last updated: 2026-10-11 — M1-S10 scoped User Review 接受；READY_TO_COMMIT，等待用户 Commit Decision
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -157,7 +157,7 @@ integration、failure invariant 与完整 slices 见
 | M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
 | M1-S8T | Minimum guided text learning | COMPLETE — S8T-A/B/C merged to main in PR #25 (`c2dbb4f`)；review/external/docs/ownership PASS |
 | M1-S9 | Optional Planner enrichment | COMPLETE — S9A–S9F implementation/review/PostgreSQL/Behavior Flow/Ownership PASS (`d68d70f`…`786f124`) |
-| M1-S10 | Japanese validation pack | SCOPE_NOT_APPROVED |
+| M1-S10 | Japanese validation pack | prior IMPLEMENTATION / VERIFICATION / CODE REVIEW PASS；scoped User Review 接受；READY_TO_COMMIT |
 | M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
 
@@ -326,7 +326,16 @@ post-merge 文档收口未重跑。S8T 状态为 `COMPLETE`。M1-S9 Design / Sco
 与 Behavior Flow COMPLETE；local targeted 63/63、disposable PostgreSQL 18.6 empty-schema Flyway V1–V17、
 fake-worker integration 12/12、19-class affected regression 186/186 PASS。M1-S9 full-feature Ownership Check
 PASS（2026-09-21），Understanding `UNDERSTOOD`，Human Touch `NOT_REQUIRED`；状态为
-`COMPLETE`。M1-S10 仍为 `SCOPE_NOT_APPROVED`。
+`COMPLETE`。M1-S10 Architecture / Scope 于 2026-10-09 获批：一个 `ja + zh-cn`、`FOUNDATION`
+clarification / repetition vertical slice 使用 shared evaluator protocol prompt 与独立 Japanese rubric；当前 Slice 由
+Codex full delegation。Japanese material / manifest / rubric 与 integration 已实现；2026-10-09 prior affected unit
+211/211、PostgreSQL 18.6 empty-schema Flyway V1–V17 后 affected integration 56/56 PASS。2026-10-10 补齐真实
+Evaluator request / dispatch / durable consumption 的验证缺口，unit 27/27、integration 18/18 PASS（无 skip），
+未重跑全部 211/56；delta Code Review PASS。临时容器已删除，primary database 未使用；当前 Gate 为
+`READY_TO_COMMIT`：2026-10-11 源码导读与用户设计讨论后，用户接受本次资源/配置扩展并要求进入下一步。
+按 [AGENTS 协作合同](../../AGENTS.md#5-user--codex-collaboration--项目内协作) 记录 scoped User Review 与 `PROVISIONAL` 工程复盘，
+不提高模块掌握等级、不证明 live Japanese quality。本次仅文档同步，未重跑测试、未 commit、未开始 S11；
+下一动作是用户 Commit Decision，S11 Scope 仍需单独确认。详细证据见 [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md#713-implemented-m1-s10-boundary)。
 
 ### M2 — Persistent Adaptation Loop
 

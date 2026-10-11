@@ -3,8 +3,8 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
 > Production baseline: M1-S8T COMPLETE — PR #25 merged to main（`c2dbb4f`）
-> Current candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
-> Current gate: M1-S9A `IMPLEMENTATION`
+> Current candidate: M1-S10 Japanese Validation Pack implementation / external verification complete
+> Current gate: M1-S10 `READY_TO_COMMIT` — scoped User Review 接受，等待用户 Commit Decision
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
@@ -222,9 +222,10 @@ required Practice capability is available
 
 ### 6.4 M1 language-specific boundary
 
-English 与 Japanese 共用 workflow、state、API、assessment envelope 和 grounding validation。语言差异放在 typed
-Content、prompt / rubric resource 与必要的 configuration 中，不在 Application Service 散落
-`if (language == JAPANESE)`。
+English 与 Japanese 共用 workflow、state、API、assessment envelope、evaluator protocol prompt 和 grounding
+validation。语言差异优先放在 typed Content、rubric resource 与必要的 configuration 中，不在 Application Service
+散落 `if (language == JAPANESE)`。只有 Eval evidence 证明共享协议无法表达某类语言行为时，才单独批准
+language-specific prompt variation；新增语言本身不自动产生新 prompt。
 
 Japanese M1 允许：
 
@@ -587,6 +588,43 @@ Frontend UI、Trace persistence 或 M2 qualification。完整 M1-S8 implementati
 `SUCCEEDED + CONSUMED` 仍可因 Java grounding rejection 形成 EvaluationRun
 `FAILED + GROUNDING_REJECTED`。Understanding `UNDERSTOOD`；Human Touch `NOT_REQUIRED`。
 
+### 7.13 Implemented M1-S10 boundary
+
+2026-10-09，用户批准一个 `ja + zh-cn`、`FOUNDATION` clarification / repetition vertical slice，并对当前 Slice
+明确选择由 Codex full delegation。实现新增 `ja-builtin-clarify-repeat/v1` immutable classpath material 与
+`builtin-japanese-text-communication-rubric/v1`，同时把 Built-in `packId` 从 English-only 命名修正为
+`builtin-m1-text`。Japanese material 使用两个普通 `PRACTICE` step：一个 `EXACT` 请求重复、一个
+`SEMANTIC_ONLY` 确认与致谢；可接受 exact variants 由 material 显式列举，未引入 kana / kanji / word-order
+equivalence engine。
+
+本 Slice 复用已有 Catalog、Planner、Practice、deterministic assessment、Evaluator request/grounding、owner/profile
+isolation 与 Provider-free path；没有修改 Production Java、schema、API、dependency、module 或 shared evaluator
+prompt。独立 Japanese rubric 通过 exact `(rubricReference, targetLanguage)` 解析；English / Japanese rubric 不互相
+fallback。Japanese integration test（最初预留为 Human Core，后由用户全量委托 Codex）走真实 PostgreSQL 链路，
+验证 Japanese task/session/assessment、同一用户 English/Japanese Profile 隔离与 Provider-free 零 PlanningRun /
+ModelCallJob。2026-10-10 Review 指出初版只直接调用 grounding validator，不能证明完整 evaluation failure
+闭环；用户授权补测后，仅替换 Model Gateway 返回值，真实 request factory、异步 Worker、Run / Job、grounding
+与 result consumption 已覆盖 Japanese claim 成功落库、support-text claim rejection 和 Model failure。
+断言包括 exact shared prompt / Japanese rubric、candidate 与 claim 落库 / 不落库、terminal replay，以及
+completed Practice / deterministic assessment 保留。受控 claim 不证明真实模型的日语诊断质量。
+
+Prior verification（2026-10-09）：affected unit 211/211 PASS；一次性 PostgreSQL 18.6 空库应用 Flyway V1–V17 后
+affected integration 56/56 PASS。补测 verification（2026-10-10）：相关 unit 27/27、integration 18/18 PASS，
+无 skip；integration 为 Japanese 3 与 existing dispatch 2 / consumption 13，本次新增 2 案例、增强原有 1 案例，
+未重跑全部 211/56。两次临时容器均已删除，primary database 未使用；本次文档同步不重跑 Java tests。
+
+2026-10-10 delta Code Review PASS，无 blocking finding，既有 Behavior Flow 仍适用。当时 Gate 为
+`OWNERSHIP_PENDING`：按 [AGENTS 协作合同](../../AGENTS.md#5-user--codex-collaboration--项目内协作)，先源代码导读，再由用户独立 Review 与讨论设计取舍，
+保留真实问题 / 方案 / 验证 / 局限的复盘；未自动确认用户 UNDERSTOOD，未 commit，未开始 M1-S11。
+
+2026-10-11，源码导读与用户设计讨论完成：用户接受基础练习使用 `EXACT`，同时指出真实对话的表达多样性、
+Japanese / English 基础学习差异与非日语测试者的质量判断限制，并明确接受当前 Slice、要求进入下一步。
+当前 Gate 为 `READY_TO_COMMIT`，仅表示 S10 资源 / 配置 / 测试范围的 Review 收口；不认定真实日语诊断质量
+已验证，不提高底层 Java 模块等级。Human Touch `NOT_REQUIRED`（既有 full delegation）。
+实际 Review 见 [Ownership Matrix](../ownership/OWNERSHIP_MATRIX.md#m1-s10-scoped-user-review--2026-10-11)，
+工程复盘见 [LEARN-002](../ownership/LEARNING_LOG.md#learn-002--新语言验证共享工程流程不等于真实语言质量已验证)，
+保持 `PROVISIONAL`。本次只同步文档，未重跑测试、未 commit、未开始 S11。
+
 ## 8. Practice lifecycle and deterministic assessment
 
 M1 conceptual lifecycle：
@@ -642,8 +680,8 @@ Java 根据已保存 learner text 执行：
 6. 拒绝引用 support text、assistant text、其他 Session 或不存在 span 的 claim。
 
 invalid structure、unsupported claim、fake turn、quote mismatch 或 ambiguous occurrence 只令 semantic branch
-失败，不影响 deterministic result。当前只发布 English versioned rubric；Japanese 将在 M1-S10 使用同一
-schema / validator 与独立 versioned prompt / rubric resource 验证 language isolation。
+失败，不影响 deterministic result。English 与 Japanese 现已发布各自的 versioned rubric，并使用同一 shared
+evaluator protocol prompt、schema 与 validator；exact rubric-language mismatch fail closed。
 
 ## 10. ModelCallJob integration
 
@@ -703,11 +741,11 @@ mechanism、wait budget 与 Production files 必须在对应 Current Slice Contr
 
 ```text
 Change Axis Evidence: FACT
-Variation Type: Content source + target language + support scaffold + prompt/rubric
+Variation Type: Content source + target language + support scaffold + rubric
 Decision: narrow read boundary + typed data + Composition
 Current Problem Solved: M1 classpath content、M3 published content 与多个语言组合不能耦合到 Planner/Practice
-Complexity Introduced: one material read port、typed Target Core / Support Scaffold、versioned resource selection
-Revisit Trigger: M3 publish lifecycle、第二个 physical content source、真实 language policy duplication
+Complexity Introduced: one material read port、typed Target Core / Support Scaffold、versioned rubric selection
+Revisit Trigger: M3 publish lifecycle、第二个 physical content source、真实 language policy / prompt duplication
 Extensibility Fit: RIGHT_SIZED
 ```
 
@@ -732,8 +770,8 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 | M1-S7 | Grounded Evaluator contract | fake turn、bad quote、ambiguous span 与 unsupported claim 被拒绝 | A / Review |
 | M1-S8 | Evaluator ModelCallJob integration | deterministic result 不受 Model failure；迟到结果按 version 消费或 stale | A / Review |
 | M1-S8T | Minimum guided text learning | COMPLETE — 示范、解释、理解检查、辅助使用及必要辅助条件记录已随 PR #25 merge | A / Complete |
-| M1-S9 | Optional Planner enrichment | DESIGN APPROVED — S9A Deterministic Candidate Set APPROVED for Zcode | A / Implementation |
-| M1-S10 | Japanese validation pack | `ja + zh-CN` 使用同一 workflow，cross-language fallback / pollution 被拒绝 | A / Review |
+| M1-S9 | Optional Planner enrichment | COMPLETE — implementation / review / PostgreSQL / Behavior Flow / Ownership PASS | A / Complete |
+| M1-S10 | Japanese validation pack | prior IMPLEMENTATION / VERIFICATION / CODE REVIEW PASS；`ja + zh-CN` 复用同一 workflow，scoped User Review 接受 | A / READY_TO_COMMIT |
 | M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | B / Review |
 | M1-S12 | M1 integrated closeout | E2E、DB、security、Eval、Trace、client build 与 docs evidence 满足 exit criteria | Phase Closeout |
 
@@ -790,11 +828,12 @@ Architecture Impact: in-boundary physicalization of approved Learning Domain mod
 New ADR Required: NO
 Phase Slice Plan: APPROVED
 Production Baseline: M1-S8T COMPLETE（PR #25 merge `c2dbb4f`）
-Current Candidate: M1-S9A Current Slice Contract APPROVED for Zcode；implementation NOT_STARTED
+Current Candidate: M1-S10 implementation / external verification complete
+Current Gate: READY_TO_COMMIT — scoped User Review accepted；User Commit Decision pending
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：`M1-S9A IMPLEMENTATION`。Zcode 只实现 S9A Deterministic Candidate Set，完成 targeted
-verification 后停在 `REVIEW_PENDING` 并交由 Codex Review；不得自动开始 S9B。
+当前 Stop Point：`M1-S10 READY_TO_COMMIT`。下一动作是用户 Commit Decision，确认是否提交及纳入文件范围；
+不自动 commit / push / merge，不把既有其他文档修改全部纳入 S10，也不开始 S11。模块掌握等级保持不变。

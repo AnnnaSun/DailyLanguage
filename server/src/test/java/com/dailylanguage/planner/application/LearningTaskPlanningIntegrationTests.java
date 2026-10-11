@@ -182,12 +182,13 @@ class LearningTaskPlanningIntegrationTests {
     @Test
     void doesNotPlanAcrossLanguageIsolationBoundary() {
         UUID ownerId = newUser();
-        LanguageProfileIdentity japaneseProfile = languageProfileRepository
-                .create(ownerId, "ja")
+        LanguageProfileIdentity unpublishedLanguageProfile = languageProfileRepository
+                .create(ownerId, "fr")
                 .orElseThrow();
 
         assertThat(planningService.plan(
-                japaneseProfile.id(), new UserContext(ownerId), command("zh-cn", "FOUNDATION", 10)))
+                unpublishedLanguageProfile.id(), new UserContext(ownerId),
+                command("zh-cn", "FOUNDATION", 10)))
                 .isEqualTo(new Unavailable(PlanningResult.UnavailableReason.NO_ELIGIBLE_MATERIAL));
         assertThat(countRows("learning_task", ownerId)).isZero();
     }

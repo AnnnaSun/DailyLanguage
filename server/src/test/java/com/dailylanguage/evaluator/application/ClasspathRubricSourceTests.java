@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ClasspathRubricSourceTests {
 
     private static final String BUILTIN_REFERENCE = "builtin-text-communication-rubric/v1";
+    private static final String JAPANESE_REFERENCE =
+            "builtin-japanese-text-communication-rubric/v1";
 
     private final ClasspathRubricSource source =
             new ClasspathRubricSource();
@@ -49,6 +51,19 @@ class ClasspathRubricSourceTests {
         // reference 存在，但请求语言与 resource 不一致：不得跨语言落位。
         assertThat(source.resolve(BUILTIN_REFERENCE, "ja")).isEmpty();
         assertThat(source.resolve(BUILTIN_REFERENCE, "EN")).isEmpty();
+    }
+
+    @Test
+    void resolvesJapaneseRubricOnlyForItsExactReferenceAndLanguage() {
+        Optional<SemanticEvaluationRubric> resolved = source.resolve(JAPANESE_REFERENCE, "ja");
+
+        assertThat(resolved).isPresent();
+        assertThat(resolved.orElseThrow().targetLanguage()).isEqualTo("ja");
+        assertThat(resolved.orElseThrow().issueDefinitions())
+                .extracting(IssueDefinition::issueType)
+                .containsExactly(IssueType.GRAMMAR, IssueType.NATURALNESS, IssueType.TASK_RESPONSE);
+        assertThat(source.resolve(JAPANESE_REFERENCE, "en")).isEmpty();
+        assertThat(source.resolve(BUILTIN_REFERENCE, "ja")).isEmpty();
     }
 
     @ParameterizedTest

@@ -58,7 +58,7 @@ class ClasspathBuiltInMaterialLoaderTests {
             .replace("SCAFFOLDS_PLACEHOLDER", SCAFFOLD_LINE);
 
     @Test
-    void loadsBuiltInEnglishPackFromClasspath() {
+    void loadsBuiltInMultilanguagePackFromClasspath() {
         BuiltInMaterialPack pack = new ClasspathBuiltInMaterialLoader().load();
 
         assertThat(pack.materials())
@@ -66,11 +66,46 @@ class ClasspathBuiltInMaterialLoaderTests {
                 .containsExactlyInAnyOrder(
                         new MaterialIdentity("en-builtin-greeting-intro", "v1"),
                         new MaterialIdentity("en-builtin-cafe-request", "v1"),
-                        new MaterialIdentity("en-builtin-cafe-request", "v2"));
+                        new MaterialIdentity("en-builtin-cafe-request", "v2"),
+                        new MaterialIdentity("ja-builtin-clarify-repeat", "v1"));
         assertThat(pack.plannableMaterialIdentities())
                 .containsExactlyInAnyOrder(
                         new MaterialIdentity("en-builtin-greeting-intro", "v1"),
-                        new MaterialIdentity("en-builtin-cafe-request", "v2"));
+                        new MaterialIdentity("en-builtin-cafe-request", "v2"),
+                        new MaterialIdentity("ja-builtin-clarify-repeat", "v1"));
+    }
+
+    @Test
+    void loadsJapanesePackWithKanaReadingAndOrdinaryPracticeSteps() {
+        PublishedLearningMaterial material = new ClasspathBuiltInMaterialLoader().load().materials().stream()
+                .filter(loaded -> loaded.identity()
+                        .equals(new MaterialIdentity("ja-builtin-clarify-repeat", "v1")))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(material.targetCore().targetLanguage()).isEqualTo("ja");
+        assertThat(material.targetCore().difficulty()).isEqualTo(MaterialDifficulty.FOUNDATION);
+        assertThat(material.targetCore().readingInfo().readingLine()).contains("えきの あんないじょ");
+        assertThat(material.targetCore().steps())
+                .extracting(step -> step.kind())
+                .containsExactly(TextStepKind.EXACT, TextStepKind.SEMANTIC_ONLY);
+        assertThat(material.targetCore().steps())
+                .extracting(step -> step.learningPurpose())
+                .containsExactly(TextLearningPurpose.PRACTICE, TextLearningPurpose.PRACTICE);
+        assertThat(material.targetCore().steps().getFirst().acceptedAnswers())
+                .containsExactly(
+                        "すみません、もう一度お願いします。",
+                        "すみません、もう一度お願いします",
+                        "もう一度お願いします。",
+                        "もう一度お願いします");
+        assertThat(material.targetCore().steps().get(1).acceptedAnswers()).isEmpty();
+        assertThat(material.targetCore().semanticRubricReference())
+                .isEqualTo("builtin-japanese-text-communication-rubric/v1");
+        assertThat(material.supportScaffolds()).singleElement()
+                .satisfies(scaffold -> {
+                    assertThat(scaffold.supportLanguage()).isEqualTo("zh-cn");
+                    assertThat(scaffold.guidedSteps()).isEmpty();
+                });
     }
 
     @Test

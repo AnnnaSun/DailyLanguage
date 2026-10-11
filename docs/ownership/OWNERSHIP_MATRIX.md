@@ -229,9 +229,10 @@ Ownership 不能只根据：
 
 ## L2 → L3
 
-需要通过 Explain Back。
+需要来自真实代码的独立解释与工程判断证据，可以来自用户 Critical Review、设计讨论或必要时的 Explain Back。
+Agent 自查 PASS、讲解完成、测试通过或用户笼统表示同意，不自动证明 L3。
 
-至少能够回答：
+至少能够结合代码说明：
 
 1. Entry Point 在哪里？
 2. 主要 Call Chain 是什么？
@@ -241,8 +242,19 @@ Ownership 不能只根据：
 
 并能够指出实际代码位置。
 
+### Code Walkthrough before User Review / 先导读再审查
+
+Agent 先提供关键文件与方法、一次具体输入、调用链和状态变化，解释设计理由、替代方案与失败行为；
+陌生模块只补当前判断需要的知识。不以通用概念、长篇 Summary 或突然出题代替源码导读。
+
+用户随后可以质疑约束、实现、抽象、测试覆盖或提出优化。Agent 应用 Evidence 回应；
+有依据地接受当前方案也是有效 Review，不要求每次找出 Bug。
+仅有概念性建议而没有源码追踪与判断证据时，不自动提高掌握等级。
+
 ### Explain Back Question Scope / 反向解释的提问边界
 
+Explain Back 仅在理解缺口需要澄清时使用，允许打开源码讨论，不是每个 Slice 的固定考试。
+未提供代码入口和必要上下文前不出题；用户要求先解释或没有回答，不构成 Ownership 降级证据。
 Explain Back 必须以已实现的真实代码为边界。提问前先判断行为流程的完成度，
 不得要求用户通过未实现的设计、未接入的 dependency 或未决定的后续阶段猜测当前调用链。
 
@@ -328,6 +340,10 @@ Ownership 降级或 `PARTIAL` / `NOT_UNDERSTOOD` 的证据。应废弃问题，�
 # 4. Evidence / Ownership 证据
 
 每次等级变化应尽量记录 Evidence。
+
+用户 Review 证据应定位实际代码与行为，简要记录提出的风险 / 替代方案、依据、Agent 验证或回应，以及用户
+最终判断。用户提出与 Agent 提出、用户操作与 Agent 实现必须区分；未知的参与内容记为 `UNKNOWN`。
+这种证据可支持 L3 判断，但不把只做 Review 自动记为 L4 hands-on，也不自动赋予 Interview Readiness。
 
 例如：
 
@@ -659,7 +675,8 @@ Ownership Debt：
 
 # 13. Human Touch Tracking / 人工操作记录
 
-A 类核心 Feature 应尽量包含 Human Touch。
+Human Touch 按学习价值在 Scope 阶段选择，不是每个 A 类 Feature 的必经步骤；
+已选择的 `Human Core` 仍按 Slice Contract 完成或由用户明确重新分配，不为记录而制造修改。
 
 有效行为包括：
 
@@ -695,9 +712,10 @@ Human Touch 的目的：
 
 ---
 
-# 14. Explain Back Record / 反向解释记录
+# 14. User Review / Explain Back Record / 审查与理解记录
 
-完成 A 类 Feature Review 后可以记录：
+有意义的 A 类闭环在代码导读与用户 Review 后，可按第 4 节记录实际判断与理解缺口。
+只有真正使用 Explain Back 时才填写下面的问答记录；历史记录保留，不因新协作方式重做或降级：
 
 | Module / Feature | Questions | Result  | Missing Area | Date |
 | ---------------- | --------: | ------- | ------------ | ---- |
@@ -715,7 +733,16 @@ Result：
 * `PARTIAL`
 * `NOT_UNDERSTOOD`
 
-只有 `UNDERSTOOD` 且代码层证据充分时，才考虑提升到 L3。
+无论通过用户 Review 讨论还是 Explain Back，只有 `UNDERSTOOD` 且代码层证据充分时，才考虑提升到 L3。
+
+## M1-S10 scoped User Review — 2026-10-11
+
+- **Review 方式 / 结果：**源码导读后进行独立设计讨论；用户接受当前 Japanese resource / rubric / manifest 与测试范围，并明确要求进入下一步。当前 Slice 为 `READY_TO_COMMIT`，等待用户 Commit Decision。
+- **实际用户判断：**基础练习可使用 `EXACT`，真实对话需要允许多种表达；关注意思、语病与表达改进，而非考试式匹配。用户指出 Japanese / English 基础学习路径不同，并指出不懂日语会限制人工测试判断。
+- **已澄清边界：**未匹配不等于表达错误；共享 workflow 不要求教学路径相同；受控模型结果的工程验证不能证明日语诊断质量。DeepSeek 接入与语言质量评估仍需独立范围和验证。
+- **Ownership 深度：**仅接受本次资源/配置扩展的 Review，不据此评定 Evaluator、Model Gateway、Run / Job 或 persistence 的新 `UNDERSTOOD`；现有模块等级不变。本 Slice 不新增核心 Java 逻辑，不追加底层模块 Explain Back。
+- **Human Touch：**`NOT_REQUIRED`；原 Human Core 测试已由用户明确全量委托 Codex，不记作用户亲手实现或运行。
+- **验证限制：**沿用 Feature §7.13 的 prior unit / PostgreSQL integration evidence；本次没有重跑 Java、live Provider 或 frontend。无 commit / push / merge，未开始 S11。
 
 ---
 
@@ -852,22 +879,27 @@ Code Ownership 与 Architecture Ownership 相关，但不完全相同。
 Feature 开发：
 
 ```
+Joint Decision / Scope + Learning Focus + optional Human Core
+    ↓
 Implementation
     ↓
-Code Review
+Agent Critical Review + Verification + author fixes
     ↓
-Ownership Review
+Code Walkthrough
     ↓
-Explain Back
+User Critical Review / Design Discussion
     ↓
-Human Touch if required
+Targeted Clarification / Explain Back if needed
+    ↓
+Ownership Assessment + meaningful Decision Retrospective
     ↓
 Update Ownership Matrix
 ```
 
 不要在 Feature 实现刚结束时直接更新 Ownership Level。
 
-先经过 Review。
+先经过 Review，并获得用户的真实理解与判断证据。已选择的 Human Core 按 Contract 在实现阶段完成，
+不在收口时临时加一道编程题；`OWNERSHIP_PENDING` 不因 Agent 自查通过自动变成 `READY_TO_COMMIT`。
 
 ---
 
@@ -1010,6 +1042,11 @@ L5
 项目核心展示模块最终目标：
 
 `I3`
+
+面试准备应能从真实项目说明问题与约束、备选方案、选择理由、代价、验证结果、局限与演进条件，
+而不只是背模块名称和技术栈。Learning Log 第 19 节提供复盘结构。
+同时说明用户本人参与的决策 / Review / 操作与 Agent 实现贡献；没有亲自实现不虚称独立编码，
+没有生产或 live Provider evidence 不虚称线上收益或模型效果。Ownership 与 Interview Readiness 仍按证据分别评定。
 
 ---
 

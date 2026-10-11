@@ -37,8 +37,12 @@ Engineering Learning
 → 形成可迁移知识
 
 Interview
-→ 转化为真实项目表达
+→ 解释真实问题、备选方案、选择理由、代价与验证结果
 ```
+
+当前协作目标是基于真实项目的批判性学习与共同工程：Agent 承担实现，用户参与决策、代码追踪、Review 与
+优化讨论，hands-on 按学习价值选择。代码导读和学习安排遵循 [AGENTS 协作合同](../../AGENTS.md#5-user--codex-collaboration--项目内协作)；
+本文件不承担课程进度或强制问答记录，也不因为 Agent 已讲解就自动产生学习成果。
 
 ---
 
@@ -269,6 +273,10 @@ Learning Log
 
 确认理解。
 
+用户结合代码提出有依据的 Review / 设计判断，并能解释实际取舍，也可以成为确认理解的证据。
+Agent 自动生成的复盘草稿、测试通过记录或用户笼统同意不能单独证明用户已经 `CONFIRMED`；
+用户的实际操作与 Agent 运行测试 / 实现代码须分开，不把后者记作用户 `OPERATED`。
+
 ---
 
 ## OPERATED
@@ -394,6 +402,12 @@ Test:
 
 Trace:
 ...
+
+User Decision / Review / Operation:
+...
+
+Agent Implementation / Verification:
+...
 ```
 
 如果当前只是 Architecture Learning，可以写：
@@ -458,6 +472,7 @@ Architecture Decision:
 只记录真实实现能够支撑的内容。
 
 不要写脱离项目事实的“标准答案”。
+涉及实际问题与方案选择时，使用第 19 节的决策复盘结构，不必复制完整 ADR 或所有测试输出。
 
 ---
 
@@ -535,6 +550,24 @@ Docker volume 只覆盖指定 mount target，不会自动改变应用的 `PGDATA
 **Reusable Rule:**
 
 配置 container persistence 时，必须核对当前 image 的真实 data directory；不能只复制旧版本常见的 volume path。
+
+## LEARN-002 — 新语言验证：共享工程流程不等于真实语言质量已验证
+
+**Category:** AI Workflow / Evaluator / Testing
+**Source:** M1-S10 implementation + source walkthrough + User Review（2026-10-11）
+**Confidence:** PROVISIONAL — Codex 整理的工程复盘；记录实际用户判断，不自动认定完整复盘已掌握或亲手操作。
+
+**Problem / Constraints:** 新增 Japanese pack 要验证既有 workflow 可复用、语言隔离不被破坏；测试者不熟悉日语，不能仅凭测试通过判断语言诊断正确。
+
+**Alternatives / Decision:** 当前选择 shared evaluator protocol prompt + 独立 versioned rubric + material 中显式 exact variants；没有新增 Japanese Java 分支、独立 workflow 或 equivalence engine。更宽的语义接受与语言专属 Prompt 属于后续设计选项，未做质量对比实验，不声称当前方案语言效果更优。
+
+**Trade-off / Revisit Trigger:** 资源扩展可验证共享工程链路，但 `EXACT` 只能覆盖已列举答案；未匹配不能自动解释为错误，`SEMANTIC_ONLY` 的 deterministic `NOT_APPLICABLE` 也不是正确性结论。进入开放对话或基础文字教学时，应重新设计对应能力与评估合同，而非直接放宽当前 exact rule。
+
+**Verification / Limitations:** [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md#713-implemented-m1-s10-boundary) 保留 prior unit / PostgreSQL integration evidence。补测新增 2 个、增强 1 个 Japanese integration case，验证真实 request / Run / Job / consumption 的成功、grounding rejection、model failure 与 replay；模型返回值受控。它们证明工程接线与状态边界，不证明真实日语诊断质量；本次未重跑，live DeepSeek / frontend 为 `NOT_RUN`。
+
+**Participation / Review:** Codex 实现资源、测试并运行验证；用户提出基础练习与真实对话接受标准不同、日英基础学习路径不同、非日语使用者难以判断质量，并接受当前 Slice。关键词判断只是用户讨论的直觉方向，未被批准为算法；kana 教学、开放对话、DeepSeek live 验证均未进入本次 Scope。
+
+**Interview Angle:** 这是扩展语言时的设计与测试取舍，不是线上事故。可围绕“如何复用 workflow 而不混淆工程正确性和模型质量”展开；后续可讨论人工审校用例与真实 Provider eval，但未执行前不能宣称效果或量化收益。
 
 ---
 
@@ -1186,6 +1219,23 @@ indexing strategy
 `L3+`
 
 可以考虑转成 Interview Material。
+
+### Engineering Decision Retrospective / 工程决策复盘
+
+只为有价值的 Architecture、AI workflow、Debug、可靠性或关键 Review 问题记录，可直接放在相关 Learning
+Entry 的 Interview Angle 中；不为每个 Slice 新建文件，也不为凑面试故事编造问题。
+
+1. **Problem / Constraints**：真实需求、症状或设计约束是什么？影响谁？问题来自设计、测试、Review 还是运行时？
+2. **Alternatives**：有哪些可行方案？哪些只讨论过，哪些实际做过实验？没有做过 benchmark 就不声称比较过性能。
+3. **Decision / Why**：当前选择什么？业务约束、复杂度、边界、可靠性或 Evidence 如何支持选择？
+4. **Trade-off / Revisit Trigger**：付出的代价、接受的风险是什么？哪些条件变化后应重新评估？无明显取舍可记 N/A。
+5. **Verification / Limitations**：代码、测试、Trace 或实验验证了什么，没验证什么？标注 fresh / prior / NOT_RUN；
+   测试区分新增 / 修改案例与已有回归、unit / integration / live Provider，不能用通过总数代替覆盖结论。
+6. **Participation / Review**：用户提出或判断了什么？Agent 实现或验证了什么？哪些优化建议采纳、拒绝或延期，为什么？
+
+可用于面试的表达应能回应“为什么不用另一种方案”和“哪里仍有局限”，而不是仅背实现步骤。
+设计 trade-off 不包装成线上故障，受控模型结果不包装成真实诊断质量，未验证的效果不编造量化收益。
+Agent 可整理 source-grounded 草稿，但用户理解尚未确认时只能保持 `PROVISIONAL`，不自动添加高置信学习记录。
 
 例如：
 
