@@ -11,7 +11,8 @@
 >
 > 详细产品规则见 PRD / Core User Flow。
 >
-> 强制架构边界见 repository `AGENTS.md`。
+> 常驻强制边界与读取导航见 repository [AGENTS](../../AGENTS.md)；详细模块合同按任务读取
+> [PROJECT_CONTRACT](PROJECT_CONTRACT.md) 的相关章节，本文仍是架构地图而非合同替代品。
 >
 > 具体模块路径见 `MODULE_MAP.md`。
 >

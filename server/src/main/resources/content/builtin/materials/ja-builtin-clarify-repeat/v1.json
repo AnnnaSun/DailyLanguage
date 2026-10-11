@@ -1,0 +1,45 @@
+{
+  "materialId": "ja-builtin-clarify-repeat",
+  "publishedVersion": "v1",
+  "targetCore": {
+    "targetLanguage": "ja",
+    "difficulty": "FOUNDATION",
+    "scenario": "STATION_CLARIFICATION_REPEAT",
+    "communicationObjective": "Ask someone to repeat information you did not hear, then acknowledge the repeated information politely.",
+    "targetLanguageText": "駅の案内所で、駅員が「次の電車は三番線から出ます」と言いました。でも、よく聞こえませんでした。",
+    "readingInfo": {
+      "readingLine": "えきの あんないじょで、えきいんが「つぎの でんしゃは さんばんせんから でます」と いいました。でも、よく きこえませんでした。"
+    },
+    "steps": [
+      {
+        "stepId": "ask-to-repeat",
+        "kind": "EXACT",
+        "learningPurpose": "PRACTICE",
+        "prompt": "駅員に、もう一度言ってもらうよう丁寧に頼んでください。",
+        "acceptedAnswers": [
+          "すみません、もう一度お願いします。",
+          "すみません、もう一度お願いします",
+          "もう一度お願いします。",
+          "もう一度お願いします"
+        ]
+      },
+      {
+        "stepId": "acknowledge-information",
+        "kind": "SEMANTIC_ONLY",
+        "learningPurpose": "PRACTICE",
+        "prompt": "駅員が「次の電車は三番線から出ます」と繰り返しました。わかったことを伝えて、お礼を言ってください。",
+        "acceptedAnswers": []
+      }
+    ],
+    "semanticRubricReference": "builtin-japanese-text-communication-rubric/v1"
+  },
+  "supportScaffolds": [
+    {
+      "supportLanguage": "zh-cn",
+      "instruction": "阅读日语场景，并用日语完成两个步骤：先礼貌地请求对方重复一遍，再确认自己听懂的信息并表示感谢。第一步只接受材料明确列出的表达，第二步可以自由作答。",
+      "explanation": "场景：你在车站问讯处。工作人员说明下一班车从三号站台出发，但你没有听清。日语里可以先说 すみません 引起注意，再用 もう一度お願いします 礼貌地请求对方重复。",
+      "hint": "请求重复可以说「すみません、もう一度お願いします」。听清后可以用「わかりました。ありがとうございます」确认并道谢。",
+      "contrastiveNote": "「もう一度お願いします」是简洁而礼貌的重复请求；本练习不把看似同义的汉字、假名或其他说法自动判为完全相同，未列出的表达交给语义评价。"
+    }
+  ]
+}

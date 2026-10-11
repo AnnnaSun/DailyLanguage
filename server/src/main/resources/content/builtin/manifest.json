@@ -1,6 +1,6 @@
 {
   "manifestVersion": 2,
-  "packId": "builtin-m1-english",
+  "packId": "builtin-m1-text",
   "materials": [
     {
       "materialId": "en-builtin-greeting-intro",
@@ -36,6 +36,18 @@
       "license": "AGPL-3.0",
       "resource": "materials/en-builtin-cafe-request/v2.json",
       "contentHash": "sha256:d9f9cdd3041b78f462c46a3c112a82db880bcca7e846cfdcb6cae82097675674",
+      "planningAvailability": "PLANNABLE"
+    },
+    {
+      "materialId": "ja-builtin-clarify-repeat",
+      "publishedVersion": "v1",
+      "targetLanguage": "ja",
+      "supportLanguages": ["zh-cn"],
+      "source": "PROJECT_ORIGINAL",
+      "sourceVersion": "1",
+      "license": "AGPL-3.0",
+      "resource": "materials/ja-builtin-clarify-repeat/v1.json",
+      "contentHash": "sha256:28321a4ae44c70aa7e87852db5bd4f45448dd860d6c0c175921a69c50f225094",
       "planningAvailability": "PLANNABLE"
     }
   ]

@@ -40,8 +40,20 @@ class BuiltInLearningMaterialCatalogTests {
 
     @Test
     void returnsEmptyForUnpublishedTargetLanguageInsteadOfCrossLanguageFallback() {
-        assertThat(catalog.listAvailable("ja", "zh-cn")).isEmpty();
         assertThat(catalog.listAvailable("fr", "zh-cn")).isEmpty();
+    }
+
+    @Test
+    void listsOnlyJapaneseMaterialForExactPublishedLanguagePair() {
+        assertThat(catalog.listAvailable("ja", "zh-cn"))
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.identity())
+                            .isEqualTo(new MaterialIdentity("ja-builtin-clarify-repeat", "v1"));
+                    assertThat(summary.targetLanguage()).isEqualTo("ja");
+                    assertThat(summary.supportLanguages()).containsExactly("zh-cn");
+                });
+        assertThat(catalog.listAvailable("ja", "en")).isEmpty();
     }
 
     @Test
@@ -124,7 +136,7 @@ class BuiltInLearningMaterialCatalogTests {
     @Test
     void reportsMaterialNotPublishedForUnknownIdentity() {
         MaterialQueryResult result = catalog.findByIdentity(
-                new MaterialIdentity("ja-builtin-clarify-repeat", "v1"), "zh-cn");
+                new MaterialIdentity("missing-material", "v1"), "zh-cn");
 
         assertThat(result).isEqualTo(new MaterialQueryResult.Unavailable(
                 MaterialUnavailableReason.MATERIAL_NOT_PUBLISHED));

@@ -151,7 +151,7 @@ class DeterministicLearningTaskPlannerTests {
     }
 
     @Test
-    void doesNotFallbackAcrossLanguagePairsWithRealBuiltInCatalog() {
+    void plansJapaneseProfileWithExactPublishedLanguagePair() {
         LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
                 new EligibleLearningTaskCandidateReader(new BuiltInLearningMaterialCatalog()));
         PlanningRequest japaneseRequest = new PlanningRequest(
@@ -162,6 +162,27 @@ class DeterministicLearningTaskPlannerTests {
                 Set.of());
 
         PlanningResult result = planner.plan(japaneseRequest);
+
+        assertThat(result).isInstanceOfSatisfying(PlanningResult.Planned.class, planned -> {
+            assertThat(planned.task().materialIdentity())
+                    .isEqualTo(new MaterialIdentity("ja-builtin-clarify-repeat", "v1"));
+            assertThat(planned.task().targetLanguage()).isEqualTo("ja");
+            assertThat(planned.task().supportLanguage()).isEqualTo("zh-cn");
+        });
+    }
+
+    @Test
+    void doesNotFallbackAcrossLanguagePairsWithRealBuiltInCatalog() {
+        LearningTaskPlanner planner = new DeterministicLearningTaskPlanner(
+                new EligibleLearningTaskCandidateReader(new BuiltInLearningMaterialCatalog()));
+        PlanningRequest unpublishedLanguageRequest = new PlanningRequest(
+                new LanguageProfileIdentity(PROFILE_ID, USER_ID, "fr"),
+                "zh-cn",
+                FOUNDATION,
+                10,
+                Set.of());
+
+        PlanningResult result = planner.plan(unpublishedLanguageRequest);
 
         assertUnavailable(result, NO_ELIGIBLE_MATERIAL);
     }

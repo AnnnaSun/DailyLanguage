@@ -1,1521 +1,182 @@
 # AI Language Tutor — Repository AGENTS
 
-> 本文件定义 AI Language Tutor repository 的项目级 Architecture Contract（架构合同）与产品边界。
->
-> 通用开发流程、Small Diff、Review Gate、Human Ownership、Git Safety、Context Efficiency 等规则继承用户级 Codex Harness。
->
-> 本文件只保留 Language Tutor 特有、长期必须遵守的约束。
-
----
+> 项目级入口合同：常驻硬约束、协作边界与按需读取导航。
+> 通用 A/B/C 流程、Small Diff、Git Safety、命名与验证纪律继承用户级 Harness；
+> 详细 workflow 使用对应 Skill，不在本文件重复维护。
 
 ## 1. Project Identity / 项目定位
 
-AI Language Tutor 是一个：
-
-**provider-agnostic、stateful AI Language Tutor Agent。**
-
-核心目标是帮助用户真正使用语言完成：
-
-- 日常交流；
-- 阅读理解；
-- 自然表达；
-- 真实场景沟通。
-
-项目不能逐渐退化为：
-
-- 普通背单词 App；
-- 单纯题库；
-- Grammar Drill App；
-- ChatGPT 套壳聊天框；
-- 只有 Prompt、没有长期学习状态的 Demo。
-
-核心差异化来自：
-
-    Persistent Learner Model
-            ↓
-         Planner
-            ↓
-         Practice
-            ↓
-        Evaluator
-            ↓
-      Learning Memory
-            ↓
-      Profile Update
-            ↓
-       Re-planning
-
-任何核心 Feature 设计都应判断：
-
-> 它是否真正参与、增强或支撑这个闭环？
-
----
-
-## 2. Product North Star / 产品北极星
-
-长期学习目标关注：
-
-    以前不会表达
-    → 现在能表达
-
-    以前只能回答
-    → 现在能主动追问
-
-    以前听不懂自然表达
-    → 现在能参与真实互动
-
-    以前知道语法规则
-    → 现在能自然使用
-
-产品优先：
-
-- Communication；
-- Reading Comprehension；
-- Natural Expression；
-- Fluency；
-- Real-world Language Use。
-
-不要以以下指标作为核心学习模型的主要驱动力：
-
-- 题目数量；
-- 打卡天数；
-- 词汇数量；
-- 考试分数。
-
----
-
-## 3. Grammar Boundary / Grammar 边界
-
-Grammar 主要作为：
-
-**Grammar Repair**
-
-存在。
-
-典型流程：
-
-    真实使用
-    ↓
-    重复、高置信结构问题
-    ↓
-    短解释
-    ↓
-    Micro Practice
-    ↓
-    回到真实场景 Transfer
-
-一次 Grammar Error 不应直接创建长期 Weakness。
-
-不要把 Grammar 扩张成主学习路径，除非产品设计经过人工明确修改。
-
----
-
-## 4. Multi-language Hard Isolation / 多语言硬隔离
-
-这是核心数据正确性约束。
-
-每门目标语言拥有独立：
-
-- Language Profile；
-- Level；
-- Skill State；
-- Weakness；
-- Vocabulary Mastery；
-- Communication Skill；
-- Practice History；
-- Review State；
-- Learning Memory；
-- Evidence；
-- Planner Context。
-
-不同学习语言之间禁止共享上述状态。
-
-例如：
-
-    English ARTICLE_USAGE weakness
-
-不得影响：
-
-    Japanese Planner
-
-### 4.1 `languageProfileId`
-
-学习数据优先通过：
-
-`languageProfileId`
-
-建立归属。
-
-不要仅依赖：
-
-`userId + languageCode`
-
-在各模块临时推断学习 workspace。
-
-核心学习实体设计时必须考虑：
-
-    User
-      ↓
-    LanguageProfile
-      ↓
-    Language-specific Learning State
-
-### 4.2 Allowed Shared State / 可共享状态
-
-以下内容可以在用户级共享：
-
-- UI language；
-- timezone；
-- default study time；
-- notification preference；
-- model connection configuration；
-- global infrastructure configuration。
-
-语言专属 preference 是否共享，应根据字段语义判断。
-
-不要因为属于同一个 `user` 就默认共享学习状态。
-
----
-
-## 5. Persistent Learner Model / 持续学习者模型
-
-Persistent Learner Model 是项目核心 Domain。
-
-长期状态不能来自一次模型判断。
-
-基本链路：
-
-    Practice
-    ↓
-    Raw Evidence
-    ↓
-    Aggregated Memory
-    ↓
-    Long-term State
-    ↓
-    Language Profile
-
-长期状态可能包括：
-
-- Weakness；
-- SkillMastery；
-- CommunicationSkill；
-- VocabularyMastery；
-- Level。
-
-需要综合考虑：
-
-- multiple evidence；
-- recency；
-- frequency；
-- scenario；
-- confidence；
-- independence；
-- correct evidence。
-
-不要把：
-
-`LLM output`
-
-直接持久化成：
-
-- ACTIVE Weakness；
-- MASTERED；
-- Level Upgrade。
-
----
-
-## 6. AI vs Java Authority / AI 与 Java 权限边界
-
-项目核心原则：
-
-### LLM 负责
-
-- soft decision；
-- diagnosis；
-- evidence；
-- candidate；
-- natural-language reasoning；
-- semantic evaluation。
-
-### Java 负责
-
-- hard constraint；
-- validation；
-- permission；
-- aggregation；
-- deterministic state transition；
-- persistence authority。
-
-LLM 可以：
-
-- 推荐；
-- 诊断；
-- 分类候选；
-- 提供 Evidence；
-- 判断自然度；
-- 生成结构化候选输出。
-
-Java 应负责：
-
-- Schema validation；
-- Enum validation；
-- hard constraints；
-- permission；
-- state transition；
-- aggregation rules；
-- long-term state qualification；
-- persistence decision。
-
-如果准备把 deterministic business rule 移入 Prompt：
-
-这是 Architecture-sensitive Change。
-
-必须先说明原因、替代方案和 trade-off。
-
----
-
-## 7. Language Profile Boundary / Language Profile 边界
-
-`Language Profile` 是：
-
-**当前长期能力状态的 compact summary。**
-
-它不是：
-
-**完整学习历史数据库。**
-
-Profile 可以包含：
-
-- overall level；
-- skill level；
-- goals；
-- main weaknesses；
-- vocabulary summary；
-- communication summary；
-- recent state；
-- preferences；
-- evidence sufficiency。
-
-不要把以下内容大量塞入 Profile：
-
-- 完整 Conversation；
-- Raw Error History；
-- 完整 Practice History；
-- 全部 Evidence；
-- 完整 Memory Episode。
-
-这些内容应属于：
-
-- Learning Memory；
-- Practice History；
-- RAG / Retrieval；
-- 其他历史数据模块。
-
----
-
-## 8. Planner Boundary / Planner 边界
-
-Planner 负责回答：
-
-> 今天练什么？为什么？难度是多少？有什么约束？
-
-主要输入包括：
-
-- Profile；
-- Active Weakness；
-- Due Review；
-- Recent Practice；
-- Repeated Errors；
-- Goals；
-- Available Time；
-- User Feedback；
-- Evidence Sufficiency。
-
-主要输出包括：
-
-- LearningTask；
-- Learning Intent；
-- Difficulty；
-- Constraints；
-- Reason。
-
-Planner 可以进行个性化 soft decision。
-
-硬约束继续由 Java 控制。
-
-### Planner MUST NOT
-
-Planner 不负责：
-
-- 生成完整学习材料；
-- 执行完整 Conversation；
-- 评分；
-- 直接写 Weakness；
-- 直接修改 Level；
-- 直接修改 Learning Memory。
-
-用户应能够：
-
-- Skip；
-- Replace；
-- Easier；
-- Harder；
-- Change Topic；
-- Replan。
-
-Planner 推荐训练意图。
-
-具体 topic / material 应保留合理用户选择权。
-
----
-
-## 9. Practice Boundary / Practice 边界
-
-Practice 是产生真实学习行为和 Evidence 的地方。
-
-可能包括：
-
-- Conversation；
-- Reading；
-- Vocabulary；
-- Review；
-- Grammar Repair；
-- Listening；
-- Writing；
-- Language Fundamentals。
-
-不同 Practice 应尽可能产生统一、可聚合的学习 Evidence。
-
-不要为了某个 Practice 单独建立一套完全无法进入 Learning Memory 的长期状态体系。
-
----
-
-## 10. Conversation Boundary / Conversation 边界
-
-Conversation 重点训练：
-
-- grammar；
-- naturalness；
-- task completion；
-- communication；
-- fluency。
-
-尤其关注：
-
-- follow-up；
-- clarification；
-- topic initiation；
-- topic shift；
-- elaboration；
-- help request；
-- register；
-- compensation strategy。
-
-Conversation 不应退化成：
-
-    用户说一句
-    ↓
-    AI 批改一句 Grammar
-    ↓
-    再说一句
-
-默认减少实时打断。
-
-Evaluation 通常在适当节点或 Session 后完成。
-
----
-
-## 11. Evaluator Boundary / Evaluator 边界
-
-Evaluator 负责：
-
-> 对一次 `PracticeSession` 产生结构化诊断 Evidence。
-
-典型输入：
-
-- PracticeSession；
-- LearningTask；
-- compact Profile；
-- task-specific Rubric。
-
-Evaluator 不应默认读取全部长期 Memory。
-
-### 11.1 Evaluator Output
-
-可以产生：
-
-- taskCompletion；
-- strengths；
-- detectedIssues；
-- vocabularyResults；
-- communicationResults；
-- independenceLevel；
-- overallPerformance；
-- confidence；
-- 对应 Evidence。
-
-### 11.2 Evaluator MUST NOT
-
-Evaluator 可以说：
-
-`本次出现 QUESTION_WORD_ORDER`
-
-但不能直接决定：
-
-`用户长期 Weakness = QUESTION_WORD_ORDER`
-
-Evaluator 不直接：
-
-- activate Weakness；
-- change Level；
-- mark long-term Mastery。
-
-低置信结果应保留为 Candidate 或 Session-level information。
-
-Evaluation 失败时：
-
-    保留 Practice
-    +
-    不污染长期状态
-
----
-
-## 12. Learning Memory Boundary / Learning Memory 边界
-
-Learning Memory 是 Persistent Learner Model 的核心。
-
-采用概念上的三层结构。
-
-### A. Raw Evidence
-
-例如：
-
-- ErrorEvent；
-- PracticeResult；
-- UserFeedbackEvent；
-- Success Evidence；
-- Communication Evidence。
-
-### B. Aggregated Memory
-
-例如：
-
-- frequency；
-- recent frequency；
-- trend；
-- cross-scenario evidence；
-- success/failure balance；
-- independence information。
-
-### C. Long-term State
-
-例如：
-
-- Weakness；
-- SkillMastery；
-- CommunicationSkill；
-- VocabularyMastery。
-
-整体关系：
-
-    Raw Evidence
-         ↓
-    Aggregated Memory
-         ↓
-    Long-term State
-
-系统必须同时记录：
-
-    错误 Evidence
-    +
-    正确 Evidence
-
-不能只记录用户失败。
-
----
-
-## 13. Weakness Rules / Weakness 规则
-
-Weakness 不应由简单固定规则决定，例如：
-
-`错 3 次 = Weakness`
-
-判断应综合考虑：
-
-- frequency；
-- recency；
-- cross-scenario；
-- confidence；
-- correct evidence；
-- independence；
-- practice type。
-
-Weakness lifecycle：
-
-    CANDIDATE
-       ↓
-     ACTIVE
-       ↓
-    IMPROVING
-       ↓
-    INACTIVE
-
-再次出现时可以：
-
-    INACTIVE
-       ↓
-    REACTIVATED
-
-Severity 与 Confidence 是两个独立概念。
-
-不要混成一个 score。
-
----
-
-## 14. Transfer Matters / 真实迁移优先
-
-专项练习成功：
-
-`Repair Success`
-
-不等于长期能力已经掌握。
-
-真实场景中的：
-
-`Transfer Success`
-
-通常应具有更高 Evidence 权重。
-
-例如：
-
-Grammar micro exercise 做对，
-
-不能自动关闭 Weakness。
-
-后续 Conversation / Writing 中自然正确使用更有长期价值。
-
----
-
-## 15. Review vs Planner / Review 与 Planner
-
-职责保持分离：
-
-    Learning State
-    → 掌握得怎样？
-
-    Review System
-    → 什么值得再次出现？
-
-    Planner
-    → 今天是否练，以及用什么方式练？
-
-不要让 Review Scheduler 同时承担完整 Planner 职责。
-
-不要让 Planner 自己维护独立 mastery truth。
-
----
-
-## 16. RAG Boundary / RAG 边界
-
-RAG 用于：
-
-- semantic retrieval；
-- relevant historical episodes；
-- content retrieval；
-- imported material retrieval；
-- personal memory retrieval。
-
-RAG 不取代结构化数据库状态查询。
-
-例如：
-
-- Current Weakness Status；
-- Current Level；
-- Vocabulary Mastery；
-- Permission；
-- Language Profile。
-
-这些优先通过确定性的 structured state / service 获取。
-
-### RAG Result Is Context
-
-Retrieval Result 是：
-
-`Context`
-
-不是长期状态真相。
-
-禁止：
-
-    RAG retrieved:
-    "user struggled with article"
-            ↓
-    直接设置
-    ARTICLE_USAGE = ACTIVE
-
-必须经过 Evidence / Memory aggregation。
-
----
-
-## 17. Context Manager Boundary / Context Manager 边界
-
-不同 Agent / Task 只获得完成当前任务需要的 Context。
-
-默认目标：
-
-    Recent Context
-    +
-    Structured Summary
-    +
-    Relevant Retrieved Context
-    +
-    Task-specific State
-
-避免：
-
-`把完整历史全部塞入 Prompt`
-
-Context Strategy 应考虑：
-
-- relevance；
-- token budget；
-- freshness；
-- provenance；
-- privacy；
-- language isolation。
-
----
-
-## 18. Tool Gateway Boundary / Tool Gateway 边界
-
-Agent 不应直接获得任意 Application / Database 写权限。
-
-Tool 调用统一通过明确 Tool Contract。
-
-Tool Gateway 根据具体 Tool 风险承担适用的：
-
-- schema validation；
-- authentication；
-- authorization；
-- permission；
-- timeout；
-- retry；
-- idempotency；
-- trace。
-
-并非所有 Tool 都必须机械实现全部策略。
-
-### 18.1 State Mutation
-
-Agent 应优先：
-
-- submit evidence；
-- request action；
-- invoke controlled tool。
-
-避免：
-
-- 直接修改 Level；
-- 直接修改 Weakness；
-- 直接写任意 DB state。
-
-新增高风险 Tool 属于 A 类 / Architecture-sensitive Change。
-
----
-
-## 19. Model Gateway Boundary / Model Gateway 边界
-
-项目保持：
-
-**provider-agnostic。**
-
-业务模块不得直接绑定：
-
-- OpenAI-specific SDK/client；
-- DeepSeek-specific SDK/client；
-- Gemini-specific SDK/client；
-- 其他 concrete provider implementation。
-
-如果已经存在 `ModelGateway` / Provider Adapter boundary：
-
-所有通用模型调用继续经过该边界。
-
-目标可以支持：
-
-- DeepSeek；
-- OpenAI；
-- Gemini；
-- Ollama；
-- OpenAI-compatible providers。
-
-业务代码应面向：
-
-`task capability / model abstraction`
-
-而不是具体供应商。
-
----
-
-## 20. Structured Output / 结构化输出
-
-用于业务状态的 LLM Output 必须经过适当：
-
-- Schema Validation；
-- Enum Validation；
-- Semantic Validation；
-- Qualification。
-
-Structured Output 最终验证失败：
-
-不得污染 Persistent Learning State。
-
-不要因为模型通常能返回正确 JSON 就绕过校验。
-
----
-
-## 21. BYOK Boundary / BYOK 边界
-
-项目采用：
-
-**BYOK-first。**
-
-Hosted Mode 默认安全边界：
-
-    API Key
-      ↓
-    浏览器本地
-      ↓
-    HTTPS 临时传给 Backend
-      ↓
-    Provider
-
-Backend 在执行模型调用时可能瞬时接触 Credential。
-
-但默认禁止持久化到：
-
-- PostgreSQL；
-- Redis；
-- Trace；
-- Log。
-
-Self-hosted Mode 可以支持：
-
-- browser local；
-- local Secret；
-- `.env`。
-
-改变 Credential persistence model 属于 Security Architecture Change。
-
----
-
-## 22. Secrets & Trace / Secret 与 Trace
-
-禁止在以下位置记录 API Key 或其他 Secret：
-
-- logs；
-- trace；
-- metrics；
-- exception message；
-- database；
-- debug dump。
-
-Trace 默认优先保存：
-
-- metadata；
-- IDs；
-- versions；
-- token count；
-- latency；
-- status。
-
-生产环境不应无条件保存完整私密 Prompt / Conversation。
-
----
-
-## 23. Trace / Observability
-
-AI 关键路径应逐步具备可追踪性。
-
-典型链路：
-
-    Request
-      ↓
-    Planner
-      ↓
-    Context
-      ↓
-    RAG
-      ↓
-    LLM
-      ↓
-    Tool
-      ↓
-    Evaluator
-      ↓
-    Learning State Mutation
-
-适合记录：
-
-- traceId；
-- agentType；
-- taskType；
-- provider/model；
-- promptVersion；
-- contextStrategyVersion；
-- rubricVersion；
-- tokens；
-- latency；
-- status；
-- retryCount；
-- selected context IDs；
-- tool status；
-- RAG retrieval metadata。
-
-Trace 负责观察。
-
-Trace 不负责修改学习状态。
-
----
-
-## 24. Eval Boundary / Eval 边界
-
-AI 行为变化不能只通过：
-
-`看起来效果不错`
-
-判断。
-
-重要模块应逐步建立：
-
-- Planner Eval；
-- Evaluator Eval；
-- Conversation Eval；
-- RAG Eval；
-- Tool Eval；
-- Context Eval；
-- Difficulty Eval。
-
-确定性约束优先 Rule-based Eval。
-
-开放性的自然度问题才考虑 LLM-based evaluation。
-
-Prompt / Model / Rubric / Context Strategy 发生重要变化时，应考虑 Regression Eval。
-
----
-
-## 25. Language-specific AI Design / 语言特定设计
-
-不要建立大量散落的：
-
-    if (language == JAPANESE) ...
-    else if (language == SPANISH) ...
-
-语言特定差异优先通过类似以下结构集中管理：
-
-- LanguageConfig；
-- promptSet；
-- evaluationTaxonomy；
-- writingSystem；
-- pronunciationConfig；
-- difficultyFramework；
-- fundamentalsConfig。
-
-共享：
-
-- architecture；
-- workflow；
-- contracts。
-
-语言差异放入：
-
-`language-specific configuration / prompt / taxonomy`
-
----
-
-## 26. Hosted + Self-hosted / 双部署模式
-
-项目使用同一套核心代码支持：
-
-- Hosted Mode；
-- Self-hosted Mode。
-
-核心架构方向：
-
-    Vue / PWA
-        ↓
-    Spring Boot
-        ↓
-    PostgreSQL + pgvector
-    Redis
-    Object Storage
-        ↓
-    User-configured AI Providers
-
-不要为 Hosted 和 Self-hosted 建立两套分叉业务逻辑。
-
-环境差异优先放入：
-
-- configuration；
-- deployment；
-- adapter；
-- infrastructure boundary。
-
----
-
-## 27. Frontend / Backend Authority
-
-Vue / PWA 可以负责：
-
-- UI state；
-- local cache；
-- offline UX；
-- browser-local credential；
-- recent/detail session cache。
-
-Spring Boot 负责核心：
-
-- domain rules；
-- authorization；
-- long-term learning state；
-- aggregation；
-- persistence coordination；
-- AI orchestration boundary。
-
-不要让前端成为长期学习状态的唯一 authority。
-
-Hosted Mode 不能假设所有核心数据只存在浏览器。
-
----
-
-## 28. V1 Scope Discipline / V1 范围纪律
-
-Detailed Function Design 描述长期完整设计。
-
-它不代表所有功能当前都需要实现。
-
-判断：
-
-`当前 Phase / V1 是否实现？`
-
-必须优先读取：
-
-1. Current approved Feature / Phase decision；
-2. V1 Scope；
-3. Full Backlog Baseline；
-4. Detailed Function Design。
-
-不要因为某功能存在于 Detailed Design 或 Backlog：
-
-`→ 自动实现`
-
-### 28.1 Backlog Preservation
-
-未进入当前 V1 / Phase 的能力：
-
-可以延期。
-
-但不要：
-
-- 静默删除设计；
-- 静默宣布“不需要”；
-- 因为当前没做就从长期设计中移除。
-
-需要改变长期产品方向时：
-
-明确提出 Product / Architecture Decision。
-
----
-
-## 29. Current High-value Engineering Modules / 核心工程模块
-
-以下模块默认具有较高 Architecture / Interview Value：
-
-- Planner；
-- Conversation Runtime；
-- Evaluator；
-- Learning Memory；
-- Weakness / Skill Aggregation；
-- Content Pipeline；
-- RAG / Retrieval；
-- Tool Gateway；
-- Context Manager；
-- Model Gateway / BYOK；
-- Structured Output；
-- Trace / Observability；
-- Eval；
-- Language Isolation。
-
-涉及这些模块的非机械修改：
-
-默认优先按：
-
-`A — Critical`
-
-处理。
-
-简单 DTO、Mapper、样板 Test 等仍可单独归为 B/C。
-
----
-
-## 30. Architecture Drift Red Flags / 架构漂移警报
-
-发现以下设计时暂停并检查：
-
-- Planner 直接修改 Memory；
-- Evaluator 直接 activate Weakness；
-- LLM 直接决定长期 Level；
-- Agent 直接写数据库；
-- 业务 Service 直接依赖具体 Model Provider；
-- RAG Result 被当作长期状态事实；
-- 不同语言共享 Weakness / Evidence；
-- API Key 写入 DB / Redis / Trace / Log；
-- Conversation 退化成逐句 Grammar correction；
-- Grammar 逐渐成为主要学习路径；
-- 完整长期历史无差别塞入每次 Prompt；
-- 为简单 Feature 新增多个 Agent；
-- Hosted / Self-hosted 分叉两套核心业务代码。
-
-这些通常属于 Architecture-sensitive Issue。
-
-不要静默实现。
-
----
-
-## 31. Documentation Source of Truth / 文档优先级
-
-当前任务需要判断产品范围或架构时，优先检查：
-
-1. Current approved Phase / Feature decision；
-2. V1 Scope & Full Backlog；
+AI Language Tutor 是 provider-agnostic、stateful AI Language Tutor Agent。
+目标是真实交流、阅读理解、自然表达与流利度，不是题库、背单词或仅有 Prompt 的聊天 Demo。
+
+核心闭环：
+Persistent Learner Model → Planner → Practice → Evaluator → Learning Memory → Profile Update → Re-planning。
+
+产品成功关注“以前不能使用 → 现在能在真实场景使用”，而不是题量、打卡、词汇量或考试分数。
+详细产品与模块约束见 [PROJECT_CONTRACT](docs/architecture/PROJECT_CONTRACT.md)；
+该文件是从旧 AGENTS 移出的既有合同，不代表相关能力全部已实现或已进入当前 Scope。
+
+## 2. Always-on Invariants / 常驻硬约束
+
+- **语言隔离：**学习状态、历史、Evidence、Memory 与 Planner Context 按 `languageProfileId` 归属；
+  不跨语言共享，不在各模块仅用 `userId + languageCode` 临时推断 workspace。
+- **AI / Java authority：**LLM 生成 soft decision、诊断、候选与 Evidence；
+  Java 持有 validation、permission、aggregation、deterministic transition 与 persistence authority。
+  把确定性业务规则移入 Prompt 属于 Architecture-sensitive Change。
+- **长期状态：**Raw Evidence → Aggregated Memory → Long-term State；同时记录成功与失败。
+  一次模型输出或一次错误不能直接变成 ACTIVE Weakness、MASTERED 或 Level Upgrade。
+- **职责隔离：**Planner 决定训练意图，不生成完整材料、评分或修改 Memory / Level / Weakness；
+  Evaluator 只生成 Session-level Evidence，不直接决定长期能力状态；失败保留 Practice，不污染长期状态。
+- **真实使用：**Grammar 作为 Repair 而非主路径；Conversation 不退化为逐句语法批改；
+  Repair Success 不等于 Transfer Success 或长期掌握。
+- **状态真相：**RAG Result 是 Context，不是长期状态事实；Profile 是 compact summary，不是完整历史库；
+  Planner 不维护第二套 mastery truth，Review Scheduler 不承担完整 Planner。
+- **受控写入：**Agent 通过明确 Tool Contract 提交 Evidence / 请求动作，不获得任意 Application / DB 写权限；
+  Structured Output 必须经适当 schema、enum、semantic validation 与 qualification。
+- **Provider boundary：**业务模块通过已有 Model Gateway / Adapter 调用模型，不直接绑定 concrete provider SDK；
+  共享 workflow / contracts，语言差异集中在配置、Prompt、taxonomy，不散落语言条件分支。
+- **Credential / Privacy：**BYOK-first；Hosted Credential 只经 HTTPS 临时传给 Backend，不落 PostgreSQL /
+  Redis / Trace / Log；Secret 不进 metrics、exception 或 debug dump。
+  Trace 优先 metadata，不无条件记录完整私密 Prompt / Conversation，不修改学习状态。
+- **部署与状态权限：**Hosted / Self-hosted 共用核心代码，环境差异放在配置 / adapter；
+  Spring Boot 持有核心 domain、authorization、长期状态与 persistence authority，不由浏览器独占真相。
+- **Context / Eval：**任务只获得所需 Context；禁止完整历史无差别塞入 Prompt。
+  AI 重要行为变化需考虑 Regression Eval，不能仅凭“看起来不错”判断。
+
+这些约束被削弱或发生冲突时 STOP AND REVIEW，不能当作普通实现细节静默修改。
+
+## 3. Task Entry / 接手与按需读取
+
+每次接手按顺序：
+本文件 → [CURRENT_HANDOFF](docs/planning/CURRENT_HANDOFF.md) →
+[PROJECT_STATUS](docs/planning/PROJECT_STATUS.md) → 当前已批准 Phase / Feature / Slice 的相关章节。
+
+修改前核对 branch、HEAD、status 和相关 Diff；快照与 Git、source、tests 或正式决定冲突时，
+标记 stale / UNKNOWN，在受影响范围内停止修改。快照不是 Scope authority 或 concurrency lock。
+
+先找标题、symbol、关键词，再读入口、直接依赖和相关测试；不默认加载整个文档目录。
+按下表读取详细合同的相关章节，不要求每个任务通读整个合同；已选择的 Skill 仍须完整读取。
+
+| 任务触及 | 必读详细合同 / 入口 |
+|---|---|
+| 产品方向、Grammar、Practice、Conversation、Transfer | PROJECT_CONTRACT §1–3、§9–10、§14；当前 Feature |
+| Profile、语言归属 | PROJECT_CONTRACT §4、§7 |
+| Memory、Weakness、长期状态 | PROJECT_CONTRACT §5–6、§12–14 |
+| Planner、Review scheduling | PROJECT_CONTRACT §8、§15；当前 Feature |
+| Evaluator、Structured Output | PROJECT_CONTRACT §6、§11、§20、§24；对应 Behavior Flow |
+| RAG、Context、Tool | PROJECT_CONTRACT §16–18；相关 Architecture / Flow |
+| Model Gateway、BYOK、Trace | PROJECT_CONTRACT §19–24；相关 Architecture / Flow |
+| 语言特定 AI、部署、前后端权限 | PROJECT_CONTRACT §25–27 |
+| Scope / Architecture 变化、漂移检查 | PROJECT_CONTRACT §28、§30、§37–38 |
+
+Architecture 导航使用 [SYSTEM_OVERVIEW](docs/architecture/SYSTEM_OVERVIEW.md)、
+[MODULE_MAP](docs/architecture/MODULE_MAP.md)、[DATA_FLOW](docs/architecture/DATA_FLOW.md)、
+[AGENT_FLOW](docs/architecture/AGENT_FLOW.md)；最终行为判断必须核对代码与测试。
+Planner、Conversation Runtime、Evaluator、Learning Memory / Weakness / Skill Aggregation、Content Pipeline、
+RAG、Tool / Context / Model Gateway / BYOK、Structured Output、Trace / Eval 与语言隔离的非机械修改
+默认 A — Critical；DTO / Mapper / 样板测试仍可单独归 B/C。
+没有足够证据时扩大读取；能回答“改哪里、为什么、影响谁、如何验证”后停止探索。
+实质性任务 / Scope 扩大时判断并使用 `token-efficient-work`，不为普通任务重复全库扫描。
+
+## 4. Scope and Documentation Authority / 范围与文档权威
+
+判断当前是否实现，按以下顺序检查：
+
+1. Current approved Phase / Feature / Slice decision；
+2. [V1_SCOPE](docs/product/V1_SCOPE.md) 与 Full Backlog Baseline；
 3. Detailed Function Design；
 4. Core User Flow；
 5. PRD。
 
-这不是自动覆盖规则。
-
-如果文档之间出现真实冲突：
-
-    STOP
-    ↓
-    指出冲突
-    ↓
-    给出具体出处
-    ↓
-    请求或提出人工决策
-
-禁止 Codex 自己偷偷选一个版本。
-
----
-
-## 32. Documentation Update Rule / 文档更新规则
-
-代码发生已批准的重大变化时，检查是否影响：
-
-- `SYSTEM_OVERVIEW.md`；
-- `MODULE_MAP.md`；
-- `DATA_FLOW.md`；
-- `AGENT_FLOW.md`；
-- ADR；
-- Feature Dossier。
-
-普通小修改不需要更新所有文档。
-
-已实现的重要跨模块行为调用链，应按 `docs/flow/README.md` 创建或更新 Behavior Flow。
-Flow 必须以真实 source code 和 verification evidence 为依据，并在 Diff Review / Ownership Check
-前校验；不得把未来设计混入已实现流程。
-
-文档应描述：
-
-**真实当前 Architecture。**
-
-不能长期保留已经不存在的理想设计。
-
----
-
-## 33. Development Backlog Rule / 开发过程待办规则
-
-开发过程中，如果发现与当前 Task 无关、但值得后续保留的内容，例如：
-
-* Product Idea；
-* UX Improvement；
-* AI Engineering Enhancement；
-* Backend / Frontend Improvement；
-* Refactor Opportunity；
-* Technical Debt；
-* Performance Idea；
-* Security Improvement；
-* Future Architecture Option；
-* Documentation Improvement；
-
-不得因为“顺手可以做”自动扩大当前 Scope。
-
-默认处理流程：
-
-```
-Detect
-  ↓
-Report
-  ↓
-Record in docs/planning/BACKLOG.md
-  ↓
-Continue Current Approved Task
-```
-
-### 33.1 Default Backlog State / 默认状态
-
-新发现的 Backlog Item 默认：
-
-```
-Status: INBOX
-Priority: UNASSESSED
-Target: UNDECIDED
-```
-
-写入 `BACKLOG.md` 仅代表：
-
-> 该想法值得保留并等待后续决策。
-
-它不代表：
-
-* 已进入 V1；
-* 已进入当前 Phase；
-* 已批准实现；
-* 已批准 Architecture Change；
-* Codex 可以自动开始开发。
-
----
-
-### 33.2 Scope Promotion / 进入正式 Scope
-
-Backlog Item 只有经过明确 Scope Decision 后，才能进入：
-
-```
-INBOX
-  ↓
-TRIAGED
-  ↓
-PLANNED
-```
-
-如果正式进入某个 Phase / Feature，应同步相应开发计划。
-
-如果决定影响正式产品范围，还应检查是否需要同步：
-
-* V1 Scope；
-* Detailed Function Design；
-* Phase Plan。
-
-如果决定改变 Architecture Contract，还应检查是否需要：
-
-* Architecture Change Proposal；
-* ADR；
-* `SYSTEM_OVERVIEW.md`；
-* `MODULE_MAP.md`；
-* `DATA_FLOW.md`；
-* `AGENT_FLOW.md`。
-
-不要为了一个 Backlog Item 自动更新所有文档，只同步真实受影响的内容。
-
----
-
-### 33.3 Backlog Capture Command / 快速记录行为
-
-当用户表达类似：
-
-> 记一个 backlog：……
-
-> 这个以后可以做。
-
-> 先记下来，当前不实现。
-
-> 这个点后面优化。
-
-默认执行：
-
-1. 读取 `docs/planning/BACKLOG.md`；
-2. 获取下一个可用 `IDEA-XXX`；
-3. 根据用户提供的信息填写条目；
-4. 不确定的信息标记为 `UNKNOWN` / `UNASSESSED` / `UNDECIDED`；
-5. 追加条目；
-6. 不修改 Production Code；
-7. 不自动扩大 Current Task；
-8. 不自动改变 V1 Scope。
-
-如果用户只是提出一个想法，但是否希望保存并不明确：
-
-先报告该想法属于 Current Scope 外内容，再询问是否记录到 Backlog。
-
----
-
-### 33.4 Technical Debt / 技术债
-
-开发过程中发现明确存在、但当前决定暂不处理的工程问题，可以记录为：
-
-```
-Type: TECH_DEBT
-```
-
-Technical Debt 与 Future Idea 必须区分。
-
-Technical Debt 表示：
-
-> 当前实现已经存在已知不足或 trade-off。
-
-Future Idea 表示：
-
-> 当前实现不一定存在问题，只是未来可能增强。
-
-不得把所有未来增强都描述成 Technical Debt。
-
----
-
-### 33.5 Backlog Is Not a Second PRD / Backlog 不替代正式设计
-
-`BACKLOG.md` 是开发过程中的动态捕获层。
-
-它不替代：
-
-* PRD；
-* Detailed Function Design；
-* V1 Scope；
-* Architecture Docs。
-
-当一个 Backlog Item 成为正式 Product / Architecture Decision 后，应把最终决定同步到对应正式文档。
-
-Backlog 条目保留决策轨迹，但不成为长期唯一 Source of Truth。
-
----
-
-## 34. User / Codex / Zcode Collaboration Boundary / 项目内协作边界
-
-除非用户对当前 Task 明确另有分工，用户、Codex 与 Zcode 按以下项目内边界协作。
-
-本协作方式的目标不仅是完成交付，还要保证用户实际参与高价值的 Architecture Decision 和核心代码实现。
-Agent 可以承担产量，但不得默认替代用户完成全部架构推导与关键实现，再仅通过事后的 Explain Back 补偿。
-
-### 34.1 User Engineering Participation / 用户工程参与
-
-- A 类 Task 默认采用共同开发：Codex 先提供真实代码 Evidence、约束、风险、备选方案和待决问题，用户先给出
-  核心边界、Invariant 或 trade-off 判断，Codex 再质疑、补充并共同收敛 Current Slice Contract；不得把用户参与
-  简化为只对完整成品方案回答“同意 / 不同意”；
-- 每个有意义的 A 类完整行为闭环，默认至少保留一个 `Human Core` 由用户亲自实现或实质修改；B 类是否保留
-  `Human Core` 在 Scope 阶段按学习价值和业务风险决定；C 类默认由 Agent 完成；
-- `Human Core` 必须触及真实工程判断，例如核心 Domain Rule、状态转换、Validator 关键分支、transaction /
-  concurrency failure behavior 或关键 Integration Test。rename、注释、格式化、机械 Mapper 和无关测试不能作为
-  `Human Core`；
-- Current Slice Contract 必须明确 `Human Core` 的代码位置或边界、目标行为、Invariant、Acceptance Criteria、
-  可用的最小 scaffolding 和验证方式，并在 Agent 接管其余实现前停在 `HUMAN_CORE_READY`；
-- Codex 可以解释调用链、提供代码地址、澄清概念和 Review 用户实现，但默认不得提前给出可直接替换
-  `Human Core` 的完整最终代码；如果用户实现中存在 Finding，优先说明证据并交回用户修改，除非用户明确
-  委托 Zcode 修复；
-- 用户可以针对某个 Slice 明确选择 delivery-first、全量委托或调整 `Human Core`；这是当前 Slice 的例外，
-  不自动改变后续 Task 的默认合作方式；
-- 本规则从后续新批准的重要行为闭环开始适用，不追溯要求重写已完成的历史 Slice，也不阻塞已经进入
-  Ownership / Commit Gate 的既有 Feature。
-
-### 34.2 Codex Responsibilities
-
-- 负责 Architecture-sensitive Design 的 Evidence、约束与备选方案整理，促进用户参与核心决策，并负责
-  Critical Diff Review 和最终架构把关；
-- 在实现前帮助把共同决策转换为可执行的 Current Slice Contract 和 `Human Core`，但不以输出一套完整
-  成品方案代替用户的关键 Architecture Decision；
-- 负责 Docker、PostgreSQL、Redis、Flyway、Integration / E2E 等外部环境验证与诊断；
-- 外部验证发现业务 Production Code 问题时，输出可定位的 Finding；属于 `Human Core` 的问题交回用户，
-  其余问题交回 Zcode。除非用户明确重新分配实现责任，不在 Review 阶段接管对应作者的 Production Code；
-- 有限额度优先用于 Architecture Decision、外部验证和 Critical Review，不重复实现已由 Zcode 完成的 Slice。
-
-Codex 可执行和诊断外部环境，但 Docker / deployment config、Flyway migration 或其他 repository file
-的修改仍必须属于当前已批准 Scope。涉及破坏性数据操作时，继续遵守本文档的授权与停止条件。
-
-### 34.3 Zcode Responsibilities
-
-- 负责已批准 Current Slice 中除预留 `Human Core` 外的 Production Code、Unit / Module Tests 和实现内修复；
-- 可以先完成 Current Slice Contract 明确允许的最小 scaffolding，使用户能够实现 `Human Core`；在
-  `HUMAN_CORE_READY` 后不得抢先完成或覆盖该核心部分；
-- 负责修复 Codex Review 或外部验证发现的非 `Human Core` 业务代码问题；只有用户明确委托时才修复
-  `Human Core`，保持同一 Slice 中清晰的实现 Ownership；
-- 开发阶段优先运行 targeted Unit / Module Tests；Docker / Database / Integration / E2E 的最终验证证据由 Codex 确认；
-- 不得因为外部验证未完成而把 Slice 描述为已通过最终验证。
-
-### 34.4 Collaboration, Review and Verification Loop
-
-```text
-Codex Evidence / Constraints / Alternatives
-  → User + Codex Architecture Decision / Scope
-  → Current Slice Contract + Human Core
-  → optional minimal scaffolding
-  → HUMAN_CORE_READY
-  → User Human Core Implementation
-  → Zcode Remaining Implementation + Unit / Module Tests
-  → Codex Critical Review + External Verification
-  → Responsible author fixes findings
-  → Codex delta-only Review + affected external regression
-  → User Ownership / Commit Decision
-```
-
-- A 类完整行为闭环未完成已约定的 `Human Core` 时，不得进入 `READY_TO_COMMIT`，除非用户已经对该闭环
-  明确选择全量委托；
-- `Human Core` 是实现参与 Gate，不替代 Critical Review；正式 Explain Back / Ownership Check 仍默认放在有意义的
-  完整行为闭环后，不因每个小 Slice 重复举行；
-- Codex 应尽量一次性汇总 blocking findings；Zcode 批量修复后，Codex 优先只复查增量 Diff 与受影响 Critical Flow；
-- 外部验证在 candidate 稳定后集中执行；修复阶段先重跑受影响范围，最终 Diff 确认后再执行必要的 wider regression；
-- Review 发现 Current Slice Contract 本身有问题时，标记为 Design / Scope Issue 并请求用户决定，不由任一 Agent 静默改变架构；
-- 两个 Agent 均不得因上述分工自动 commit、push、merge 或开始未批准的下一 Slice。
-
----
-
-## 35. CURRENT_HANDOFF / Codex 与 Zcode 交接约定
-
-`docs/planning/CURRENT_HANDOFF.md` 是 Codex 与 Zcode 共享的、可覆盖更新的当前工作快照。
-
-它只负责回答：
-
-- 当前由谁工作、为什么交接；
-- 当前 Branch / HEAD / Worktree 是什么；
-- 当前 Slice 到达哪个 Gate；
-- 哪些修改已经完成、验证到哪里；
-- 哪些风险、UNKNOWN、用户决定和下一步仍未解决。
-
-它不是新的 Product / Architecture / Scope Source of Truth，也不替代：
-
-- `PROJECT_STATUS.md`；
-- `V1_PHASE_PLAN.md`；
-- Feature Dossier / ADR；
-- Git、source code、tests 与真实 Diff。
-
-### 35.1 Read and Verify / 接手规则
-
-Codex 与 Zcode 每次接手 repository work 时，必须在 `AGENTS.md` 之后读取
-`docs/planning/CURRENT_HANDOFF.md`，并在修改前至少核对：
-
-1. `git branch --show-current` 与 `git rev-parse --short HEAD`；
-2. `git status --short`；
-3. 与当前 Slice 有关的 Diff；
-4. `PROJECT_STATUS.md` 与相关 approved Phase / Feature decision。
-
-`CURRENT_HANDOFF.md` 中的陈述与 Git、source、tests 或正式决策冲突时，以后者为事实依据；接手 Agent
-必须把冲突标记为 `UNKNOWN` 或 stale，并在影响范围内停止修改，不能静默选择一个版本或覆盖未提交工作。
-
-### 35.2 Conditional Maintenance / 条件维护
-
-`CURRENT_HANDOFF.md` 不再因为普通 Slice Stop Point、commit、Scope Decision、新验证结果或 Worktree 变化而
-自动更新。Codex 与 Zcode 只在以下情况更新：
-
-- 当前工作的 Agent 准备停止或交接，并且能够确认它自己的剩余额度严格低于 `10%`；
-- 用户明确要求创建或刷新 handoff snapshot。
-
-Codex 与 Zcode 只能判断各自额度，不能推断另一个 Agent 的剩余额度。当前环境没有暴露可读取的额度百分比时，
-Agent 不得根据 Context 长度、运行时间、token 使用量或主观感觉猜测 `<10%`；只有 host 明确提供的 usage signal、
-用户提供的 `/status` / usage dashboard 结果，或用户直接说明额度低于 `10%`，才能触发额度型 handoff 更新。
-
-满足条件时，更新应是离开前的最后一项 documentation action。更新后如果又修改了代码、文档、验证结果或
-commit，必须在仍有可用额度时再次同步。Commit 仍由用户决定；维护 handoff 不授权 Agent 自动 commit。
-
-如果额度突然耗尽导致离开者无法更新，接手 Agent 必须先根据 Git 与正式文档重建快照，将
-`Handoff State` 标记为 `RECOVERED`，并把无法确认的意图、验证或 ownership 标记为 `UNKNOWN`。
-
-### 35.3 Required Snapshot / 必填内容
-
-每次更新至少包含：
-
-- Updated At、Updated By、Handoff State 与 Handoff Reason；
-- Branch、HEAD 与 Worktree Summary；
-- Current Product Gate、Current Slice、Slice Gate 与 Stop Point；
-- Approved Scope / Explicit Non-scope；
-- Completed Work；
-- Verification Evidence，区分 fresh、prior 与 not run；
-- Uncommitted Changes，区分本 Slice 修改与接手前已有修改；
-- Decisions、Blockers、Risks、`UNKNOWN`；
-- 单一、可执行的 Next Action；
-- 需要用户完成的 Scope / Architecture / Commit Decision。
-
-文件按当前快照原地更新，不把它写成累积日志。禁止记录 API Key、Secret、完整私密 Prompt / Conversation、
-未经脱敏的用户数据或其他敏感信息。
-
----
-
-## 36. Repository Navigation / 项目导航
-
-如果以下文件存在：
-
-- `docs/planning/CURRENT_HANDOFF.md`
-- `docs/planning/PROJECT_STATUS.md`
-- `docs/architecture/SYSTEM_OVERVIEW.md`
-- `docs/architecture/MODULE_MAP.md`
-- `docs/architecture/DATA_FLOW.md`
-- `docs/architecture/AGENT_FLOW.md`
-- `docs/adr/`
-- `docs/features/`
-- `docs/ownership/`
-
-探索代码时优先用它们定位。
-
-随后通过实际 Source Code 验证。
-
-不要为了一个局部 Task 重新读取全部产品设计文档。
-
----
-
-## 37. Architecture Change / 架构修改
-
-以下项目级核心原则不得作为普通 implementation detail 修改：
-
-- Persistent Learner Model Loop；
-- Multi-language Isolation；
-- AI vs Java Authority；
-- Planner Responsibility；
-- Evaluator Responsibility；
-- Learning Memory Ownership；
-- Tool Permission Boundary；
-- Model Gateway Boundary；
-- Credential Persistence Model；
-- Hosted + Self-hosted Architecture。
-
-若确实需要改变：
-
-    Architecture Change Proposal
-    ↓
-    Alternatives
-    ↓
-    Trade-offs
-    ↓
-    Impact
-    ↓
-    Human Approval
-
-随后根据需要记录 ADR。
-
----
-
-## 38. Final Project Rule / 最终项目规则
-
-每次核心功能开发都应避免两个方向。
-
-### Product Drift
-
-项目逐渐变成：
-
-`普通语言学习 App`
-
-### Agent Drift
-
-项目逐渐变成：
-
-`所有事情都让 LLM 决定`
-
-本项目的核心价值来自：
-
-    真实语言使用
-    +
-    Persistent Learner State
-    +
-    Evidence-driven Adaptation
-    +
-    Controlled Agent Runtime
-    +
-    可验证的 AI Engineering
-
-如果实现方案削弱这些核心边界：
-
-**STOP AND REVIEW。**
+长期设计或 Backlog 中存在某能力，不等于已批准当前实现；延期不等于删除长期设计。
+真实文档冲突必须指出出处、影响和待决问题，由用户决定，不静默选择版本。
+项目核心闭环、语言隔离、AI / Java authority、模块职责、Tool / Provider / Credential / 双部署边界改变，
+必须先提出 Current Situation、Problem、Proposed Change / Alternatives、Trade-offs、Impact，等待 Human Approval，
+再按需记录 ADR；详细影响边界见 PROJECT_CONTRACT §37。
+
+重大获批变化只同步真正受影响的 Architecture / ADR / Feature 文档；小修改不更新全部文档。
+已实现的重要跨模块行为，按 [Flow 规则](docs/flow/README.md) 创建 / 更新 Behavior Flow，
+在 Diff Review / Ownership 前核对 source 与 verification；未来设计不能混入已实现流程。
+Status 只保留当前 Gate、摘要与证据入口；Phase Plan 管路线图；Feature 管合同与详细决策；
+历史证据保留在归档，不把重复长正文维护成多个 Source of Truth。
+
+## 5. User / Codex Collaboration / 项目内协作
+
+当前默认 User + Codex；Codex 承担获批的开发、测试与验证，不默认安排其他 Coding Agent 实现或交接。
+恢复多 Agent 分工须用户明确指定。Architecture、Scope、Commit Decision 始终由用户负责。
+
+目标是“真实项目交付 + 批判性学习 + 共同工程”：理解架构、陌生模块与 AI workflow，
+能够独立 Review、优化并解释真实工程问题；不退化成纯课程或只批准 Agent 成品方案。
+
+- A 类先由 Codex 给出 Evidence、约束、风险和少量方案，用户参与 Invariant、边界与 trade-off 判断，
+  共同收敛 Current Slice Contract；合同写明 1–2 个 Learning Focus、实现作者、User Review 入口和待审判断。
+  B 类按风险简化，C 类不增加固定学习问答。
+- Human Core 是按学习价值预先选择的可选 hands-on，不强制每个 A 类闭环人工编码。
+  选择时必须触及 Domain Rule、状态转换、Validator、failure behavior 或关键测试；
+  rename、注释、格式化和机械修改不算。
+- 已选 Human Core 写清代码边界、行为、Invariant、Acceptance Criteria、最小 scaffolding 和验证；
+  停在 `HUMAN_CORE_READY` 后由用户实现。Codex 不抢先给出完整替换答案、不覆盖用户实现；
+  取消 / 转交仍须用户明确决定，不因规则调整取消已有约定。
+- Codex 负责获批 Slice 的实现、Unit / Module Tests、Docker / PostgreSQL / Redis / Flyway /
+  Integration / E2E 验证和获准修复；环境 / migration 文件修改同样须在批准 Scope 内。
+  Review 请求本身不授权修复；Human Core finding 交回用户，只有明确委托后才接管。
+- 实现后先从具体请求导读：业务角色、入口、对象与参数、调用、State Read / Mutation、
+  AI / Java authority、成功 / 失败结局、所选与替代方案；按需解释陌生模块，不要求平均阅读 boilerplate。
+- Codex 对自己的代码检查属于自查，不冒充独立作者 Review；不能替代用户 Critical Review。
+  用户建议以代码、测试或实验回应，区分 Finding、trade-off 与 Scope 外建议，不自动变成重构。
+  用户可认为方案合理，不必制造 Bug、Finding 或人工修改证明参与。
+- 先代码导读，再讨论理解缺口；Explain Back 仅必要时使用，不是默认考试；
+  未答题或选择先听解释不等于 `NOT_UNDERSTOOD`。Agent 解释、测试通过、笼统同意均不自动证明 Ownership。
+  Ownership 以真实代码追踪、设计判断、failure reasoning 与独立 Review 讨论为证据；
+  方法见 [OWNERSHIP_MATRIX](docs/ownership/OWNERSHIP_MATRIX.md)，历史掌握等级不因本次规则改变。
+
+闭环：
+Evidence / Alternatives → User + Codex Decision → Slice Contract →
+optional Human Core → Codex Implementation / Tests → Critical Self-review / External Verification →
+获准修复 / delta-only Review → Code Walkthrough → User Critical Review / Design Discussion →
+必要澄清 → Engineering Decision Retrospective → User Ownership / Commit Decision。
+
+有 blocking finding 保持 `REVIEW_BLOCKED`；Code Review 可继续且验证完成后，用户 Review / 理解待确认时
+保持 `OWNERSHIP_PENDING`。不得仅凭自查 PASS 进入 `READY_TO_COMMIT`；
+已约定 Human Core 未完成仍阻止该 Gate，除非用户明确调整分工。
+导读 / Review / 复盘放在有意义的完整闭环后，不每个小 Slice 重复举行。
+一次性汇总 blocking findings；修复先查增量 Diff 与受影响回归，candidate 稳定后集中必要外部 / wider 验证。
+合同本身有问题时请求 Design / Scope Decision，不静默修改；不自动 commit、push、merge 或开始下一 Slice。
+
+面试复盘沿用 [LEARNING_LOG](docs/ownership/LEARNING_LOG.md)：
+真实问题 / 约束 → 备选方案 → 选择理由 → 代价 / 风险 → 验证 → 局限 / Revisit Trigger。
+区分用户决策 / Review / 操作与 Agent 实现、讨论与实际实验，不虚构事故、指标或模型质量。
+测试证据区分新增与已有回归、unit / integration / live Provider、fresh / prior / NOT_RUN，
+说明证明与未证明的内容；不自动把 Agent 草稿标为 CONFIRMED / OPERATED，不另建第二套面试知识库。
+
+## 6. Backlog / 范围外待办
+
+开发发现范围外值得保留的工程事项：报告 → 记录 [BACKLOG](docs/planning/BACKLOG.md) → 继续当前 Scope，
+不顺手实现。用户明确要求“记下来 / 以后优化”时读取文件、取下一个 IDEA-XXX、追加条目；
+信息未知标 UNKNOWN，默认 Status: INBOX / Priority: UNASSESSED / Target: UNDECIDED。
+仅提出想法但保存意图不明时，先询问是否记录。
+
+记录不等于进入 V1 / Phase、批准实现或架构变化。明确 Scope Decision 后才由 INBOX → TRIAGED → PLANNED，
+只同步真实受影响的计划 / 产品 / Architecture / ADR；最终正式决定不能只留在 Backlog。
+TECH_DEBT 指当前存在的已知不足或取舍；Future Idea 不等于当前缺陷，二者不可混写。
+
+## 7. CURRENT_HANDOFF / 条件维护
+
+快照用于跨 session 恢复，不再代表双 Agent 开发交接；历史作者与验证保留为历史事实。
+仅用户明确要求创建 / 刷新，或 Codex 准备停止且可确认自己的剩余额度严格低于 10% 时更新。
+普通 Stop Point、commit、Scope Decision、测试结果与 Worktree 变化不自动触发更新；
+不从 Context 长度、时间或 token 用量猜额度，须 host usage signal、用户 /status / dashboard 或明确说明。
+
+更新是离开前最后一项 documentation action；随后有代码、文档、验证或 commit 变化须再次同步。
+突然耗尽且无法更新时，接手者根据 Git / 正式文档重建，标 Handoff State: RECOVERED，
+不能确认的意图 / 验证 / Ownership 标 UNKNOWN。快照维护不授权自动 commit。
+
+必填：Updated At / By、State / Reason、Branch / HEAD / Worktree、Phase / Slice / Gate / Stop Point、
+Approved Scope / Non-scope、Completed Work、fresh / prior / NOT_RUN Verification、
+本 Slice 与接手前未提交工作、Decisions / Blockers / Risks / UNKNOWN、单一 Next Action、用户待决事项。
+原地更新，不写累积日志；禁止 Secret、完整私密 Prompt / Conversation 与未脱敏用户数据。
+
+## Final Rule
+
+真实语言使用 + Persistent Learner State + Evidence-driven Adaptation + Controlled Agent Runtime。
+当继续产码与重要修改的理解、控制冲突时：STOP AND REVIEW。

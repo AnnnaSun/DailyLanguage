@@ -1,0 +1,21 @@
+{
+  "rubricReference": "builtin-japanese-text-communication-rubric/v1",
+  "targetLanguage": "ja",
+  "issueDefinitions": [
+    {
+      "issueType": "GRAMMAR",
+      "scope": "Japanese grammar problems observable in the quoted learner text, including particle choice, predicate form, politeness form, or word order.",
+      "explanationRequirement": "Name the Japanese grammar problem visible in the quote and give a corrected Japanese version of the quoted span."
+    },
+    {
+      "issueType": "NATURALNESS",
+      "scope": "Japanese phrasing in the quoted learner text that is grammatical but awkward, overly direct, or unsuitable for the practice situation and register.",
+      "explanationRequirement": "Explain why the quoted Japanese phrasing is unnatural for this situation and give a more natural Japanese alternative for the quoted span."
+    },
+    {
+      "issueType": "TASK_RESPONSE",
+      "scope": "Ways the quoted learner text fails to request repetition, acknowledge the repeated information, or otherwise answer the Japanese step prompt.",
+      "explanationRequirement": "State which required part of the Japanese step prompt or communication objective the quoted text does not fulfill and what is missing."
+    }
+  ]
+}
