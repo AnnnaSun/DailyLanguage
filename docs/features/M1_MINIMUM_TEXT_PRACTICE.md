@@ -3,13 +3,13 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
 > Production baseline: M1-S8T COMPLETE — PR #25 merged to main（`c2dbb4f`）
-> Current candidate: M1-S10 Japanese Validation Pack implementation / external verification complete
-> Current gate: M1-S10 `READY_TO_COMMIT` — scoped User Review 接受，等待用户 Commit Decision
+> Current candidate: M1-S11-A support observation API implementation / verification complete；S10 已随 `badcf6e` 提交
+> Current gate: M1-S11-A `REVIEW_PENDING` — 用户已将 Human Core 转交 Codex；等待用户 Review
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
 integration、failure invariant 与 implementation slice 顺序。它把已批准的 M1 Phase outcome 细化为可 Review
-的设计，但不授权修改 Production Code、schema 或 API。
+的设计；具体 Production Code、schema 或 API 修改须单独批准 Current Slice Contract（当前 S11-A 见 §18）。
 
 ## 1. Decision summary
 
@@ -772,7 +772,7 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 | M1-S8T | Minimum guided text learning | COMPLETE — 示范、解释、理解检查、辅助使用及必要辅助条件记录已随 PR #25 merge | A / Complete |
 | M1-S9 | Optional Planner enrichment | COMPLETE — implementation / review / PostgreSQL / Behavior Flow / Ownership PASS | A / Complete |
 | M1-S10 | Japanese validation pack | prior IMPLEMENTATION / VERIFICATION / CODE REVIEW PASS；`ja + zh-CN` 复用同一 workflow，scoped User Review 接受 | A / READY_TO_COMMIT |
-| M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | B / Review |
+| M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | S11-A REVIEW_PENDING；后续子 slice 未授权实现 |
 | M1-S12 | M1 integrated closeout | E2E、DB、security、Eval、Trace、client build 与 docs evidence 满足 exit criteria | Phase Closeout |
 
 2026-09-07 Scope Decision：S8T 在完整 S8 结束后、S9 前设计并交付；标识独立于 S8A–E，保留既有编号。
@@ -828,12 +828,113 @@ Architecture Impact: in-boundary physicalization of approved Learning Domain mod
 New ADR Required: NO
 Phase Slice Plan: APPROVED
 Production Baseline: M1-S8T COMPLETE（PR #25 merge `c2dbb4f`）
-Current Candidate: M1-S10 implementation / external verification complete
-Current Gate: READY_TO_COMMIT — scoped User Review accepted；User Commit Decision pending
+Current Candidate: M1-S11-A implementation / verification complete（Contract 见 §18）
+Current Gate: REVIEW_PENDING — Codex 自查与定向验证完成，等待用户 Review
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：`M1-S10 READY_TO_COMMIT`。下一动作是用户 Commit Decision，确认是否提交及纳入文件范围；
-不自动 commit / push / merge，不把既有其他文档修改全部纳入 S10，也不开始 S11。模块掌握等级保持不变。
+S10 资源、测试与协作／文档调整已一起提交到 `badcf6e`；本文件 §7.13 的提交前记录仍是历史证据，
+不据此重新打开 S10 Review。当前只批准 S11-A；Stop Point 为 `REVIEW_PENDING`。
+不自动 commit / push / merge、不开始 S11-B 或 S12，模块掌握等级保持不变。
+
+## 18. M1-S11-A Current Slice Contract / Implementation
+
+### 18.1 Approval and boundary
+
+- Approved：2026-10-11，用户批准 S11-A Contract，并指定 observation 校验／映射函数为 Human Core；
+  曾授权 Codex 搭建最小 scaffolding 后停在 `HUMAN_CORE_READY`。
+- Assignment revised：同日用户明确表示“还是你写代码吧”，将该 Human Core 转交 Codex，并完成当前
+  S11-A 接线与验证。不得记作用户亲手实现、操作或理解证据；不自动提升 Ownership。
+- Baseline：`feature/m1s11-VuePracticeUX` / `badcf6e587574f33549c63e1aa6d26fb1c1be03e`；开始前 worktree clean。
+- Level：A — response evidence semantics 与 additive API；沿用现有 authority，不引入新 schema 或 dependency。
+- Goal：在既有 response PUT 中接收受限 UI observation，由 Java 校验后与首次 learnerText 一起保存，
+  accepted / replay response 返回首次 durable supportCondition。
+- Non-scope：Vue、独立 support-event 账本、刷新恢复、回答覆盖、skip / abandon、completion 改造、
+  Provider / Credential 接线、live Provider、内容／rubric 修改、长期 qualification / Memory / Mastery。
+- S11 其他子 slice 的方案不等于 implementation approval；本次也不授权修改 CURRENT_HANDOFF。
+
+### 18.2 Implemented behavior and files
+
+`validateSupportObservation` 已实现，Controller 已 additive 接收 `supportObservation`；旧请求仍按全
+UNKNOWN 处理。通过 owner/profile、exact material、Session status 与 observation 校验后，沿用同一
+transaction / Session row lock 保存首次 learnerText 和 supportCondition。返回的 supportCondition
+来自 Accepted / Replayed 中的 durable response，不回显本次上报覆盖旧快照。
+
+Production files（均 Modified）：PracticeSessionController、PracticeSessionApplicationService、
+PracticeSession（仅 domain 注释）。新增 PracticeSupportObservationTests；修改现有 Controller / Application /
+Persistence integration tests。同步本合同、Practice / Grounding Flow、Guided Feature；无 schema、dependency、
+Repository / Mapper、resource、Vue 或 Credential 修改。完整源码与验证入口见 Practice Flow。
+
+### 18.3 Validation contract
+
+校验位于 `PracticeSessionApplicationService.validateSupportObservation`，实现作者为 Codex。
+采用具体函数和既有 record / enum，不引入独立 Validator framework 或新 abstraction 层级。
+
+```java
+static Optional<PracticeSession.ResponseSupportCondition> validateSupportObservation(
+        MaterialQueryResult.Available material, SupportObservation observation)
+```
+
+- `material`：调用方已经按 owner/profile 和 Task exact identity 解析的非空合法材料；
+  `selectedScaffold` 是本次 support language 对应的支架，不查询其他语言 scaffold。
+- `observation`：可为 null；非 null 时四个字段仍可能缺失。输入 record 保留这些字段，由校验函数统一拒绝不完整观察。
+- `Optional.of(condition)`：合法、可保存的 snapshot；`Optional.empty()`：非法输入，HTTP 映射为
+  `400 INVALID_PRACTICE_RESPONSE`，不得写入回答。
+- 函数无 DB、HTTP、UI、日志、Model 或长期状态副作用；不修改输入对象，不重算 learnerText。
+
+验收规则：
+
+| Input / evidence | Required result |
+|---|---|
+| observation 整体缺失 | 四项 `UNKNOWN`，包括材料没有 frame 的情况；保留旧请求语义 |
+| observation 存在但任一字段为 null | 拒绝，不把缺字段静默补成 UNKNOWN |
+| 客户端任一字段自报 `NOT_PROVIDED` | 拒绝；即使 Java 本可推导出该结果，也不接受客户端否定结论 |
+| 合法材料中存在的支架，上报 `PROVIDED / OPENED` | 保留相应观察；不解释为已阅读、理解或独立能力 |
+| 支架存在但上报 `UNKNOWN` | 保持 UNKNOWN，不推断未提供 |
+| 整个 selected material 没有某类支架，上报 UNKNOWN | Java 才可推导该维度 `NOT_PROVIDED` |
+| 不存在的支架却上报 PROVIDED / OPENED | 拒绝；当前真实材料用 responseFrame 覆盖该情况 |
+| 当前 transfer step 无 frame，但其他 guided step 有 | 不等于整个 Session 材料无 frame；不得降级已有 observation |
+
+当前 loader 强制 `targetLanguageText`、`explanation`、`hint` 非空；`readingInfo` 与 `contrastiveNote`
+是可选补充。因此现有合法材料实际可缺失的四类支架主要是 responseFrame，不为无效材料增加备用解释。
+demonstration 对应示范正文／读音行，explanation 对应解释／contrastiveNote，hint 对应提示，
+responseFrame 看整个 selected scaffold 的 guided steps，不能只看当前 step。
+
+这里的 NOT_PROVIDED 只描述系统材料没有该类支架，不证明没有外部辅助。PROVIDED / OPENED 是
+经格式和材料一致性校验的浏览器观察上报，不是防篡改证明；未来 M2 不得绕过 qualification。
+跨步骤已发生的展示／打开由后续 UI capture 保守累计；本函数不重建事件历史，也不证明观察来源。
+
+### 18.4 Implemented call flow
+
+1. Controller additive 接收可选 `supportObservation`；非法 enum 名称／shape 保持安全 400；enum 名称显式解析，数字不会作为 ordinal 接受。旧请求兼容。
+2. owner/profile 与 exact material 校验后在既有 Session 行锁与 transaction 内调用校验；合法结果进入首次 response 写入。
+3. 同 exact text 的 replay 返回首次 timestamp 与 support snapshot；不同 text 仍 conflict，
+   不把新的 observation 覆盖到旧行。完成后的 Session 仍拒绝 response。
+4. response additive 返回 durable supportCondition，不返回 learnerText、accepted answers、rubric 或 Credential。
+5. 原有五参数 submit overload 保持兼容并委托六参数入口；两个 public 入口均保留 REQUIRED transaction，
+   不改变既有 Session-row-first 锁序。
+
+### 18.5 Verification and stop point
+
+Fresh 2026-10-11（Java 25；Mockito tests 使用显式 Byte Buddy agent）：
+
+| Layer | Evidence | Limit |
+|---|---|---|
+| Targeted unit | SupportObservation 22、Application 38、Controller 28，共 88/88 PASS，0 skipped | 含新增 34 个用例及既有 54 个回归；不是 frontend 验证 |
+| Isolated integration | Practice 38、GroundedEvaluationInputReader 5，共 43/43 PASS，0 skipped | 含新增 3 个集成用例；不是 live Provider 质量验证 |
+| Fresh database | 独立 PostgreSQL 18.6 + pgvector 0.8.6，empty schema Flyway V1–V17 validated/applied | 无 schema change；未连接 primary database |
+| HTTP integration | MockMvc 通过真实 Security / Controller / Service / PostgreSQL，独立 Redis 7.2.15 承载 Session | 认证 principal / CSRF 由测试工具提供，不声称真实浏览器登录已验证 |
+| Core assertions | 非法观察零写入、durable snapshot 返回、same-text replay、different-text conflict、跨 owner/profile、缺 CSRF 拒绝、并发只保留首次 snapshot、completion 后 Reader 读取原 snapshot | 浏览器观察可信度与学习有效性仍有限 |
+
+Scaffolding 阶段的 22 RED 是先前 placeholder 状态；本轮已转绿，不再是当前未完成事项。
+首次集成尝试被 sandbox socket 限制阻断，获准后在相同隔离目标重跑并通过；不把环境失败计作业务 PASS。
+两个临时容器已删除；`git diff --check` PASS。测试日志只用于本地验证，不进入生产 Trace。
+
+- NOT_RUN：Vue / browser、live Provider、完整 server suite、S12 integrated closeout。
+- Learning Focus：客户端 observation 与 Java authority；UNKNOWN、材料缺失和 immutable snapshot 的区别。
+- Codex critical self-review：未发现当前 Scope 的 blocking finding；不冒充用户独立 Review。
+- Stop Point：`REVIEW_PENDING`，下一动作是从一次 response 请求进行源码导读与用户 Review。
+- Human Core：用户明确转交 Codex；Human Touch 不记为用户完成，不安排补考，不自动提高 Ownership。
+- 不开始 S11-B 或 S12，不 commit / push / merge；不更新 CURRENT_HANDOFF。

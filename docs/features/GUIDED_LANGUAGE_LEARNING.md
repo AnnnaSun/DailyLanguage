@@ -1,6 +1,6 @@
 # Guided Language Learning — 输入、理解与独立使用
 
-> Updated: 2026-09-10
+> Updated: 2026-10-11 — S11-A observation API 已实现并验证；REVIEW_PENDING，Vue capture 尚未实现
 > Direction: APPROVED — 用户同意补充教学流程并复用现有模块
 > Product design / V1 phase allocation: APPROVED — 2026-09-07
 > Current Slice Contract: APPROVED — S8T-A / S8T-B / S8T-C
@@ -15,8 +15,8 @@
 当前已发布 `en-builtin-cafe-request/v2`：`TargetPracticeCore` 通过 `learningPurpose` 区分理解检查、辅助使用与
 独立迁移，`SupportScaffold.guidedSteps` 为每个 guided step 提供中文 instruction，并只在
 `SCAFFOLDED_USE` 暴露答案性 `responseFrame`。Practice start 下发安全教学投影；`practice_response` 持久化
-四类 support-condition snapshot。当前 HTTP submit 无法确认真实暴露条件，因此显式保存 `UNKNOWN`，不伪造
-无辅助成功。Reading / Listening / Language Fundamentals 的逻辑设计仍不等于已交付。
+四类 support-condition snapshot。S11-A HTTP submit 已接受经 Java 校验的受限 supportObservation，
+缺失上报仍保存 UNKNOWN；返回首次 durable snapshot，不伪造无辅助成功。Reading / Listening / Language Fundamentals 的逻辑设计仍不等于已交付。
 
 本设计补充 Practice 内的教学行为，不新增顶层 Learning module、独立 Learner Model 或第二套 Session。
 已批准更新 V1 范围及 Phase exit criteria；M1-S8T 复用 Content、Planner、Practice Runtime 与 Evaluator input，
@@ -34,7 +34,7 @@
 | 理解检查 | `comprehension-check`：`COMPREHENSION_CHECK + EXACT` | 当前只形成本次 deterministic result |
 | 辅助使用 | `order-with-frame`：`SCAFFOLDED_USE + EXACT`，下发 `responseFrame` | M2 才解释为有条件的学习 Evidence |
 | 独立迁移 | `order-water-freely`：`INDEPENDENT_TRANSFER + SEMANTIC_ONLY`，无 `responseFrame` | 当前不伪造 semantic correctness；由既有 Evaluator 产生候选诊断 |
-| 辅助条件 | response 首次写入时原子保存四类 exposure；当前 HTTP 路径均为 `UNKNOWN` | S11/runtime 才能提供可信的 `PROVIDED / OPENED / NOT_PROVIDED` |
+| 辅助条件 | S11-A 原子保存经 Java 校验的 observation；缺失上报为 UNKNOWN，replay 返回首次 snapshot | Vue 尚未 capture；客户端观察不证明阅读、理解或无外部辅助 |
 | 后续复习 | 尚未实现 | Review 与调度规则留给后续 Phase |
 
 这不是每次必走的线性课程。已有基础用户可以直接尝试；遇到困难可以选择“先教我”、
@@ -73,8 +73,11 @@ v1 内容保持 immutable，并转为 `HISTORICAL_ONLY`，仍可按 exact identi
 
 当前已保留可追溯的 material identity/version、任务目标、实际回答、评价来源，以及与 response 同行首次写入的
 `ResponseSupportCondition`。四个独立维度为 demonstration、explanation、hint 与 responseFrame；每个维度取值
-`UNKNOWN / NOT_PROVIDED / PROVIDED / OPENED`。migration 前历史与当前 HTTP submit 均使用 `UNKNOWN`，不能把
-缺失或未知记录默认为未使用辅助，也不能把点击或停留时间当作认知事实。
+`UNKNOWN / NOT_PROVIDED / PROVIDED / OPENED`。migration 前历史与缺失 observation 的请求使用 UNKNOWN。
+S11-A 拒绝不完整字段、客户端自报 NOT_PROVIDED、材料不存在却声称提供／打开的观察；合法正向观察保留。
+当前合法材料的前三类支架必有，responseFrame 只有在整个 selected scaffold 中确实不存在，且完整上报为
+UNKNOWN 时，才由 Java 推导 NOT_PROVIDED。当前 step 无 frame 不等于整个 Session 材料无 frame。
+缺失或未知记录不默认为未使用辅助；浏览器上报不证明实际阅读或理解，不证明没有外部辅助。
 
 教学示范与评分答案的可见性应明确区分：可以展示为教学准备的例句，不因此暴露内部完整
 accepted answers / rubric。历史结果按当时材料版本和辅助条件解释，不重新标注旧 Session 为独立成功。
@@ -89,7 +92,7 @@ Learning Memory 负责聚合后的长期状态。不存在独立的“课程完�
 |---|---|---|
 | Content | 已承载 typed learning purpose、逐 step scaffold 与 cafe v2 | versioned、可追溯；Public Reference 仍只是参考 |
 | Planner | 已选择唯一 `PLANNABLE` cafe v2，并保留 exact identity | 不生成完整课程，不直接写能力状态 |
-| Practice Runtime | 已投影 guided scaffold，并持久化四类辅助条件 snapshot | 当前 HTTP 只写 `UNKNOWN`；不自行决定掌握 |
+| Practice Runtime | 已投影 guided scaffold；S11-A 校验 HTTP observation 并保存／返回首次 snapshot | Vue capture 未实现；不自行决定掌握 |
 | Evaluator | trusted input 已携带 durable response/support condition | 不把模仿当独立表现，不直接修改长期状态 |
 | Learning Memory | 按证据类型与条件聚合 | 不以看过内容或课程进度替代能力判断 |
 | Review | 安排值得再次出现的内容 | 不承担完整 Planner 或维护另一份 mastery truth |
@@ -112,8 +115,10 @@ Grammar Repair 继续用于真实使用后重复、高置信的问题。首次�
 - M1 工程验收：guided material validation、legacy default、exact-version planning/start、safe projection、
   support-condition migration/round-trip、owner/profile isolation 与 Evaluator input regression 已由 unit/integration
   tests 覆盖。
-- 当前能力限制：HTTP submit 只保存 `UNKNOWN`，因此 M1 不能宣称某次回答真实使用或未使用辅助；S11/runtime
-  暴露追踪、M2 qualification/aggregation 与后续 Review 尚未实现。
+- S11-A fresh verification：unit 88/88、独立 PostgreSQL / Redis integration 43/43 PASS，0 skipped；
+  真实 HTTP 保存的 snapshot 可进入 Evaluator input，非法观察／跨 owner/profile／缺 CSRF 被拒绝，replay 不覆盖。
+- 当前能力限制：Vue capture、M2 qualification/aggregation 与后续 Review 尚未实现。HTTP 校验不证明
+  浏览器观察真实、不证明学习有效性，也不能把隐藏支架后的表现直接判为独立成功。
 - 学习有效性 UNKNOWN：未来通过减少辅助后的迁移与后续表现验证；工程测试和一次 dogfooding 不证明普遍有效。
 
 ## 7. Delivery gate

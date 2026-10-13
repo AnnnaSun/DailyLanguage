@@ -20,6 +20,7 @@ import com.dailylanguage.practice.application.PracticeSessionApplicationService.
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.PracticeMaterialView;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.SupportObservation;
 import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.PracticeSession;
 import com.dailylanguage.planner.domain.LearningTask;
@@ -78,8 +79,15 @@ public class PracticeSessionController {
             @PathVariable String stepId,
             @RequestBody SubmitLearnerResponseRequest request,
             @AuthenticationPrincipal(errorOnInvalidType = true) UserContext userContext) {
+        SupportObservation observation;
+        try {
+            observation = request.supportObservation() == null
+                    ? null : request.supportObservation().toObservation();
+        } catch (IllegalArgumentException exception) {
+            return practiceFailure(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_RESPONSE");
+        }
         SubmitResult result = practiceSessionApplicationService.submit(
-                languageProfileId, sessionId, stepId, userContext, request.learnerText());
+                languageProfileId, sessionId, stepId, userContext, request.learnerText(), observation);
 
         return switch (result) {
             case SubmitResult.InvalidResponse ignored ->
@@ -143,7 +151,20 @@ public class PracticeSessionController {
         };
     }
 
-    record SubmitLearnerResponseRequest(String learnerText) {
+    record SubmitLearnerResponseRequest(String learnerText, SupportObservationRequest supportObservation) {
+    }
+
+    // 使用显式名称解析，避免 JSON 数字被当成 enum ordinal 接受；null 留给 application 校验。
+    record SupportObservationRequest(String demonstration, String explanation, String hint, String responseFrame) {
+
+        SupportObservation toObservation() {
+            return new SupportObservation(
+                    exposure(demonstration), exposure(explanation), exposure(hint), exposure(responseFrame));
+        }
+
+        private static PracticeSession.SupportExposure exposure(String value) {
+            return value == null ? null : PracticeSession.SupportExposure.valueOf(value);
+        }
     }
 
     record PracticeErrorResponse(String code) {
@@ -225,11 +246,12 @@ public class PracticeSessionController {
         }
     }
 
-    record SubmitResponse(UUID sessionId, String stepId, OffsetDateTime submittedAt) {
+    record SubmitResponse(UUID sessionId, String stepId, OffsetDateTime submittedAt,
+            PracticeSession.ResponseSupportCondition supportCondition) {
 
         static SubmitResponse from(PracticeSession.LearnerResponse response) {
             return new SubmitResponse(
-                    response.sessionId(), response.stepId(), response.submittedAt());
+                    response.sessionId(), response.stepId(), response.submittedAt(), response.supportCondition());
         }
     }
 }

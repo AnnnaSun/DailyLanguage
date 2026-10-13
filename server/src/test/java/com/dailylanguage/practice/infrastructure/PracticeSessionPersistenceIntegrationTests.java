@@ -14,8 +14,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,10 @@ import com.dailylanguage.practice.application.PracticeSessionApplicationService;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.CompletionResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.SupportObservation;
+import com.dailylanguage.practice.domain.PracticeSession.SupportExposure;
+import com.dailylanguage.evaluator.application.GroundedEvaluationInputReader;
+import com.dailylanguage.evaluator.application.GroundedEvaluationInputResult;
 import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepKind;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepOutcome;
@@ -42,8 +50,14 @@ import com.dailylanguage.user.infrastructure.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = "app.registration-enabled=true")
+@AutoConfigureMockMvc
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_DATABASE_TESTS", matches = "true")
 class PracticeSessionPersistenceIntegrationTests {
@@ -78,6 +92,12 @@ class PracticeSessionPersistenceIntegrationTests {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private GroundedEvaluationInputReader evaluationInputReader;
 
     // --- repository：schema、ownership 与 durable constraints ---
 
@@ -632,6 +652,102 @@ class PracticeSessionPersistenceIntegrationTests {
         assertThat(accepted).as("exactly one different payload wins: %s", outcomes).isEqualTo(1);
         assertThat(conflicts).as("the other payload conflicts without overwriting: %s", outcomes)
                 .isEqualTo(1);
+        assertThat(countResponsesForSession(sessionId)).isEqualTo(1);
+    }
+
+    @Test
+    void httpObservationPersistsFirstSnapshotAndReachesEvaluationInput() throws Exception {
+        OwnedTask owned = createOwnedPlannedTask(
+                new MaterialIdentity("en-builtin-cafe-request", "v2"), CAFE_SCENARIO, GUIDED_CAFE_OBJECTIVE);
+        UserContext user = new UserContext(owned.ownerId());
+        UUID sessionId = ((StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), user)).session().id();
+        String endpoint = "/api/language-profiles/" + owned.profileId()
+                + "/practice-sessions/" + sessionId + "/responses/comprehension-check";
+        var authenticated = authentication(UsernamePasswordAuthenticationToken.authenticated(user, null, List.of()));
+        String body = """
+                {"learnerText":"A medium coffee.","supportObservation":{
+                  "demonstration":"PROVIDED","explanation":"OPENED",
+                  "hint":"UNKNOWN","responseFrame":"UNKNOWN"}}
+                """;
+
+        mockMvc.perform(put(endpoint).with(authenticated).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put(endpoint).with(authenticated).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace("PROVIDED", "NOT_PROVIDED")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PRACTICE_RESPONSE"));
+        assertThat(countResponsesForSession(sessionId)).isZero();
+
+        mockMvc.perform(put(endpoint).with(authenticated).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.supportCondition.demonstration").value("PROVIDED"))
+                .andExpect(jsonPath("$.supportCondition.explanation").value("OPENED"));
+        PracticeSession.LearnerResponse first = practiceSessionRepository
+                .findOwnedResponse(sessionId, "comprehension-check", owned.ownerId(), owned.profileId()).orElseThrow();
+        mockMvc.perform(put(endpoint).with(authenticated).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace("PROVIDED", "UNKNOWN").replace("OPENED", "UNKNOWN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.supportCondition.demonstration").value("PROVIDED"))
+                .andExpect(jsonPath("$.supportCondition.explanation").value("OPENED"));
+        mockMvc.perform(put(endpoint).with(authenticated).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace("A medium coffee.", "A large coffee.")))
+                .andExpect(status().isConflict());
+        mockMvc.perform(put(endpoint.replace(owned.profileId().toString(), UUID.randomUUID().toString()))
+                        .with(authenticated).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put(endpoint).with(authentication(UsernamePasswordAuthenticationToken.authenticated(
+                                new UserContext(userRepository.create()), null, List.of())))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+        assertThat(practiceSessionRepository.findOwnedResponse(
+                sessionId, "comprehension-check", owned.ownerId(), owned.profileId())).contains(first);
+
+        practiceSessionApplicationService.submit(owned.profileId(), sessionId, "order-with-frame", user,
+                "Could I have a medium coffee, please?");
+        practiceSessionApplicationService.submit(owned.profileId(), sessionId, "order-water-freely", user,
+                "Could I have a bottle of water, please?");
+        assertThat(practiceSessionApplicationService.complete(owned.profileId(), sessionId, user))
+                .isInstanceOf(CompletionResult.Created.class);
+        assertThat(evaluationInputReader.readOwned(owned.profileId(), sessionId, user))
+                .isInstanceOfSatisfying(GroundedEvaluationInputResult.Ready.class, ready ->
+                        assertThat(ready.input().responses()).contains(first));
+    }
+
+    @Test
+    void impossibleFrameObservationLeavesNoPartialResponse() {
+        OwnedTask owned = createOwnedPlannedTask();
+        UserContext user = new UserContext(owned.ownerId());
+        UUID sessionId = ((StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), user)).session().id();
+        SupportObservation impossible = new SupportObservation(
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN, SupportExposure.UNKNOWN, SupportExposure.OPENED);
+        assertThat(practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "order-drink", user, "text", impossible))
+                .isEqualTo(new SubmitResult.InvalidResponse());
+        assertThat(countResponsesForSession(sessionId)).isZero();
+        assertThat(practiceSessionRepository.findOwned(sessionId, owned.ownerId(), owned.profileId()))
+                .hasValueSatisfying(session -> assertThat(session.status()).isEqualTo(PracticeSession.Status.IN_PROGRESS));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentObservationsKeepOneFirstSnapshotForTheSameText() throws Exception {
+        OwnedTask owned = createOwnedPlannedTask();
+        UserContext user = new UserContext(owned.ownerId());
+        UUID sessionId = ((StartResult.Created) practiceSessionApplicationService.start(
+                owned.profileId(), owned.taskId(), user)).session().id();
+        var outcomes = runConcurrently(2, index -> practiceSessionApplicationService.submit(
+                owned.profileId(), sessionId, "order-drink", user, "Same text",
+                new SupportObservation(index == 0 ? SupportExposure.PROVIDED : SupportExposure.OPENED,
+                        SupportExposure.UNKNOWN, SupportExposure.UNKNOWN, SupportExposure.UNKNOWN)));
+        assertThat(outcomes.stream().filter(SubmitResult.Accepted.class::isInstance)).hasSize(1);
+        assertThat(outcomes.stream().filter(SubmitResult.Replayed.class::isInstance)).hasSize(1);
+        PracticeSession.LearnerResponse stored = practiceSessionRepository.findOwnedResponse(
+                sessionId, "order-drink", owned.ownerId(), owned.profileId()).orElseThrow();
+        assertThat(outcomes).containsExactlyInAnyOrder(new SubmitResult.Accepted(stored), new SubmitResult.Replayed(stored));
+        assertThat(stored.supportCondition().responseFrame()).isEqualTo(SupportExposure.NOT_PROVIDED);
         assertThat(countResponsesForSession(sessionId)).isEqualTo(1);
     }
 
