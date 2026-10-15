@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.7
 > Approved: 2026-08-20  
-> Last updated: 2026-10-11 — M1-S10 scoped User Review 接受；READY_TO_COMMIT，等待用户 Commit Decision
+> Last updated: 2026-10-15 — 补充 M3 技术评估、Hosted 监控与 OpenTelemetry 链路关联；既有 M1-S10 Gate 记录未在本次刷新
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -420,6 +420,23 @@ turn-scoped event contract、Context strategy、Prompt、model route、scenario 
 - 根据真实 dogfooding evidence 确定有限 Built-in Content Pack 的数量和覆盖，并将 M1 artifact 接入
   versioned provenance / publish boundary；不提前承诺完整 curriculum 或全语言内容。
 
+#### M3 检索与离线数据处理评估（2026-10-15）
+
+- 先以现有 PostgreSQL + pgvector 基础定义可复现的 Retrieval baseline；具体全文检索策略在 M3
+  Current Slice Contract 中决定。使用有使用权的多语言材料和标注查询，对比检索相关性、延迟、
+  索引更新、资源占用与成本，并验证 `languageProfileId` / namespace 隔离及 source provenance。
+- Elasticsearch 只作为可选的检索对照实验：若 baseline 在多语言关键词检索、复杂筛选或性能上出现
+  有证据的不足，再评估独立 read-side index。引入生产环境须另行批准 Architecture Change，并说明
+  PostgreSQL 状态权威、索引同步 / 重建、权限过滤、故障降级及 Hosted / Self-hosted 运维成本。
+- Spark 只在获准语料的体量或处理耗时证明普通批处理不足时，评估离线清洗、去重、统计与版本化
+  Content artifact 生成；记录输入规模、吞吐 / 资源、可复现性和 provenance。它不进入在线请求链路，
+  不作为 M3 Done Criteria 或小规模 Hosted 试用的常驻组件。
+- 内容解析、embedding 与 indexing 可记录后台任务的实际吞吐和恢复需求；V1 仍遵守
+  `Spring TaskExecutor + DB Job State` 边界。RabbitMQ / Kafka 的触发条件和决策留在
+  [IDEA-002](BACKLOG.md#idea-002--re-evaluate-kafka-or-rabbitmq-after-v1) 的 Post-V1 Review；
+  不因 M3 增加生产中间件，也不把 BYOK Credential 放入消息。
+- 对外介绍时区分已实现的 baseline、完成的对照实验和获批上线的组件；性能结论只使用真实测量结果。
+
 ### M4 — Learning Completeness
 
 **Goal**
@@ -476,6 +493,43 @@ turn-scoped event contract、Context strategy、Prompt、model route、scenario 
 - Architecture Docs 与真实实现一致；
 - 核心调用链完成人工 Ownership Check；
 - 可重复 demo 展示 adaptation、grounding、fallback、trace、replay 与 language isolation。
+
+#### M6 Hosted Trial / Observability Plan（2026-10-15 决策）
+
+- 交付定位：中国内地小范围、非收费的 Hosted 试用；其他用户可下载同一套代码自行部署。
+  Hosted 允许用户自行注册，部署时显式设置 `REGISTRATION_ENABLED=true`；Self-hosted 保留现有可选单用户路径。
+- 费用边界：计划中的付费对象仅为云平台与大模型 API；Hosted 监控选用
+  [Grafana Cloud Free](https://grafana.com/products/cloud/) 免费套餐，不把付费监控服务作为上线依赖。
+  免费额度、保留期限与云平台出站流量成本须在部署前复核；不自动升级付费套餐。
+- 观测目标：可按 `traceId` / `spanId` 关联关键请求与 AI 调用，查看主机及 JVM CPU / 内存、
+  HTTP 与 Model Gateway 耗时、错误状态，并控制日志与 Trace 的采样量。采用标准 OpenTelemetry
+  Trace context；具体采集与导出配置在独立 Observability slice 中设计、Review 和验证。当前已有的
+  module-local Trace 不等于 OpenTelemetry 全链路追踪，也未接入 Grafana。
+- 隐私边界：外发监控数据只包含必要 metadata；Credential、Secret、完整私密 Prompt / Conversation
+  不进入 Log、Trace 或 Metric。Self-hosted 不依赖项目 Hosted 的 Grafana Cloud 账户。
+- 容量与应对：云厂商、实例规格和真实 CPU / RAM 用量尚未确认；先在候选实例上做登录、注册、
+  学习与模型调用的混合负载及恢复验证，再按 CPU / 内存、耗时、错误率和费用决定容量。
+  现有登录 / 注册限流继续保留；如试用达到瓶颈，可暂停 Hosted 服务或另行决定更广泛的限流实现，
+  不在本次文档决策中预先修改业务代码。
+
+#### Next Observability Slice — 链路关联设计边界（2026-10-15 决策）
+
+- 此 A 类 slice 只处理链路身份与关联：每次 HTTP 请求使用标准 OpenTelemetry `traceId`，
+  关键步骤使用 `spanId`；跨 `ModelCallJob` worker 与 Model Gateway executor 的线程边界传递 context。
+  异步 Job 晚于 HTTP 响应结束时，仍应能关联到发起请求的 Trace。
+- `PlanningRun` / `EvaluationRun` 的 `runId`、`ModelCallJob.jobId` 作为业务关联属性；
+  `taskId`、`sessionId` 仅在已产生或已读取时附到相关 Span。一个 Task 的多次请求保留各自的
+  `traceId`，通过业务 ID 检索关联，不把 `taskId` 当作 Trace ID，也不预先持久化未知的 `taskId`。
+- 现有 Model Gateway 每次调用生成的 UUID 是局部调用标识；实施时须与标准 OpenTelemetry
+  `traceId` 明确区分（如 `modelCallId`），避免在日志中用同名字段表示不同身份。
+- 验收至少覆盖 Planner 与 Evaluator 各一条 HTTP → Run / Job → Worker → Gateway →
+  结果处理路径，以及无 Provider、提交被拒、模型失败、迟到完成和线程复用时的 context 清理。
+  Observability 失败不得改变 Model result、Job 状态或 Learning State。
+- 此 slice 不增加 Trace / Span 到业务数据库的持久化，不把业务 ID 做成 metric label，
+  不外发 Credential、Secret 或完整私密 Prompt / Conversation。Grafana Cloud 的 OTLP 导出、
+  主机 CPU / RAM 采集与采样额度验证仍属于部署监控工作，不随链路关联自动实施。
+- 在当前 M1-S11 Gate 结束后再固定本 slice 的生产文件、改动量和验证合同；该规划不授权现在改代码，
+  也不自动推进当前 M1-S11 或 M6。
 
 ## 3. Completed M0 Implementation Slices and Closeout
 
