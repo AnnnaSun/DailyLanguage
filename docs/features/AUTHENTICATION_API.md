@@ -27,6 +27,10 @@ CSRF rejection 和 Single-user mode 隐藏 login endpoint 属于 Security Filter
 Cookie 的 `Path`、`SameSite` 和 `Secure` 是 response cookie attribute，不需要作为 request header
 参数手动提交。缺失或错误的 token 返回 `403`，并在 Rate Limit、Controller 和 Argon2 前停止。
 
+内部 `DispatcherType.ERROR` 分发允许继续生成错误响应，避免 CSRF 的 403 经 `/error` 再次鉴权被覆盖
+成 401；普通浏览器 `REQUEST /error` 仍要求认证。这不跳过 CSRF 或整个安全过滤器链。
+真实 HTTP 回归入口：`AuthenticationErrorDispatchHttpTests`；错误 body 仍不保证上述固定 JSON code。
+
 ## `POST /api/auth/login`
 
 Request：
