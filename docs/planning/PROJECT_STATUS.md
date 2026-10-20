@@ -58,8 +58,8 @@ Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](.
 | 本轮 / NOT_RUN | Java / Vue / 数据库／浏览器回归、真实 C31 网络重跑、live Provider、Identity、SAA、K3s / Tekton、生产部署 | 文档同步不是运行时验证 |
 
 完整 S11 批次、失败与局限见 Feature §18–19；C31 仅保留平台方案 §9.3 的脱敏摘要。
-C31 原始本机诊断证据位于验证工程忽略的 .local/；工程源码、私钥、临时参数和产物均不纳入项目提交。
-该工程当前仍为本地未跟踪文件；未来暂存必须显式选文件，不能将整个工作区一并暂存。
+C31 一次性验证源码及本机诊断日志／构建产物已按用户 2026-10-21 的要求删除；
+仅保留上述脱敏摘要及 [原 Dubbo 补丁](../architecture/patches/dubbo-3.3.6-peerhost.patch)，不保留测试凭据或运行产物。
 
 ## Outstanding Gates
 
