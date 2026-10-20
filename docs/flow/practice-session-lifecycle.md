@@ -1,8 +1,8 @@
 # PracticeSession Lifecycle Flow
 
 - Document Status: `IMPLEMENTED`
-- Feature / Slice: `M1-S5 / M1-S6 / M1-S8T`
-- Last Verified: `2026-09-09`
+- Feature / Slice: `M1-S5 / M1-S6 / M1-S8T / M1-S11-A`
+- Last Verified: `2026-10-11`（本次核对 response observation 增量与受影响回归）
 - Entry:
   - `POST /api/language-profiles/{languageProfileId}/learning-tasks/{taskId}/practice-sessions`
   - `PUT /api/language-profiles/{languageProfileId}/practice-sessions/{sessionId}/responses/{stepId}`
@@ -20,8 +20,8 @@ exact `materialId + publishedVersion` 为每个 material step 提交一条 respo
 
 - `PLANNED` Task 与唯一 `IN_PROGRESS` Session 的原子创建；
 - repeated / concurrent start 返回数据库中同一个 durable Session；
-- 每个 `(sessionId, stepId)` 只接受首次 learner text 与四类 support-condition snapshot；相同 exact payload
-  可幂等重放，不同 payload 冲突，replay/conflict 不覆盖首次 snapshot；
+- 每个 `(sessionId, stepId)` 只接受首次 learner text 与四类 support-condition snapshot；合法 observation 下，
+  相同 exact text 可重放，不同 text 冲突；即使重放请求的 observation 改变，也不覆盖首次 snapshot；
 - learner text 原样保存，不 trim、不改大小写、不做 Unicode normalization；
 - start 时只下发 learner 练习所需的安全 material projection；guided step additive 携带 `learningPurpose` 与
   support-language instruction / responseFrame，legacy `PRACTICE` step 的 guided scaffold 为 null；
@@ -39,8 +39,8 @@ exact `materialId + publishedVersion` 为每个 material step 提交一条 respo
 - 不调用 LLM / Model Gateway，不生成 Evidence，不修改 Weakness、Level、Mastery 或 Learning Memory；
 - 不保存 Prompt、Credential、accepted answers、semantic rubric 或 Content lineage；
 - 不提供 response 修改、删除或覆盖语义。
-- 当前 HTTP submit 不接受客户端自报 support condition，四类 exposure 均显式保存 `UNKNOWN`；真实
-  `PROVIDED / OPENED / NOT_PROVIDED` capture、M2 qualification / aggregation 与 Review scheduling 不在本 Flow。
+- HTTP 已接受受限 supportObservation 并由 Java 校验；Vue capture、浏览器操作真实性证明、
+  M2 qualification / aggregation 与 Review scheduling 不在本 Flow。
 
 ## 2. Main Call Chain
 
@@ -120,7 +120,8 @@ sequenceDiagram
 
     Client->>Security: PUT JSON + session + CSRF token
     Security-->>Controller: authenticated UserContext (userId)
-    Controller->>Service: submit(profileId, sessionId, stepId, UserContext, learnerText)
+    Controller->>Controller: parse optional observation names (invalid → 400)
+    Controller->>Service: submit(profileId, sessionId, stepId, UserContext, learnerText, observation)
     Service->>Service: learnerText non-null / non-blank / <= 2000 code points
     alt invalid learnerText
         Service-->>Controller: InvalidResponse → 400, no repository access
@@ -148,7 +149,10 @@ sequenceDiagram
     alt Session is no longer IN_PROGRESS
         Service-->>Controller: SessionNotAcceptingResponses → 409
     else locked IN_PROGRESS Session
-        Service->>Service: supportCondition = UNKNOWN x4
+        Service->>Service: validateSupportObservation(exact material, observation)
+        break Invalid observation
+            Service-->>Controller: InvalidResponse → 400, no mutation
+        end
         Service->>SessionRepo: insertOwnedAcceptedResponse(..., supportCondition, userId, profileId)
         SessionRepo->>DB: INSERT text + four exposure values via owned IN_PROGRESS gate<br/>ON CONFLICT DO NOTHING
         alt first accepted response
@@ -160,7 +164,7 @@ sequenceDiagram
             alt owned response unexpectedly missing
                 Service-->>Controller: IllegalStateException → generic 5xx, transaction rollback
             else stored learnerText equals exact submitted payload
-                Service-->>Controller: Replayed → 200 + first submittedAt
+                Service-->>Controller: Replayed → 200 + first submittedAt + first supportCondition
             else stored learnerText differs
                 Service-->>Controller: ResponseConflict → 409, first response unchanged
             end
@@ -170,8 +174,17 @@ sequenceDiagram
 
 S8T-B 将 demonstration、explanation、hint、responseFrame 四类 exposure 作为 immutable
 `ResponseSupportCondition` 与 learner text 同行首次写入。Flyway V14 把 migration 前历史回填为 `UNKNOWN` 后移除
-column defaults，所有新 insert 必须显式提供四类值。当前 HTTP runtime 无法确认浏览器中的真实暴露，因此 Java
-明确写入四个 `UNKNOWN`；它不等于 `NOT_PROVIDED`，也不能作为无辅助成功证据。
+column defaults，所有新 insert 必须显式提供四类值。S11-A 的 HTTP request additive 接收
+`supportObservation {demonstration, explanation, hint, responseFrame}`；Controller 显式解析 enum 名称，
+不接受数字 ordinal；字段缺失、客户端 NOT_PROVIDED 或与材料矛盾的观察由 Application 拒绝。
+
+缺失整个 observation 的旧请求仍写四项 UNKNOWN。合法上报保留 PROVIDED / OPENED / UNKNOWN；只有
+完整 observation 中的 responseFrame 为 UNKNOWN 且整个 selected scaffold 无 frame，Java 才推导
+NOT_PROVIDED。示范、解释、hint 由现有 loader 保证存在；不能用当前 transfer step 没有 frame 推导
+整个 Session 材料无 frame。这些值不证明阅读、理解、独立成功或没有外部辅助。
+
+HTTP success additive 返回 durable supportCondition。先校验本次 observation，再执行首次 insert／replay；
+非法观察即使 text 与既有行相同也返回 400。浏览器尚未实现 capture，不宣称 UI 闭环已交付。
 
 ### 2.3 Complete PracticeSession
 
@@ -266,9 +279,10 @@ step 创建一条 `deterministic_step_assessment`。这些结果只表示本次�
 - response write 先锁定 owned Session row，再检查 `IN_PROGRESS` 并写入；数据库 insert gate 再次复核
   owner/profile/status，避免 terminal Session 接受迟到 response。
 - PostgreSQL V14 的 NOT NULL/CHECK 约束保证四类 support exposure 均来自 closed vocabulary；migration 前历史、
-  legacy constructor 与当前 HTTP submit 都保守解释为 `UNKNOWN`，而不是 `NOT_PROVIDED`。
+  legacy constructor 与缺失 observation 的 HTTP submit 都保守解释为 `UNKNOWN`；新观察经 Java 校验映射，
+  客户端不能自行声明 NOT_PROVIDED。
 - learner text 是 private learning data，只能 owner-scoped 读取；HTTP success response 只返回
-  `sessionId + stepId + submittedAt`，不回显 learner text。
+  `sessionId + stepId + submittedAt + supportCondition`，不回显 learner text。
 - start 的 material projection 不包含 `acceptedAnswers`、`semanticRubricReference`、Content lineage 或 ownership
   identity。
 - Java 持有 deterministic assessment authority：material 的 `TextPracticeStep.kind` 决定 `EXACT` 或
@@ -322,13 +336,13 @@ lifecycle vocabulary，当前没有公开 transition。wrong answer 只改变 st
 | unauthenticated | 401 | 既有 authentication contract | none |
 | missing / invalid CSRF | 403 | 既有 CSRF contract | none |
 | malformed JSON / wrong field type | 400 | framework-safe response | none |
-| learnerText null、blank 或超过 2,000 Unicode code points | 400 | `INVALID_PRACTICE_RESPONSE` | none |
+| learnerText null、blank 或超过 2,000 Unicode code points；observation 非法 | 400 | `INVALID_PRACTICE_RESPONSE` | none |
 | Session unknown / wrong owner / wrong profile | 404 | `PRACTICE_SESSION_NOT_FOUND` | none |
 | stepId 不属于 exact material | 404 | `PRACTICE_STEP_NOT_FOUND` | none |
 | exact material missing / inconsistent | 503 | `PRACTICE_MATERIAL_UNAVAILABLE` | none |
 | Session 已 terminal | 409 | `PRACTICE_SESSION_NOT_ACCEPTING_RESPONSES` | none |
 | first valid payload | 201 | success | one exact response + first support-condition snapshot |
-| same exact payload replay | 200 | success replay | none；返回首次 submittedAt |
+| same exact text + valid observation replay | 200 | success replay | none；返回首次 submittedAt 与 supportCondition |
 | same step、different payload | 409 | `PRACTICE_RESPONSE_CONFLICT` | none；首次 response 不变 |
 | unexpected database / infrastructure failure | generic 5xx | sanitized framework response | transaction rollback |
 
@@ -349,6 +363,19 @@ lifecycle vocabulary，当前没有公开 transition。wrong answer 只改变 st
 | assessment / step insert、Task transition 或 durable reread 失败 | generic 5xx | sanitized framework response | transaction rollback；不留下部分完成状态 |
 
 ## 6. Verification Evidence
+
+### S11-A fresh evidence — 2026-10-11
+
+- Unit：PracticeSupportObservationTests 22、Application 38、Controller 28，共 88/88 PASS，0 skipped。
+- 独立 PostgreSQL 18.6 / pgvector 0.8.6：empty schema Flyway V1–V17；Practice integration 38、
+  GroundedEvaluationInputReader integration 5，共 43/43 PASS，0 skipped。
+- 新增 MockMvc 真实 Controller → Application → PostgreSQL → completion → Reader 链路验证；
+  independent Redis 7.2.15，认证 principal / CSRF 使用测试 postprocessor，不代表浏览器登录验证。
+- 新增非法观察零写入与并发不同 observation / 同 text 只保留首次快照；既有 owner/profile、transaction、
+  completion / response race 回归保持通过。主数据库未使用，无 live Provider。
+- Codex 自查不替代用户独立 Review；当前 Gate 为 REVIEW_PENDING。
+
+### Prior evidence
 
 2026-09-09 S8T fresh closeout evidence：
 

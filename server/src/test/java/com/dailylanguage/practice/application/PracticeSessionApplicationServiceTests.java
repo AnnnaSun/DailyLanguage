@@ -30,6 +30,9 @@ import com.dailylanguage.practice.application.PracticeSessionApplicationService.
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.PracticeMaterialView;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.SupportObservation;
+import com.dailylanguage.practice.domain.PracticeSession.ResponseSupportCondition;
+import com.dailylanguage.practice.domain.PracticeSession.SupportExposure;
 import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepKind;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepOutcome;
@@ -513,6 +516,71 @@ class PracticeSessionApplicationServiceTests {
     }
 
     // --- complete ---
+
+    @Test
+    void acceptedObservationIsValidatedAgainstMaterialAndSavedWithOriginalText() {
+        arrangeSubmittableSession();
+        SupportObservation observation = new SupportObservation(
+                SupportExposure.PROVIDED, SupportExposure.OPENED,
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN);
+        ResponseSupportCondition condition = new ResponseSupportCondition(
+                SupportExposure.PROVIDED, SupportExposure.OPENED,
+                SupportExposure.UNKNOWN, SupportExposure.NOT_PROVIDED);
+        String text = "  Original text  ";
+        when(practiceSessionRepository.insertOwnedAcceptedResponse(
+                SESSION_ID, "order-drink", text, condition, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(SUBMITTED_AT));
+
+        assertThat(service.submit(PROFILE_ID, SESSION_ID, "order-drink", USER_CONTEXT, text, observation))
+                .isEqualTo(new SubmitResult.Accepted(new PracticeSession.LearnerResponse(
+                        SESSION_ID, "order-drink", text, SUBMITTED_AT, condition)));
+        verify(practiceSessionRepository).insertOwnedAcceptedResponse(
+                SESSION_ID, "order-drink", text, condition, USER_ID, PROFILE_ID);
+    }
+
+    @Test
+    void impossibleObservationIsRejectedWithoutWritingAResponse() {
+        arrangeSubmittableSession();
+        SupportObservation impossible = new SupportObservation(
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN,
+                SupportExposure.UNKNOWN, SupportExposure.OPENED);
+
+        assertThat(service.submit(PROFILE_ID, SESSION_ID, "order-drink", USER_CONTEXT, "text", impossible))
+                .isEqualTo(new SubmitResult.InvalidResponse());
+        verify(practiceSessionRepository, never()).insertOwnedAcceptedResponse(
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void replayWithChangedObservationReturnsFirstSnapshotWithoutOverwriting() {
+        arrangeSubmittableSession();
+        SupportObservation observation = new SupportObservation(
+                SupportExposure.OPENED, SupportExposure.OPENED,
+                SupportExposure.OPENED, SupportExposure.UNKNOWN);
+        PracticeSession.LearnerResponse first = new PracticeSession.LearnerResponse(
+                SESSION_ID, "order-drink", "text", SUBMITTED_AT);
+        when(practiceSessionRepository.findOwnedResponse(SESSION_ID, "order-drink", USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(first));
+
+        assertThat(service.submit(PROFILE_ID, SESSION_ID, "order-drink", USER_CONTEXT, "text", observation))
+                .isEqualTo(new SubmitResult.Replayed(first));
+    }
+
+    @Test
+    void observationCannotBypassOwnershipOrCompletedSession() {
+        SupportObservation observation = new SupportObservation(
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN,
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN);
+        assertThat(service.submit(PROFILE_ID, SESSION_ID, "order-drink", USER_CONTEXT, "text", observation))
+                .isEqualTo(new SubmitResult.SessionNotFound());
+        arrangeSubmittableSession();
+        when(practiceSessionRepository.findOwnedForUpdate(SESSION_ID, USER_ID, PROFILE_ID))
+                .thenReturn(Optional.of(completedSession()));
+        assertThat(service.submit(PROFILE_ID, SESSION_ID, "order-drink", USER_CONTEXT, "text", observation))
+                .isEqualTo(new SubmitResult.SessionNotAcceptingResponses());
+        verify(practiceSessionRepository, never()).insertOwnedAcceptedResponse(
+                any(), any(), any(), any(), any(), any());
+    }
 
     @Test
     void completesSessionAssessmentAndTaskAtomicallyFollowingTheContractedFlow() {

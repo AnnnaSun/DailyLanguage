@@ -22,8 +22,10 @@ M1-S8B `EvaluationRunCreationService.createForReadyInput` 已把该输入原子�
 （见 `evaluation-result-consumption.md`）。M1-S8D 已实现 versioned prompt/request、固定 `EVALUATION` route、
 durable commit 后的 transient dispatch 与重复请求不重新提交（见 `evaluation-model-dispatch.md`）。
 M1-S8T-B 为每条 durable learner response 增加 immutable `ResponseSupportCondition`；Reader 将该 snapshot
-随 response 原样带入 trusted input。当前 HTTP submit 的四类 exposure 均为 `UNKNOWN`，因此它只表示未知的
-交互条件，不是“未使用辅助”或独立表现的资格证据。
+随 response 原样带入 trusted input。S11-A 已接收经 Java 校验的 observation 并保存首次 snapshot，
+缺失上报的旧请求仍为四项 UNKNOWN；2026-10-11 HTTP → persistence → completion → Reader 定向集成
+已验证该传递路径。浏览器上报不是防篡改或认知证明，UNKNOWN 不是“未使用辅助”，任何 snapshot
+也不自行成为独立表现的资格证据。具体接线与验证见 `practice-session-lifecycle.md` 的 S11-A 增量。
 
 本 Flow 不执行 semantic Model call，不持久化 candidate，不修改 completed Session、deterministic assessment、
 Evidence、Memory、Weakness、Level 或 Mastery。Grounding 只证明引用来源、位置与 rubric 边界通过 Java 校验，

@@ -3,13 +3,13 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
 > Production baseline: M1-S8T COMPLETE — PR #25 merged to main（`c2dbb4f`）
-> Current candidate: M1-S10 Japanese Validation Pack implementation / external verification complete
-> Current gate: M1-S10 `READY_TO_COMMIT` — scoped User Review 接受，等待用户 Commit Decision
+> Current progress: S11-A/B 已完成用户 Review 并提交（`d7aa32e` / `958ac95`）；S11 整体 PARTIAL
+> Current gate: 2026-10-21 迁移前收口；先进行平台迁移准备，恢复入口见 §20；不开始 S11-C / S12
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
 integration、failure invariant 与 implementation slice 顺序。它把已批准的 M1 Phase outcome 细化为可 Review
-的设计，但不授权修改 Production Code、schema 或 API。
+的设计；具体 Production Code、schema 或 API 修改须单独批准 Current Slice Contract（已交付 S11-A/B 见 §18–19）。
 
 ## 1. Decision summary
 
@@ -772,7 +772,7 @@ option Map 或通用 normalization engine。只有出现重复且有证据的 la
 | M1-S8T | Minimum guided text learning | COMPLETE — 示范、解释、理解检查、辅助使用及必要辅助条件记录已随 PR #25 merge | A / Complete |
 | M1-S9 | Optional Planner enrichment | COMPLETE — implementation / review / PostgreSQL / Behavior Flow / Ownership PASS | A / Complete |
 | M1-S10 | Japanese validation pack | prior IMPLEMENTATION / VERIFICATION / CODE REVIEW PASS；`ja + zh-CN` 复用同一 workflow，scoped User Review 接受 | A / READY_TO_COMMIT |
-| M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | B / Review |
+| M1-S11 | Minimum Vue Practice UX | 用户可完成 task/session/evaluation；Credential 保持 transient | S11-B User Review ACCEPTED；S11-C+ 未授权实现 |
 | M1-S12 | M1 integrated closeout | E2E、DB、security、Eval、Trace、client build 与 docs evidence 满足 exit criteria | Phase Closeout |
 
 2026-09-07 Scope Decision：S8T 在完整 S8 结束后、S9 前设计并交付；标识独立于 S8A–E，保留既有编号。
@@ -828,12 +828,288 @@ Architecture Impact: in-boundary physicalization of approved Learning Domain mod
 New ADR Required: NO
 Phase Slice Plan: APPROVED
 Production Baseline: M1-S8T COMPLETE（PR #25 merge `c2dbb4f`）
-Current Candidate: M1-S10 implementation / external verification complete
-Current Gate: READY_TO_COMMIT — scoped User Review accepted；User Commit Decision pending
+Current Progress: M1-S11-A/B COMMITTED；S11 overall PARTIAL（见 §20）
+Current Gate: 迁移前 documentation closeout；后续 UX implementation 未获批
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
 Gateway、BYOK Credential boundary 或 Hosted + Self-hosted core path。
 
-当前 Stop Point：`M1-S10 READY_TO_COMMIT`。下一动作是用户 Commit Decision，确认是否提交及纳入文件范围；
-不自动 commit / push / merge，不把既有其他文档修改全部纳入 S10，也不开始 S11。模块掌握等级保持不变。
+S10 资源、测试与协作／文档调整已一起提交到 `badcf6e`；本文件 §7.13 的提交前记录仍是历史证据，
+不据此重新打开 S10 Review。S11-A 已获用户整体 Review 接受并提交为 `d7aa32e`；本轮批准 S11-B，
+实现后的 Stop Point 曾为 `REVIEW_PENDING`；当前用户 Review / Commit Decision 见 §19.5。
+不自动 push / merge、不开始 S11-C 或 S12，模块掌握等级保持不变。
+
+## 18. M1-S11-A Current Slice Contract / Implementation
+
+### 18.1 Approval and boundary
+
+- Approved：2026-10-11，用户批准 S11-A Contract，并指定 observation 校验／映射函数为 Human Core；
+  曾授权 Codex 搭建最小 scaffolding 后停在 `HUMAN_CORE_READY`。
+- Assignment revised：同日用户明确表示“还是你写代码吧”，将该 Human Core 转交 Codex，并完成当前
+  S11-A 接线与验证。不得记作用户亲手实现、操作或理解证据；不自动提升 Ownership。
+- Baseline：`feature/m1s11-VuePracticeUX` / `badcf6e587574f33549c63e1aa6d26fb1c1be03e`；开始前 worktree clean。
+- Level：A — response evidence semantics 与 additive API；沿用现有 authority，不引入新 schema 或 dependency。
+- Goal：在既有 response PUT 中接收受限 UI observation，由 Java 校验后与首次 learnerText 一起保存，
+  accepted / replay response 返回首次 durable supportCondition。
+- Non-scope：Vue、独立 support-event 账本、刷新恢复、回答覆盖、skip / abandon、completion 改造、
+  Provider / Credential 接线、live Provider、内容／rubric 修改、长期 qualification / Memory / Mastery。
+- S11 其他子 slice 的方案不等于 implementation approval；本次也不授权修改 CURRENT_HANDOFF。
+
+### 18.2 Implemented behavior and files
+
+`validateSupportObservation` 已实现，Controller 已 additive 接收 `supportObservation`；旧请求仍按全
+UNKNOWN 处理。通过 owner/profile、exact material、Session status 与 observation 校验后，沿用同一
+transaction / Session row lock 保存首次 learnerText 和 supportCondition。返回的 supportCondition
+来自 Accepted / Replayed 中的 durable response，不回显本次上报覆盖旧快照。
+
+Production files（均 Modified）：PracticeSessionController、PracticeSessionApplicationService、
+PracticeSession（仅 domain 注释）。新增 PracticeSupportObservationTests；修改现有 Controller / Application /
+Persistence integration tests。同步本合同、Practice / Grounding Flow、Guided Feature；无 schema、dependency、
+Repository / Mapper、resource、Vue 或 Credential 修改。完整源码与验证入口见 Practice Flow。
+
+### 18.3 Validation contract
+
+校验位于 `PracticeSessionApplicationService.validateSupportObservation`，实现作者为 Codex。
+采用具体函数和既有 record / enum，不引入独立 Validator framework 或新 abstraction 层级。
+
+```java
+static Optional<PracticeSession.ResponseSupportCondition> validateSupportObservation(
+        MaterialQueryResult.Available material, SupportObservation observation)
+```
+
+- `material`：调用方已经按 owner/profile 和 Task exact identity 解析的非空合法材料；
+  `selectedScaffold` 是本次 support language 对应的支架，不查询其他语言 scaffold。
+- `observation`：可为 null；非 null 时四个字段仍可能缺失。输入 record 保留这些字段，由校验函数统一拒绝不完整观察。
+- `Optional.of(condition)`：合法、可保存的 snapshot；`Optional.empty()`：非法输入，HTTP 映射为
+  `400 INVALID_PRACTICE_RESPONSE`，不得写入回答。
+- 函数无 DB、HTTP、UI、日志、Model 或长期状态副作用；不修改输入对象，不重算 learnerText。
+
+验收规则：
+
+| Input / evidence | Required result |
+|---|---|
+| observation 整体缺失 | 四项 `UNKNOWN`，包括材料没有 frame 的情况；保留旧请求语义 |
+| observation 存在但任一字段为 null | 拒绝，不把缺字段静默补成 UNKNOWN |
+| 客户端任一字段自报 `NOT_PROVIDED` | 拒绝；即使 Java 本可推导出该结果，也不接受客户端否定结论 |
+| 合法材料中存在的支架，上报 `PROVIDED / OPENED` | 保留相应观察；不解释为已阅读、理解或独立能力 |
+| 支架存在但上报 `UNKNOWN` | 保持 UNKNOWN，不推断未提供 |
+| 整个 selected material 没有某类支架，上报 UNKNOWN | Java 才可推导该维度 `NOT_PROVIDED` |
+| 不存在的支架却上报 PROVIDED / OPENED | 拒绝；当前真实材料用 responseFrame 覆盖该情况 |
+| 当前 transfer step 无 frame，但其他 guided step 有 | 不等于整个 Session 材料无 frame；不得降级已有 observation |
+
+当前 loader 强制 `targetLanguageText`、`explanation`、`hint` 非空；`readingInfo` 与 `contrastiveNote`
+是可选补充。因此现有合法材料实际可缺失的四类支架主要是 responseFrame，不为无效材料增加备用解释。
+demonstration 对应示范正文／读音行，explanation 对应解释／contrastiveNote，hint 对应提示，
+responseFrame 看整个 selected scaffold 的 guided steps，不能只看当前 step。
+
+这里的 NOT_PROVIDED 只描述系统材料没有该类支架，不证明没有外部辅助。PROVIDED / OPENED 是
+经格式和材料一致性校验的浏览器观察上报，不是防篡改证明；未来 M2 不得绕过 qualification。
+跨步骤已发生的展示／打开由后续 UI capture 保守累计；本函数不重建事件历史，也不证明观察来源。
+
+### 18.4 Implemented call flow
+
+1. Controller additive 接收可选 `supportObservation`；非法 enum 名称／shape 保持安全 400；enum 名称显式解析，数字不会作为 ordinal 接受。旧请求兼容。
+2. owner/profile 与 exact material 校验后在既有 Session 行锁与 transaction 内调用校验；合法结果进入首次 response 写入。
+3. 同 exact text 的 replay 返回首次 timestamp 与 support snapshot；不同 text 仍 conflict，
+   不把新的 observation 覆盖到旧行。完成后的 Session 仍拒绝 response。
+4. response additive 返回 durable supportCondition，不返回 learnerText、accepted answers、rubric 或 Credential。
+5. 原有五参数 submit overload 保持兼容并委托六参数入口；两个 public 入口均保留 REQUIRED transaction，
+   不改变既有 Session-row-first 锁序。
+
+### 18.5 Verification and stop point
+
+Fresh 2026-10-11（Java 25；Mockito tests 使用显式 Byte Buddy agent）：
+
+| Layer | Evidence | Limit |
+|---|---|---|
+| Targeted unit | SupportObservation 22、Application 38、Controller 28，共 88/88 PASS，0 skipped | 含新增 34 个用例及既有 54 个回归；不是 frontend 验证 |
+| Isolated integration | Practice 38、GroundedEvaluationInputReader 5，共 43/43 PASS，0 skipped | 含新增 3 个集成用例；不是 live Provider 质量验证 |
+| Fresh database | 独立 PostgreSQL 18.6 + pgvector 0.8.6，empty schema Flyway V1–V17 validated/applied | 无 schema change；未连接 primary database |
+| HTTP integration | MockMvc 通过真实 Security / Controller / Service / PostgreSQL，独立 Redis 7.2.15 承载 Session | 认证 principal / CSRF 由测试工具提供，不声称真实浏览器登录已验证 |
+| Core assertions | 非法观察零写入、durable snapshot 返回、same-text replay、different-text conflict、跨 owner/profile、缺 CSRF 拒绝、并发只保留首次 snapshot、completion 后 Reader 读取原 snapshot | 浏览器观察可信度与学习有效性仍有限 |
+
+Scaffolding 阶段的 22 RED 是先前 placeholder 状态；本轮已转绿，不再是当前未完成事项。
+首次集成尝试被 sandbox socket 限制阻断，获准后在相同隔离目标重跑并通过；不把环境失败计作业务 PASS。
+两个临时容器已删除；`git diff --check` PASS。测试日志只用于本地验证，不进入生产 Trace。
+
+- NOT_RUN：Vue / browser、live Provider、完整 server suite、S12 integrated closeout。
+- Learning Focus：客户端 observation 与 Java authority；UNKNOWN、材料缺失和 immutable snapshot 的区别。
+- Codex critical self-review：未发现当前 Scope 的 blocking finding；不冒充用户独立 Review。
+- Historical stop point：implementation 后曾为 `REVIEW_PENDING`；2026-10-13 用户接受整体 Review，
+  并明确要求提交，已提交为 `d7aa32e`。这是用户 Review / Commit Decision，不自动提高掌握等级。
+- Human Core：用户明确转交 Codex；Human Touch 不记为用户完成，不安排补考，不自动提高 Ownership。
+- 上述实现阶段未开始 S11-B 或 S12，未自动 commit / push / merge，未更新 CURRENT_HANDOFF；
+  S11-B 的后续授权与合同见 §19。
+
+## 19. M1-S11-B Current Slice Contract / Implementation
+
+### 19.1 Approval and scope
+
+- Approved：2026-10-13，用户在审阅最小认证页面与 API client 合同后明确要求“开始 S11-B”。
+- Baseline：`feature/m1s11-VuePracticeUX` / `d7aa32e`，worktree clean。
+- Approved delta：2026-10-15，用户在确认 Root Cause 与方案后明确要求“修吧”，批准 §19.4 的
+  internal ERROR dispatch 授权修正与相关回归；不扩大普通业务请求权限。
+- Level：A — browser identity / CSRF / failure boundary；实现作者 Codex，不安排 Human Core。
+- Goal：页面通过后端确认当前身份，支持既有账号登录、刷新恢复、登出后重查以及失败重查。
+- Non-scope：注册页面、Language Profile / task / Practice UI、Provider / Credential、学习状态、
+  router / store / test framework dependency、§19.4 以外的后端认证规则改变、新 API / schema、Hosted ingress 实现、S11-C / S12。
+- Expected / actual production files：Modified `client/src/App.vue`、`client/vite.config.ts`；
+  Added `client/src/api.ts`。初始三个文件共 201 行；后续按用户要求修正 `client/index.html` 的中文语言声明，
+  并批准 `SecurityConfiguration` 的 §19.4 小修复；没有新 dependency / resource 修改。
+- Verification / docs：Added `client/tests/api.test.mjs`、`docs/flow/browser-authentication.md`；
+  Modified 本合同、Flow README index。沿用现有 TypeScript compiler + Node test runner，无 package 修改。
+
+### 19.2 Behavior and acceptance criteria
+
+1. `onMounted → getCurrentUser → GET /api/auth/me`；仅 `401 UNAUTHENTICATED` 表示已确认未登录。
+   其他错误进入 unavailable，不能把服务故障伪装成已登录或未登录。
+2. login / logout 写请求先 GET 既有公开 `/api/auth/registration` 触发 SPA token cookie，再读取
+   `XSRF-TOKEN` 回传 `X-XSRF-TOKEN`。login 采用后端既有 form-urlencoded email/password contract。
+3. 每个 fetch 有 10 秒 deadline；等待期间按钮 / 输入禁用，函数也用 pending 防重复进入。
+   无自动 retry。transport failure / timeout 保留结果未知，只允许用户发起只读重查。
+4. 登录成功或登出成功后再次 GET `/me`；初始加载 / 页面刷新同样由后端身份决定 UI。
+   `single_user` 下登出后仍可能有身份，页面明确显示该事实，不凭本地赋值宣称已登出。
+5. invalid credentials、429、403、network / timeout 与 unavailable 使用安全提示；不把任意后端文本
+   回显或纳入 exception。invalid credentials 保留登录表单，用户可修改输入重新提交。
+6. 密码在调用 login 前从 Vue ref 清空，仅请求所需内存仍短暂持有；应用不写 storage / log / Trace。
+   浏览器自身可能自动填充表单，本实现不改变浏览器 password-manager 设置，不声称禁止其自动填充。
+7. Vite dev server 仅监听 `127.0.0.1`，`/api` 代理到 `127.0.0.1:8080`；请求为 same-origin cookie。
+   本地 HTTP 后端须使用既有 `SESSION_COOKIE_SECURE=false` override；Hosted 保留 HTTPS / Secure cookie，
+   仍需由部署提供同源 `/api` 路由，Vite development proxy 不是 Hosted ingress。
+
+Acceptance：正确登录后确认身份、错误登录不显示成功、刷新恢复、登出重查、Session 失效返回登录、
+pending 禁止重复操作、失败不重放写请求；Client 不持有长期 identity / learning-state authority。
+API / schema / dependency impact：不新增 endpoint / schema / dependency；§19.4 恢复既有 CSRF 403
+合同的真实 HTTP 行为，CSRF 校验与普通请求 Session authority 不变。
+Extensibility：具体函数复用 fetch / safe error / CSRF 处理，不增加 router、store 或通用 client framework。
+
+### 19.3 Verification and stop point
+
+Fresh 2026-10-13：
+
+| Layer | Evidence | Limit |
+|---|---|---|
+| New client tests | `node --test tests/api.test.mjs`：16/16 PASS，0 skipped | fetch / cookie 模拟；不替代真实浏览器 |
+| Type / production build | `npm run build`：vue-tsc + Vite PASS | 不证明 Hosted 部署 |
+| Existing backend regression | AuthenticationHttpContract 14 + LocalRegistrationHttpContract 13：27/27 PASS | 既有 HTTP tests，非新增 Java tests |
+| Existing Session integration | RedisAuthenticationSessionIntegration 2/2 PASS，0 skipped | 独立 PostgreSQL / Redis；非 primary environment |
+| Actual browser | 错误密码、正确登录、刷新恢复、登出及刷新、Session 丢失后重查、真实 429、pending / 10s timeout / 恢复重查、single_user 自动身份及登出重查 PASS | IAB + 本地 HTTP；Session 失效由清空临时 Redis 模拟，未等待 24h TTL |
+| Database | 无挂载临时 PostgreSQL 18.6 + pgvector 0.8.6 / Redis 7.2.15；空 schema Flyway V1–V17 applied | 无 migration 修改；合成测试账号通过既有 registration API 创建 |
+
+client tests 覆盖：401 / 503 与无效 success 分离、CSRF cookie rotation / 缺失 / 非法编码、form contract、
+403 非 JSON、write-side 401 不转成成功、429、safe error、timeout 与无 write retry。浏览器额外观察到
+重新出现的密码框已有值（INFERENCE：浏览器自动填充）；不能把应用清空 ref 当成 DOM 永不填充的证明。
+fixture setup 最初误将注册成功预期为 201；实际合同为 204，
+账号已创建，后续浏览器成功登录确认；该 assertion failure 不计作业务验证 PASS。
+
+Historical FACT（2026-10-13）：本地实际 Servlet + Vite proxy 的 single_user 模式下，带 cookie 但缺 CSRF header 的
+login / logout 返回 `401 UNAUTHENTICATED`；既有 MockMvc / Authentication API 文档描述为 403。
+最初 403 smoke assertion 因此失败，后续精确读取确认这项差异；不记作 403 验证通过。
+该原因与 registered-user 对照曾为 UNKNOWN；2026-10-15 已定位并获准修复，见 §19.4。
+client 仍对 write-side 401 进入 unavailable / 只读重查，不当作成功，不自动 replay。
+
+- NOT_RUN：full server suite、Hosted HTTPS ingress / Secure cookie browser、live Provider、S11-C+ / S12。
+- Cleanup：临时 frontend / backend 已停止，两个无挂载验证容器已删除；`git diff --check` 与文档本地链接检查 PASS。
+- Learning Focus：浏览器携带 cookie / CSRF，而 Java 保留身份、权限与 Session authority。
+- User Review 入口：`App.vue` 的 refreshIdentity / submitLogin / submitLogout → `api.ts` 的
+  getCurrentUser / csrfHeaders / login / logout；重点判断 UNKNOWN / unavailable 与已确认未登录的区别。
+- Codex self-review：上述后端状态差异已完成获准修复与定向回归；用户 Review 决定见 §19.5；
+  不替代用户独立 Review，模块掌握等级不变。
+- Historical stop point：`REVIEW_PENDING`；当前决定见 §19.5。不开始 S11-C / S12，不刷新 CURRENT_HANDOFF。
+
+### 19.4 Approved CSRF error-dispatch correction
+
+Root Cause confirmed（2026-10-15）：CSRF 默认 handler 调用 sendError(403)，Tomcat 随后执行
+ERROR /error 分发；原来的 anyRequest().authenticated() 再次要求认证，匿名错误处理被
+AuthenticationEntryPoint 覆盖为 401。MockMvc 的原始 REQUEST 没有自动执行容器错误分发，故停在 403。
+同配置诊断已对齐 14 对 HTTP / MockMvc 请求与 2 个显式 ERROR 分发；registered-user 的匿名请求同样受影响，
+已有认证 Session 的错误分发则保留 403。single_user adapter 位于 CSRF 之后，且默认跳过 ERROR。
+
+Selected fix：仅在现有 authorizeHttpRequests 规则之前添加
+`dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()`，让内部错误处理保留原始状态。
+普通浏览器 REQUEST /error 不匹配该规则，仍要求认证；不跳过整个 Security Filter Chain，
+不关闭 CSRF，不新增全局 JSON error contract、不放行 FORWARD 或普通业务 endpoint。
+替代方案是在 CSRF failure handler 直接写 JSON，当前没有采用，避免扩大 error response contract。
+
+Changed files：Modified `SecurityConfiguration.java`、本 Feature、`AUTHENTICATION_API.md`、
+`docs/flow/browser-authentication.md`；Added `AuthenticationErrorDispatchHttpTests.java`。
+关键 production delta 是一个 DispatcherType import、一个授权规则和 WHY 注释。
+
+Fresh verification（2026-10-15）：
+
+- RED：新 HTTP regression 的 anonymous login / logout 两个 invocation 在修复前均预期 403、实际 401。
+- Final GREEN：新 AuthenticationErrorDispatchHttpTests 14/14；既有 AuthenticationHttpContract 14、
+  SpaCsrfHttpContract 3、LocalRegistrationHttpContract 13，共 44/44 PASS，0 skipped。
+- 真实 HTTP 用本机随机端口 Tomcat + production Security / Controller；不注入 csrf()，通过 GET cookie
+  和 POST header 验证两种模式的 missing / wrong token、合法登录登出、single_user identity、普通 REQUEST
+  /error 与 /me 仍为 401，以及非法登出不注销已登录 Session。
+- test fixture 替换 authentication / rate-limit / persistent-single-user / registration 依赖，使用容器内存
+  Session，排除 PostgreSQL / Redis auto-configuration；不声称验证真实 password hashing 或 Redis persistence。
+- 验证期间规则曾意外回到旧版并导致 10 个回归失败；用户确认非有意还原后恢复，最终整组重跑 PASS，
+  源文件测试前后 SHA-256 一致；不把中间失败计作 PASS。
+- NOT_RUN：本次未重跑 browser、PostgreSQL / Redis integration、完整 server suite、Hosted HTTPS 或 live Provider。
+- Historical stop point：`REVIEW_PENDING`；User Review 聚焦 dispatcher 类型与 URL 匹配的区别，以及原始 403 是否保留；当前决定见 §19.5。
+
+### 19.5 User Review and Commit Decision
+
+2026-10-15：用户在 Vue 源码导读、Tomcat / Servlet Filter Chain / SecurityFilterChain 调用关系讨论及
+CSRF Root Cause / 修复 Review 后，先接受该修复，再明确表示“review 过，我认为可提交”。
+S11-B 整体 User Review ACCEPTED，当前 S11-B 与获准 CSRF 修复的 Commit Decision APPROVED。
+
+实现作者为 Codex；用户意见、Scope / Architecture / Commit Decision 按实际讨论记录，
+不记作用户 Human Touch，不因本次接受自动提高模块掌握等级。此前 §19.3 的 browser / PostgreSQL /
+Redis evidence 为 2026-10-13 的 prior 验证；§19.4 的 44/44 为 2026-10-15 定向验证，不声称重跑全部环境。
+授权不包含 push / merge、S11-C / S12 或 CURRENT_HANDOFF 刷新。
+
+## 20. S11 Migration Checkpoint — 2026-10-21
+
+用户要求先完成状态／Review 收口，再处理统一提交与迁移；后续明确暂不 merge 或开新分支。
+本节是恢复开发入口，不是新 implementation approval；§18–19 保留历史合同与验证。
+
+### 20.1 已交付与当前 Git
+
+- S11-A：`d7aa32e`，经 Java 校验的 supportObservation 与首次回答原子保存；same-text replay 返回首次
+  durable snapshot。用户已接受整体 Review；Human Core 已明确转交 Codex，不补记用户 hands-on。
+- S11-B：`958ac95`，最小 Vue 登录／当前身份／退出与 native fetch client；失败只读重查、不自动重放写请求。
+  包含 internal ERROR dispatch 放行以保留真实 CSRF 403；普通 REQUEST /error 仍受保护。
+  用户已接受整体及修复 Review；没有待补的 S11-A/B code / user Review。
+- `a486ef7` 仅补充 Phase Plan 的 M3 技术评估与后续 Observability 规划，没有重复修改 S11-B 代码。
+- 核对时分支 `feature/m1s11-VuePracticeUX`、HEAD `a486ef7`；本地 main 为 `c2dbb4f`。
+  S9、S10、S11-A/B 均已提交但尚未合入此本地 main；远端是否变化须另查。
+- 已有验证均为 PRIOR：A unit 88 / integration 43；B client 16、build、HTTP 27、Session 2 与本地 browser；
+  CSRF 修复 targeted HTTP 44。日期、失败历史与局限见 §18.5、§19.3–19.4，本次不重跑或扩大结论。
+
+### 20.2 尚未交付的最小页面闭环
+
+| 建议后续子 slice（待重新定合同） | 目标行为 | 当前边界／恢复时重点 |
+|---|---|---|
+| S11-C Language Profile / task | 选择语言档案，provider-free planning，展示 Java 返回的真实 task | Vue 未接；planning POST 非幂等，无已批准自动重试或刷新恢复方案 |
+| S11-D guided practice / response | 启动 Session，展示示范／解释／guided step，累计 support observation，提交回答并显示 accepted / replay | A 只提供校验／持久化，Vue capture 未实现；隐藏 UI 不证明独立掌握；不承诺任意刷新恢复回答 |
+| S11-E completion / assessment | 说明缺失回答，完成 Session，呈现 deterministic assessment 与 completed replay | Java 决定完成／评分；SEMANTIC_ONLY 不伪造确定性语义正确；页面未实现 |
+| S11-F optional evaluation | Provider / Credential 配置与 evaluation 触发／查询，呈现 pending、failure 与已有结果 | provider-free practice/completion 不依赖它；不盲目重放已有 Run/Job；迁移后重核执行／消费接口 |
+
+以上分组沿用讨论建议，C–F 的具体文件、API、验收、学习重点和分工均未批准。
+整体目标仍为 task → guided practice → response / support-condition → completion → deterministic assessment
+→ optional evaluation；当前只有认证 UI，没有该页面闭环、S11 end-to-end 或 S12 closeout PASS。
+完整学习体系、kana 教学、开放对话、新语义评分引擎和 live DeepSeek 不在最小 UX 默认范围。
+
+### 20.3 迁移后恢复顺序与不变量
+
+1. 从 [Project Status](../planning/PROJECT_STATUS.md)、Git 与迁移实施结果恢复事实；
+   不沿用旧 S9 / S10 snapshot，不重开已完成的 S11-A/B Review。
+2. 核对前端位置与身份入口：C26 计划独立 Vue 仓库，Identity / Gateway 的路由、Cookie / CSRF、Session
+   和应用授权会影响 B；迁移尚未实现。保留 App.vue → api.ts → backend 身份确认／失败重查语义。
+3. 重核 Profile / Planner / Practice / Evaluator 的实际 API 与 Behavior Flow、owner/profile、response /
+   completion replay 与 pending / unknown / failure。当前没有 response-read 恢复 API；接口迁移不能默认补足，
+   若需扩展先给证据和方案。
+4. 结合 C25 的 Language 切换与所需 AI 接口验证结果收敛下一 UX slice，再由用户批准 Current Slice Contract；
+   不一次批准 C–F。优先复用已有结构，声明 Expected Files、impact、AC、验证、Stop Point 与 1–2 个 Learning Focus。
+   Human Core 按最新规则提议并由用户选择，A 的明确转交不因规则变化重开。
+
+长期状态归后端，按 languageProfileId 隔离；Java 持有 validation、deterministic transition 与 persistence。
+Credential 在后端仅临时使用，禁止进入 DB / Redis / Log / Trace / durable Job。C19 允许未来在用户设备持久
+保存的方向不等于具体存储／保护实现已批准，也不让浏览器成为身份或学习状态的长期真相。
+迁移后的 API／依赖和运行行为为 UNKNOWN，须 fresh 回归，不能沿用历史测试数量宣布兼容。
+
+Stop Point：只完成文档／状态收口；不改业务代码，不开始 S11 后续实现、S12 或 Identity。

@@ -383,3 +383,24 @@ Evidence 决定：
 
 本条目只批准未来评估，不批准新的 Voice runtime、Pronunciation Provider、production dependency、schema、
 长期能力类型、Prompt 或实现。
+
+## IDEA-015 — Rename platform repository and local directory
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: FUTURE_MIGRATION
+
+### Context
+
+用户希望将 DailyLanguage 仓库逐步改为容纳语言学习、PersonalNote 及公共服务的 Monorepo，平台名称暂记为 PersonalHub。用户明确要求进入代码修改阶段后调整 GitHub 仓库名与本地仓库目录名，当前只记录，不实施。最终仓库 slug、目录拼写及实施 slice 尚未确定。
+
+正式命名方向与边界见[平台架构方案](../architecture/PLATFORM_ARCHITECTURE_PROPOSAL.md) §4 及 [ADR-0005](../adr/0005-unified-learning-platform-microservices.md)。
+
+### Follow-up
+
+- 在代码修改阶段确认最终名称与最小重命名范围，保留现有仓库和 Git 历史。
+- 核对 remote、本地路径及文档引用，并检查届时已有的 CI / webhook 等仓库关联配置。
+- 不自动扩大为 Java package、Maven 坐标、服务注册名、数据库或业务应用的一并重命名。
+
+本记录不批准当前执行 GitHub 外部修改、目录移动、代码修改或 commit；具体实施 slice 仍需明确范围。

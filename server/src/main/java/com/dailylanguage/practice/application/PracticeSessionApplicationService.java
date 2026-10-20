@@ -30,6 +30,8 @@ import com.dailylanguage.planner.infrastructure.LearningTaskRepository;
 import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.DeterministicTextAssessmentPolicy;
 import com.dailylanguage.practice.domain.PracticeSession;
+import com.dailylanguage.practice.domain.PracticeSession.ResponseSupportCondition;
+import com.dailylanguage.practice.domain.PracticeSession.SupportExposure;
 import com.dailylanguage.practice.infrastructure.PracticeSessionRepository;
 import com.dailylanguage.security.domain.UserContext;
 
@@ -116,7 +118,7 @@ public class PracticeSessionApplicationService {
 
     /**
      * owner-scoped 查找 Session → resolve exact material → 验证 stepId → 锁定 Session 行 →
-     * 再确认 IN_PROGRESS → INSERT … ON CONFLICT DO NOTHING → 冲突后以 exact payload 比较既有行。
+     * 再确认 IN_PROGRESS → 校验辅助观察 → INSERT … ON CONFLICT DO NOTHING → 冲突后以 exact text 比较既有行。
      */
     @Transactional
     public SubmitResult submit(
@@ -125,6 +127,17 @@ public class PracticeSessionApplicationService {
             String stepId,
             UserContext userContext,
             String learnerText) {
+        return submit(languageProfileId, sessionId, stepId, userContext, learnerText, null);
+    }
+
+    @Transactional
+    public SubmitResult submit(
+            UUID languageProfileId,
+            UUID sessionId,
+            String stepId,
+            UserContext userContext,
+            String learnerText,
+            SupportObservation observation) {
         Objects.requireNonNull(languageProfileId, "languageProfileId must not be null");
         Objects.requireNonNull(sessionId, "sessionId must not be null");
         Objects.requireNonNull(stepId, "stepId must not be null");
@@ -162,10 +175,12 @@ public class PracticeSessionApplicationService {
             return new SubmitResult.SessionNotAcceptingResponses();
         }
 
-        // 当前 API 不接受客户端自报的 support condition；HTTP submit 显式落 UNKNOWN，
-        // 等 runtime 记录真实暴露条件后由后续 slice 替换。
-        PracticeSession.ResponseSupportCondition supportCondition =
-                PracticeSession.ResponseSupportCondition.unknown();
+        Optional<ResponseSupportCondition> validatedCondition =
+                validateSupportObservation(resolvedMaterial.orElseThrow(), observation);
+        if (validatedCondition.isEmpty()) {
+            return new SubmitResult.InvalidResponse();
+        }
+        ResponseSupportCondition supportCondition = validatedCondition.orElseThrow();
         Optional<OffsetDateTime> submittedAt = practiceSessionRepository.insertOwnedAcceptedResponse(
                 sessionId, stepId, learnerText, supportCondition, userContext.userId(), languageProfileId);
         if (submittedAt.isPresent()) {
@@ -181,6 +196,56 @@ public class PracticeSessionApplicationService {
             return new SubmitResult.Replayed(stored);
         }
         return new SubmitResult.ResponseConflict();
+    }
+
+    /**
+     * 把客户端观察校验为本次回答可保存的辅助条件，不判断理解或能力。
+     * material 由调用方完成 owner/profile 与 exact identity 校验；observation 可缺失，字段也可能为空。
+     * 返回 empty 表示非法观察，调用方不得写入回答；返回值存在才可执行既有首次写入。
+     */
+    static Optional<PracticeSession.ResponseSupportCondition> validateSupportObservation(
+            MaterialQueryResult.Available material, SupportObservation observation) {
+        if (observation == null) {
+            // 旧请求没有 capture 信息，不能因材料缺 frame 就重解释为已确认无辅助。
+            return Optional.of(ResponseSupportCondition.unknown());
+        }
+        if (!isReportedExposure(observation.demonstration())
+                || !isReportedExposure(observation.explanation())
+                || !isReportedExposure(observation.hint())
+                || !isReportedExposure(observation.responseFrame())) {
+            return Optional.empty();
+        }
+
+        // 合法材料的示范、解释和 hint 均必有；frame 需检查整个 selected scaffold，
+        // 当前 step 没有 frame 不能抹去同一 Session 之前的暴露。
+        boolean hasResponseFrame = material.selectedScaffold().guidedSteps().stream()
+                .anyMatch(step -> step.responseFrame() != null);
+        SupportExposure responseFrame = observation.responseFrame();
+        if (!hasResponseFrame) {
+            if (responseFrame != SupportExposure.UNKNOWN) {
+                return Optional.empty();
+            }
+            responseFrame = SupportExposure.NOT_PROVIDED;
+        }
+        return Optional.of(new ResponseSupportCondition(
+                observation.demonstration(), observation.explanation(), observation.hint(), responseFrame));
+    }
+
+    private static boolean isReportedExposure(SupportExposure exposure) {
+        return exposure == SupportExposure.UNKNOWN
+                || exposure == SupportExposure.PROVIDED
+                || exposure == SupportExposure.OPENED;
+    }
+
+    /**
+     * 客户端上报形状，不代表已校验的 domain snapshot；保留 nullable 字段以便拒绝不完整输入。
+     * 复用既有 enum，但客户端自报 NOT_PROVIDED 必须拒绝。
+     */
+    public record SupportObservation(
+            PracticeSession.SupportExposure demonstration,
+            PracticeSession.SupportExposure explanation,
+            PracticeSession.SupportExposure hint,
+            PracticeSession.SupportExposure responseFrame) {
     }
 
     /**
@@ -461,7 +526,7 @@ public class PracticeSessionApplicationService {
             }
         }
 
-        /** learnerText 为 null、blank 或超过 2,000 Unicode code points。 */
+        /** learnerText 非法，或辅助观察不完整／与材料不一致。 */
         record InvalidResponse() implements SubmitResult {
         }
 

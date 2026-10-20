@@ -1,5 +1,7 @@
 package com.dailylanguage.security.config;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,6 +39,8 @@ public class SecurityConfiguration {
                         .spa()
                         .csrfTokenRepository(spaCsrfTokenRepository(secureCookie)))
                 .authorizeHttpRequests(authorize -> authorize
+                        // 保留原始错误状态，避免 ERROR 分发再次鉴权把 CSRF 的 403 覆盖成 401。
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/health/**",

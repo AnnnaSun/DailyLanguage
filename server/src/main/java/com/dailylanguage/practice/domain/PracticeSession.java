@@ -96,8 +96,8 @@ public record PracticeSession(
     /**
      * 一条 learner response 提交时刻的四类 M1 支架暴露快照（demonstration / explanation / hint /
      * responseFrame）。作为 immutable snapshot 与 learnerText 在同一行、同一事务首次写入，
-     * 重复提交不覆盖。当前 API 不接受客户端自报的 support condition；HTTP submit 路径显式使用
-     * {@link #unknown()}。
+     * 重复提交不覆盖。HTTP observation 先由 Java 校验再映射；旧请求缺失 observation 时使用
+     * {@link #unknown()}。浏览器观察不证明阅读、理解或没有外部辅助。
      */
     public record ResponseSupportCondition(
             SupportExposure demonstration,

@@ -7,6 +7,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,6 +28,9 @@ import com.dailylanguage.practice.application.PracticeSessionApplicationService.
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.PracticeMaterialView;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.StartResult;
 import com.dailylanguage.practice.application.PracticeSessionApplicationService.SubmitResult;
+import com.dailylanguage.practice.application.PracticeSessionApplicationService.SupportObservation;
+import com.dailylanguage.practice.domain.PracticeSession.ResponseSupportCondition;
+import com.dailylanguage.practice.domain.PracticeSession.SupportExposure;
 import com.dailylanguage.practice.domain.DeterministicAssessment;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepKind;
 import com.dailylanguage.practice.domain.DeterministicAssessment.StepOutcome;
@@ -41,6 +46,7 @@ import com.dailylanguage.security.infrastructure.RedisAuthenticationAttemptRateL
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -202,7 +208,7 @@ class PracticeSessionControllerTests {
     void acceptedResponseReturnsCreatedWithSubmittedAt() throws Exception {
         when(practiceSessionApplicationService.submit(
                 eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class),
-                eq("Could I have a medium coffee, please?")))
+                eq("Could I have a medium coffee, please?"), isNull()))
                 .thenReturn(new SubmitResult.Accepted(new PracticeSession.LearnerResponse(
                         SESSION_ID, "order-drink", "Could I have a medium coffee, please?", SUBMITTED_AT)));
 
@@ -219,7 +225,7 @@ class PracticeSessionControllerTests {
     @Test
     void replayedResponseReturnsTheFirstSubmittedAt() throws Exception {
         when(practiceSessionApplicationService.submit(
-                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any()))
+                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any(), isNull()))
                 .thenReturn(new SubmitResult.Replayed(new PracticeSession.LearnerResponse(
                         SESSION_ID, "order-drink", "Could I have a medium coffee, please?", SUBMITTED_AT)));
 
@@ -242,12 +248,66 @@ class PracticeSessionControllerTests {
     }
 
     @Test
+    void passesObservationToServiceAndReturnsTheDurableSnapshotOnReplay() throws Exception {
+        SupportObservation observation = new SupportObservation(
+                SupportExposure.PROVIDED, SupportExposure.OPENED,
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN);
+        ResponseSupportCondition firstCondition = ResponseSupportCondition.unknown();
+        when(practiceSessionApplicationService.submit(
+                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class),
+                eq("text"), eq(observation)))
+                .thenReturn(new SubmitResult.Replayed(new PracticeSession.LearnerResponse(
+                        SESSION_ID, "order-drink", "text", SUBMITTED_AT, firstCondition)));
+
+        mockMvc.perform(authenticatedResponsePut("""
+                        {"learnerText":"text","supportObservation":{
+                          "demonstration":"PROVIDED","explanation":"OPENED",
+                          "hint":"UNKNOWN","responseFrame":"UNKNOWN"}}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.supportCondition.demonstration").value("UNKNOWN"))
+                .andExpect(jsonPath("$.supportCondition.explanation").value("UNKNOWN"))
+                .andExpect(jsonPath("$.supportCondition.hint").value("UNKNOWN"))
+                .andExpect(jsonPath("$.supportCondition.responseFrame").value("UNKNOWN"))
+                .andExpect(jsonPath("$.learnerText").doesNotExist())
+                .andExpect(jsonPath("$.userId").doesNotExist());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"SHOWN\"", "\"opened\"", "1", "true", "{}", "[]"})
+    void rejectsInvalidObservationNamesAndShapesBeforeService(String value) throws Exception {
+        mockMvc.perform(authenticatedResponsePut("""
+                        {"learnerText":"text","supportObservation":{
+                          "demonstration":%s,"explanation":"UNKNOWN",
+                          "hint":"UNKNOWN","responseFrame":"UNKNOWN"}}
+                        """.formatted(value)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(practiceSessionApplicationService);
+    }
+
+    @Test
+    void missingObservationFieldIsPassedAsNullForDomainRejection() throws Exception {
+        SupportObservation incomplete = new SupportObservation(
+                SupportExposure.UNKNOWN, SupportExposure.UNKNOWN, SupportExposure.UNKNOWN, null);
+        when(practiceSessionApplicationService.submit(
+                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class),
+                eq("text"), eq(incomplete))).thenReturn(new SubmitResult.InvalidResponse());
+
+        mockMvc.perform(authenticatedResponsePut("""
+                        {"learnerText":"text","supportObservation":{
+                          "demonstration":"UNKNOWN","explanation":"UNKNOWN","hint":"UNKNOWN"}}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PRACTICE_RESPONSE"));
+    }
+
+    @Test
     void ignoresClientSuppliedUserIdInFavorOfTheAuthenticatedContext() throws Exception {
         UUID requestedUserId = UUID.randomUUID();
         when(practiceSessionApplicationService.start(eq(PROFILE_ID), eq(TASK_ID), any(UserContext.class)))
                 .thenReturn(new StartResult.Created(inProgressSession(), cafeMaterialView()));
         when(practiceSessionApplicationService.submit(
-                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any()))
+                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any(), isNull()))
                 .thenReturn(new SubmitResult.Replayed(new PracticeSession.LearnerResponse(
                         SESSION_ID, "order-drink", "text", SUBMITTED_AT)));
 
@@ -266,7 +326,7 @@ class PracticeSessionControllerTests {
         org.mockito.ArgumentCaptor<UserContext> submitContext =
                 org.mockito.ArgumentCaptor.forClass(UserContext.class);
         verify(practiceSessionApplicationService)
-                .submit(eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), submitContext.capture(), any());
+                .submit(eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), submitContext.capture(), any(), isNull());
         org.assertj.core.api.Assertions.assertThat(startContext.getValue().userId())
                 .isEqualTo(AUTHENTICATED_USER_ID);
         org.assertj.core.api.Assertions.assertThat(submitContext.getValue().userId())
@@ -431,7 +491,7 @@ class PracticeSessionControllerTests {
 
     private void arrangeSubmitFailure(SubmitResult result, int status, String code) throws Exception {
         when(practiceSessionApplicationService.submit(
-                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any()))
+                eq(PROFILE_ID), eq(SESSION_ID), eq("order-drink"), any(UserContext.class), any(), isNull()))
                 .thenReturn(result);
 
         mockMvc.perform(authenticatedResponsePut("{\"learnerText\":\"text\"}"))
