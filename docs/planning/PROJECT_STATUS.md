@@ -1,97 +1,70 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-10-11 — S10 scoped User Review 接受；READY_TO_COMMIT，等待用户 Commit Decision。
-> 当前状态入口；详细合同在 Feature / Phase / ADR，历史批次在 [历史快照](history/PROJECT_STATUS_2026-10-10.md)。
-> 以下运行时测试与 Code Review 均为 prior evidence；本次新增 User Review 记录，只做文档检查，不把历史 PASS 当成本轮 fresh 验证。
+> Last updated: 2026-10-21 — 迁移前收口；S11-A/B 已提交，S11 整体 PARTIAL，先进行平台迁移准备。
+> 当前状态入口；详细合同在 Feature / Phase / ADR，早期历史见 [历史快照](history/PROJECT_STATUS_2026-10-10.md)。
+> 本轮同步文档、核对证据与 Review，并运行 C31 的 9 个断言测试；历史运行结果不计为 fresh 验证。
 
 ## Current Gate
 
 | 项目 | 当前状态 |
 |---|---|
-| Phase | M1 — Minimum Text Practice Loop |
-| Slice | M1-S10 — Japanese Validation Pack |
-| Implementation / Verification / Code Review | prior PASS；当前资源/配置范围 User Review 已接受 |
-| Ownership Gate | READY_TO_COMMIT（仅 S10）；不提高模块掌握等级，不评定底层 Java 新 UNDERSTOOD |
-| Production baseline | M1-S8T merged to main：PR #25 / `c2dbb4f` |
-| Current branch / HEAD | `architecture/M1S9-OptionalPlannerEnrichment` / `a2f7d47`（本次 Git 核对；后续须重查） |
-| Worktree | DIRTY：既有 S10 material / rubric / tests 与文档修改；本次仅同步 Review 与 Gate |
-| Next slice | M1-S11 未批准开始；本次无 commit / push / merge |
+| Product Phase | M1 — Minimum Text Practice Loop；尚未达到 S11 / S12 exit |
+| S11 | PARTIAL；A observation API、B 最小认证 UX 已实现、用户 Review 接受并提交；其余 UI 未实现 |
+| Current work | DOCS_RECONCILED — 平台迁移前文档收口完成；业务迁移 implementation 尚未开始 |
+| C31 | PATCHED_C31_PASS；验证工程代码按用户决定不提交，文档仅保留迁移证据；不等于官方原版兼容或生产批准 |
+| Git baseline | `feature/m1s11-VuePracticeUX` / `a486ef7`（2026-10-21 核对；后续重新核对 Git） |
+| Main baseline | 本地 `main` / 本地记录 `origin/main` 为 `c2dbb4f`；当前分支包含其后 17 个提交，包括 S9、S10、S11-A/B；未联网刷新远端 |
+| Closeout scope | 13 个项目文档（含 AGENTS 与既有平台草案／规则）；仅文档提交，验证工程代码排除；无本轮业务代码变更。实时 HEAD / worktree 以 Git 为准 |
+| Next Action | 用户后续决定 merge / 新分支时机；迁移首个实施合同仍需独立批准，不开始 Identity 或 S11-C |
 
-`CURRENT_HANDOFF.md` 仍是 2026-09-16 的 S9 快照，HEAD / Gate 已 stale，不代表当前分工或下一动作。
-本次未刷新快照；接手须核对 Git、当前合同与本文件，不遵循旧快照中的“不开始 S10”等过时状态。
+旧 PROJECT_STATUS 的 S10 READY_TO_COMMIT 与旧 CURRENT_HANDOFF 的 S9 Gate 已失效；不据此重开已完成的 Review。
+CURRENT_HANDOFF 本轮未自动刷新，仍为旧 S9 快照；本次正式恢复记录由本文件与 Feature §20 持有。
+恢复入口为 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21)。
 
-## Next Action
+## Delivery Summary
 
-用户决定是否提交 S10，以及本次提交纳入哪些文件。Worktree 同时包含此前协作规则 / 文档精简修改，
-提交范围须与 S10 资源 / 测试修改区分；`READY_TO_COMMIT` 不代表允许全部暂存或自动 commit。
-不开始 M1-S11；后续进入 S11 仍需单独确认 Scope。
-
-## Active Decisions / 当前批准边界
-
-- **M1-S10（2026-10-09）：**批准 `ja + zh-cn` 的单个 vertical slice，由 Codex full delegation；
-  两个普通 PRACTICE step（EXACT + SEMANTIC_ONLY）、shared evaluator protocol prompt、独立 Japanese versioned rubric。
-  不新增 schema、API、dependency、module、第二套 workflow 或通用 Japanese equivalence engine。
-  详细合同与实现证据见 [M1 Feature](../features/M1_MINIMUM_TEXT_PRACTICE.md) §7.13、§14、§17。
-- **协作（2026-10-10）：**User + Codex；Codex 负责获批实现、测试、验证，用户负责 Architecture / Scope /
-  Commit 与独立 Critical Review。共同决策 → 代码导读 → 用户 Review；Human Core 按学习价值预选，
-  Explain Back 仅必要澄清，自查不冒充独立作者 Review，不自动升级 Ownership。
-  规则见 [AGENTS 协作合同](../../AGENTS.md#5-user--codex-collaboration--项目内协作)。
-- **S10 Review（2026-10-11）：**源码导读与用户设计讨论后，用户接受本次资源/配置扩展并要求进入下一步。
-  记录在 [Ownership Review](../ownership/OWNERSHIP_MATRIX.md#m1-s10-scoped-user-review--2026-10-11) 与
-  [LEARN-002](../ownership/LEARNING_LOG.md#learn-002--新语言验证共享工程流程不等于真实语言质量已验证)。
-  Human Touch `NOT_REQUIRED`（既有 full delegation）；模块等级不变，完整复盘保持 `PROVISIONAL`。
-- **Guided Language Learning：**已批准纳入 V1 P0 与 M1–M6；M1-S8T 完成，S11 承接最小 UX，
-  M2 聚合适应、M3 内容生产、M4 迁移复习、M5 音频、M6 验证。分配不授权下一 Slice。
-  见 [Guided Language Learning](../features/GUIDED_LANGUAGE_LEARNING.md) 与 [Phase Plan](V1_PHASE_PLAN.md)。
-- **M2C：**Product / Architecture Scope 已批准；放在 M2 exit 后、M3 implementation 前，不重编号 M3–M6。
-  首版受控 `en + zh-CN` text scenario；具体 schema / API / event / Prompt / Context / Slice 未批准实现。
-  见 [Adaptive Scenario Conversation](../features/ADAPTIVE_SCENARIO_CONVERSATION.md)。
-
-## Delivery Summary / 已完成能力入口
-
-| 范围 | 记录状态 | 详细来源 |
+| 范围 | 已确认状态 | 详细来源 |
 |---|---|---|
-| M0 Engineering Foundation / Model Call Job | Integrated closeout PASS；S9 baseline `b88606c` | [Phase Plan](V1_PHASE_PLAN.md)、[历史记录](history/PROJECT_STATUS_2026-10-10.md#completed-review) |
-| M1-S1–S7 Content / Planner / Practice / Grounding | Implementation / Review / Ownership 完成 | [M1 Feature](../features/M1_MINIMUM_TEXT_PRACTICE.md)、[Flows](../flow/README.md) |
-| M1-S8 Evaluator integration | 完整闭环 Ownership PASS；merged `7776111` | [M1 Feature](../features/M1_MINIMUM_TEXT_PRACTICE.md)、[Evaluation API Flow](../flow/evaluation-api-orchestration.md) |
-| M1-S8T Minimum Text Teaching | Ownership PASS；merged `c2dbb4f` | [Guided Feature](../features/GUIDED_LANGUAGE_LEARNING.md)、[Practice Flow](../flow/practice-session-lifecycle.md) |
-| M1-S9 Optional Planner Enrichment | Implementation / Review / external verification / Ownership COMPLETE；`d68d70f`…`786f124` | [Planner Enrichment](../features/PLANNER_ENRICHMENT.md)、[Planning Flow](../flow/owner-scoped-learning-task-planning.md) |
-| M1-S10 Japanese Validation Pack | prior Code Review PASS；scoped User Review 接受；READY_TO_COMMIT | [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md) |
+| M0、M1-S1–S8T | 既有实现、验证与 Review / Ownership 记录保留；S8T merged `c2dbb4f` | [Phase Plan](V1_PHASE_PLAN.md)、[Flows](../flow/README.md) |
+| M1-S9 | COMPLETE；full-feature Ownership 已完成，提交 `d68d70f`…`786f124` | [Planner Enrichment](../features/PLANNER_ENRICHMENT.md) |
+| M1-S10 | COMPLETE；scoped User Review 已接受；资源、测试与规则／文档一起提交 `badcf6e` | [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md#713-implemented-m1-s10-boundary) |
+| M1-S11-A | COMPLETE / COMMITTED `d7aa32e`；校验并保存首次 response support snapshot | [M1 Feature §18](../features/M1_MINIMUM_TEXT_PRACTICE.md#18-m1-s11-a-current-slice-contract--implementation) |
+| M1-S11-B | COMPLETE / COMMITTED `958ac95`；最小 Vue 认证、API client、CSRF ERROR-dispatch 修复；`a486ef7` 另补 Phase Plan，无代码修改 | [M1 Feature §19](../features/M1_MINIMUM_TEXT_PRACTICE.md#19-m1-s11-b-current-slice-contract--implementation)、[Browser Flow](../flow/browser-authentication.md) |
+| S11 剩余 / S12 | Language Profile、task、guided practice、response/support capture、completion、结果与 optional evaluation 的页面闭环尚未实现；后续 slice 合同未批准；S12 未开始 | [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21) |
+| 平台迁移 / C31 | 方向部分确认，完整 ADR 仍 DESIGN_REVIEW；仅独立 RPC 验证已执行，业务服务尚未迁移 | [ADR-0005](../adr/0005-unified-learning-platform-microservices.md)、[C31 摘要](../architecture/PLATFORM_ARCHITECTURE_PROPOSAL.md#93-c31-证据摘要与当前边界--2026-10-21) |
 
-完成与 commit / merge、代码理解等级是不同维度；Model Gateway、BYOK / Provider Configuration 保持既有 L2，
-不因这份摘要或测试通过升级。详细掌握证据见 [OWNERSHIP_MATRIX](../ownership/OWNERSHIP_MATRIX.md)。
+S11-A 的 Human Core 曾由用户明确转交 Codex；S11-B / C31 由 Codex 实现。不记作用户 hands-on，
+Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](../ownership/OWNERSHIP_MATRIX.md) 保持既有等级。
 
-## Verification Evidence / 当前 Slice 的既有证据
+## Active Decisions / 迁移与恢复边界
 
-| 日期 / 性质 | 范围与结果 | 没有证明的内容 |
+- 用户本轮要求先收口，后续明确暂不 merge / 开新分支；验证工程代码不提交，原样保留本机文件。当前不继续 S11 或开始 S12。
+- 已确认 C25：共同版本／基础合同 → Identity → PersonalNote 最小只读认证接入 → Language 身份／本地引用切换 → 扩大迁移。各步仍需小 slice 合同；完整设计、命名、身份接口和数据操作未整体获批。
+- C28 首选 Java 25 / Boot 4.1.1 / Cloud 2025.1.3；当前业务 server 仍为 Boot 4.1.0。C31 为独立工程，未升级业务应用；SAA 与完整生产组合未验证。
+- 已允许现有 Dubbo peer host 补丁用于本地学习迁移；不批准生产采用、长期 fork 或其他补丁。mTLS 不替代用户／资源授权，C31 不证明 Identity、Session 或跨服务权限。
+- 统一 Vue 前端按 C26 计划放入独立仓库，尚未迁出。恢复 S11 前重新核对入口、API、Cookie / CSRF、languageProfileId、Provider / Credential 合同，不直接沿用单体地址和部署假设。
+- 语言隔离、Java deterministic / persistence authority、后端临时使用 Credential 且不落库／日志／Trace 不变。C19 设备持久保存属于未来方向，保护方案未定；S11 当前没有模型 Key 存储实现。
+- Guided Language Learning、M2C 与后续 Phase 的既有批准保留；本次不扩大到 kana 教学、开放对话、新评分引擎、live DeepSeek、新业务 dependency 或完整学习体系。
+
+## Verification / fresh、prior 与 NOT_RUN
+
+| 日期 / 性质 | 范围与结果 | 局限 |
 |---|---|---|
-| 2026-10-09 / PRIOR PASS | affected unit 211/211；disposable PostgreSQL 18.6、empty schema Flyway V1–V17；affected integration 56/56 | 不代表 live Provider 质量或 frontend UX |
-| 2026-10-10 / PRIOR PASS | gap-fix unit 27/27、integration 18/18，均无 skip；Japanese 3 + existing dispatch 2 / consumption 13 | 未重跑全部 211/56；数量不能替代覆盖判断 |
-| 2026-10-10 / PRIOR Code Review PASS | shared request、durable success / grounding rejection / model failure 缺口关闭；无 blocking finding | Codex 自查不替代用户 Review / Ownership |
-| 本次 Gate 同步 / NOT_RUN | 未重跑 Java、PostgreSQL、live Provider 或前端验证 | 文档检查不是运行时验证 |
+| 2026-10-11 / PRIOR | S11-A unit 88/88、独立 PostgreSQL / Redis integration 43/43 PASS，0 skipped | 非浏览器、非 live Provider |
+| 2026-10-13 / PRIOR | S11-B client 16/16、Vue type/build、auth HTTP 27/27、Redis Session 2/2、本地 browser 路径 PASS | 当时匿名 CSRF 403 断言失败，后续根因／修复见下一行；非 Hosted HTTPS |
+| 2026-10-15 / PRIOR | CSRF 修复后真实 Tomcat HTTP 14 + 既有 HTTP 30，共 44/44 PASS，0 skipped | 修复后未重跑 browser / PostgreSQL / Redis 全链路；失败历史保留在 Feature |
+| 2026-10-20 / PRIOR，2026-10-21 读取证据 | C31 补丁版运行 20261020T151253Z-6e7823：17 项 PASS；保存脚本与当前源码一致 | 原版对照 PASS 表示预期 TLS 失败已复现，不算官方兼容通过 |
+| 2026-10-21 / FRESH | C31 断言 unit 9/9 PASS；核对 summary、补丁 hash、源码快照与清理记录；97 个本地文档路径可解析、两个新 checkpoint anchor 与 diff whitespace 检查 PASS | 不重新证明真实 RPC / TLS；两个 PersonalNote 引用为本机相邻项目路径，不承诺独立 clone 可用 |
+| 本轮 / NOT_RUN | Java / Vue / 数据库／浏览器回归、真实 C31 网络重跑、live Provider、Identity、SAA、K3s / Tekton、生产部署 | 文档同步不是运行时验证 |
 
-S10 使用独立临时 PostgreSQL，未使用 primary database；临时容器已清理（既有证据）。
-无 Production Java / schema / API change；现有 Behavior Flow 仍适用。
-更早的迁移、测试数量、skip、修复与作者记录原样保留在 [历史快照](history/PROJECT_STATUS_2026-10-10.md)，
-不在状态入口复制完整批次。
+完整 S11 批次、失败与局限见 Feature §18–19；C31 仅保留平台方案 §9.3 的脱敏摘要。
+C31 原始本机诊断证据位于验证工程忽略的 .local/；工程源码、私钥、临时参数和产物均不纳入项目提交。
+该工程当前仍为本地未跟踪文件；未来暂存必须显式选文件，不能将整个工作区一并暂存。
 
-## Blockers / Risks / UNKNOWN
+## Outstanding Gates
 
-- M1-S10 无既有已知 Code Review、Architecture 或 PostgreSQL verification blocker；
-  scoped User Review 已接受；未确认底层 Java 模块的新掌握程度，不用额外考试代替本次有限范围判断。
-- live Provider quality、frontend UX 不在 S10 验证范围；日语 Prompt fork 未实现。
-- S9 retry / process-recovery 与 M2 learner-state context 不在已完成范围；
-  crash / background completion 的 NOT_READY 局限留待已规划的后续 Gate 评估，不顺手补实现。
-- Scheduler、automatic retry、legacy CREATED / RUNNING recovery、SSE / WebSocket 未实现；
-  Trace 仅安全 logging metadata，不能宣称 durable Trace / 完整产品端到端已完成。
-- Hosted TLS、Browser local / session storage Credential UI、业务 Agent Workflow、
-  live DeepSeek Credential / network 未验证；Hosted model-call 与 password-hash capacity 仍为 PROVISIONAL，
-  按既定 Scope 在 M6 目标硬件验证。
-- Production / verification 判断仍须核对 source、tests、真实 Diff；历史记录不能替代 fresh Evidence。
-
-## Documentation Maintenance
-
-本文件只维护当前 Gate、有效决策摘要、风险、下一动作与详细来源链接。
-历史归档不是新 Scope authority，也不撤销其中的历史批准决定；最新正式合同仍按 AGENTS 的优先级核对。
-历史作者与验证结果不改写、不包装成新结果；本次只收口 S10 Gate，没有提高模块掌握等级或授权生产代码 / 新 Slice。
-Phase Plan 的长历史与 Feature 正文不在本次整理范围，后续可独立决定是否精简。
+- S11-A/B 无待补 Review；本轮 C31 自查无 blocking finding，但用户未确认其代码 Review。用户已决定不提交该验证工程，故不以它阻塞 S11 文档收口，也不将本次范围决定写成用户 Ownership PASS。
+- 平台完整 ADR、Identity 首个合同、跨服务认证／故障、前端迁出与仓库命名仍待后续决策。保存草案不等于批准全部设计，也不要求本轮冻结所有未来接口。
+- 本次只提交项目文档；merge / 开新分支暂缓，验证工程保持本地未跟踪。后续使用时须另查实际 Git 状态。
+- S11 整体 PARTIAL，迁移后重新定义下一 slice；没有 S11 全页面端到端验收或 S12 closeout PASS。
+- S9 process-recovery、model result unknown、长期 qualification / Memory / Mastery、Hosted 容量与 TLS 的既有局限保留。测试不证明真实日语诊断质量、学习有效性或用户新掌握等级。

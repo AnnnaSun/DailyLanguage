@@ -3,7 +3,7 @@
 > Status: APPROVED  
 > Version: 1.7
 > Approved: 2026-08-20  
-> Last updated: 2026-10-15 — 补充 M3 技术评估、Hosted 监控与 OpenTelemetry 链路关联；既有 M1-S10 Gate 记录未在本次刷新
+> Last updated: 2026-10-21 — 同步 S10 / S11-A/B 已提交与迁移前 checkpoint；S11 整体未完成，后续 UX 待迁移后重新定合同
 > Scope baseline: `docs/product/V1_SCOPE.md`
 
 ## 1. Delivery Strategy
@@ -157,8 +157,8 @@ integration、failure invariant 与完整 slices 见
 | M1-S8 | Evaluator ModelCallJob integration | COMPLETE — S8A–S8E implementation/review/external/docs/ownership PASS；merged to main as `7776111` |
 | M1-S8T | Minimum guided text learning | COMPLETE — S8T-A/B/C merged to main in PR #25 (`c2dbb4f`)；review/external/docs/ownership PASS |
 | M1-S9 | Optional Planner enrichment | COMPLETE — S9A–S9F implementation/review/PostgreSQL/Behavior Flow/Ownership PASS (`d68d70f`…`786f124`) |
-| M1-S10 | Japanese validation pack | prior IMPLEMENTATION / VERIFICATION / CODE REVIEW PASS；scoped User Review 接受；READY_TO_COMMIT |
-| M1-S11 | Minimum Vue Practice UX | SCOPE_NOT_APPROVED |
+| M1-S10 | Japanese validation pack | COMPLETE；scoped User Review 接受并提交 `badcf6e`；无 live Japanese quality 结论 |
+| M1-S11 | Minimum Vue Practice UX | PARTIAL；A `d7aa32e`、B `958ac95` 已完成 Review 并提交；其余 UI 未实现／合同未批准；先进行平台迁移准备 |
 | M1-S12 | M1 integrated closeout | SCOPE_NOT_APPROVED |
 
 2026-09-07 批准的教学增量见 [`GUIDED_LANGUAGE_LEARNING.md`](../features/GUIDED_LANGUAGE_LEARNING.md)。
@@ -167,6 +167,12 @@ implementation slice 交付 guided material contract、response support-conditio
 长期 qualification / aggregation 仍在 M2。
 M1-S11 同时承接该场景的最小可用界面，M4 才补齐完整学习选择与迁移体验。
 如实现超过认知预算，在 Current Slice Contract 阶段拆成可 Review 子 slice，不一次实现整个教学体系。
+
+2026-10-21 用户要求迁移前收口，后续明确暂不 merge / 开新分支；本轮不继续 S11 或开始 S12。
+S11 已完成边界、剩余 C–F 建议拆分、历史验证与迁移后恢复顺序见
+[M1 Feature §20](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21)。
+平台迁移路线、部分批准与未决边界见 [ADR-0005](../adr/0005-unified-learning-platform-microservices.md)；
+此插入工作不改变 M2–M6 业务范围，也不代表完整迁移或 S11 closeout 已通过。
 
 M1-S2 已完成 provider-free deterministic candidate filtering、stable fallback、final material re-resolution
 validation 与 typed `Planned / Unavailable` result；Planner 不拥有 persistence、Model invocation、Session 或
@@ -331,11 +337,12 @@ clarification / repetition vertical slice 使用 shared evaluator protocol promp
 Codex full delegation。Japanese material / manifest / rubric 与 integration 已实现；2026-10-09 prior affected unit
 211/211、PostgreSQL 18.6 empty-schema Flyway V1–V17 后 affected integration 56/56 PASS。2026-10-10 补齐真实
 Evaluator request / dispatch / durable consumption 的验证缺口，unit 27/27、integration 18/18 PASS（无 skip），
-未重跑全部 211/56；delta Code Review PASS。临时容器已删除，primary database 未使用；当前 Gate 为
+未重跑全部 211/56；delta Code Review PASS。临时容器已删除，primary database 未使用；历史 Gate 曾为
 `READY_TO_COMMIT`：2026-10-11 源码导读与用户设计讨论后，用户接受本次资源/配置扩展并要求进入下一步。
 按 [AGENTS 协作合同](../../AGENTS.md#5-user--codex-collaboration--项目内协作) 记录 scoped User Review 与 `PROVISIONAL` 工程复盘，
-不提高模块掌握等级、不证明 live Japanese quality。本次仅文档同步，未重跑测试、未 commit、未开始 S11；
-下一动作是用户 Commit Decision，S11 Scope 仍需单独确认。详细证据见 [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md#713-implemented-m1-s10-boundary)。
+不提高模块掌握等级、不证明 live Japanese quality。S10 后续已随 `badcf6e` 提交，不重开 Review；
+S11-A/B 批准、交付与提交见 M1 Feature §18–20，不能继续使用此前“S11 未开始”的快照。
+详细 S10 证据见 [M1 Feature §7.13](../features/M1_MINIMUM_TEXT_PRACTICE.md#713-implemented-m1-s10-boundary)。
 
 ### M2 — Persistent Adaptation Loop
 

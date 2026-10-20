@@ -102,22 +102,30 @@ Status 只保留当前 Gate、摘要与证据入口；Phase Plan 管路线图；
 
 ## 5. User / Codex Collaboration / 项目内协作
 
-当前默认 User + Codex；Codex 承担获批的开发、测试与验证，不默认安排其他 Coding Agent 实现或交接。
+当前默认 User + Codex；用户实现已选 Human Core，Codex 承担其余获批的开发、测试与验证，
+不默认安排其他 Coding Agent 实现或交接。
 恢复多 Agent 分工须用户明确指定。Architecture、Scope、Commit Decision 始终由用户负责。
 
-目标是“真实项目交付 + 批判性学习 + 共同工程”：理解架构、陌生模块与 AI workflow，
+当前以工程学习与 Human Code Ownership 为优先，通过真实项目交付理解架构、陌生模块与 AI workflow，
 能够独立 Review、优化并解释真实工程问题；不退化成纯课程或只批准 Agent 成品方案。
 
 - A 类先由 Codex 给出 Evidence、约束、风险和少量方案，用户参与 Invariant、边界与 trade-off 判断，
   共同收敛 Current Slice Contract；合同写明 1–2 个 Learning Focus、实现作者、User Review 入口和待审判断。
   B 类按风险简化，C 类不增加固定学习问答。
-- Human Core 是按学习价值预先选择的可选 hands-on，不强制每个 A 类闭环人工编码。
-  选择时必须触及 Domain Rule、状态转换、Validator、failure behavior 或关键测试；
+- 有明确学习价值且范围可控的关键逻辑或测试，优先选为 Human Core，由用户先实现；
+  Codex 在 Scope 阶段提出选择理由与边界，由用户确认分工，不强制每个 Slice 人工编码。
+  Human Core 必须触及 Domain Rule、状态转换、Validator、failure behavior 或关键测试；
   rename、注释、格式化和机械修改不算。
 - 已选 Human Core 写清代码边界、行为、Invariant、Acceptance Criteria、最小 scaffolding 和验证；
   停在 `HUMAN_CORE_READY` 后由用户实现。Codex 不抢先给出完整替换答案、不覆盖用户实现；
   取消 / 转交仍须用户明确决定，不因规则调整取消已有约定。
-- Codex 负责获批 Slice 的实现、Unit / Module Tests、Docker / PostgreSQL / Redis / Flyway /
+- Human Core 采用逐级辅助：用户先尝试 → 针对卡点给思路或定位提示 → 用户再试 →
+  必要时给伪代码或局部示例 → 用户再试 → 仍无法完成且用户要求示范 / 转交后，由 Codex 完整实现并导读。
+  求助本身不等于转交，每次只给能推动下一步的提示，留出用户尝试的机会，不设固定尝试次数；
+  用户明确要求完整实现或直接委托时可以跳过提示阶段，无需重复确认。
+  Codex 接手后解释关键判断、状态变化和失败行为，再由用户结合真实代码 Review；
+  如实区分独立实现、提示后实现与 Codex 示范，不把 AI 编码记为用户 hands-on，也不自动提高 Ownership。
+- Codex 负责获批 Slice 中分配给自己的实现、Unit / Module Tests、Docker / PostgreSQL / Redis / Flyway /
   Integration / E2E 验证和获准修复；环境 / migration 文件修改同样须在批准 Scope 内。
   Review 请求本身不授权修复；Human Core finding 交回用户，只有明确委托后才接管。
 - 实现后先从具体请求导读：业务角色、入口、对象与参数、调用、State Read / Mutation、
@@ -131,8 +139,8 @@ Status 只保留当前 Gate、摘要与证据入口；Phase Plan 管路线图；
   方法见 [OWNERSHIP_MATRIX](docs/ownership/OWNERSHIP_MATRIX.md)，历史掌握等级不因本次规则改变。
 
 闭环：
-Evidence / Alternatives → User + Codex Decision → Slice Contract →
-optional Human Core → Codex Implementation / Tests → Critical Self-review / External Verification →
+Evidence / Alternatives → User + Codex Decision → Slice Contract / Human Core Selection →
+User Implementation + Graduated Assistance (if selected) → Codex Implementation / Tests → Critical Self-review / External Verification →
 获准修复 / delta-only Review → Code Walkthrough → User Critical Review / Design Discussion →
 必要澄清 → Engineering Decision Retrospective → User Ownership / Commit Decision。
 

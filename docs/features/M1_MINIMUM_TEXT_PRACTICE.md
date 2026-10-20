@@ -3,13 +3,13 @@
 > Status: APPROVED DESIGN
 > Approved: 2026-09-03
 > Production baseline: M1-S8T COMPLETE — PR #25 merged to main（`c2dbb4f`）
-> Current candidate: M1-S11-B minimum authentication UX；S11-A 已获用户整体 Review 接受并提交到 `d7aa32e`
-> Current gate: M1-S11-B User Review ACCEPTED / Commit Decision APPROVED（2026-10-15，见 §19.5）
+> Current progress: S11-A/B 已完成用户 Review 并提交（`d7aa32e` / `958ac95`）；S11 整体 PARTIAL
+> Current gate: 2026-10-21 迁移前收口；先进行平台迁移准备，恢复入口见 §20；不开始 S11-C / S12
 > Phase: M1
 
 本文定义 M1 的目标行为、Architecture boundary、Content composition、核心 lifecycle、ModelCallJob
 integration、failure invariant 与 implementation slice 顺序。它把已批准的 M1 Phase outcome 细化为可 Review
-的设计；具体 Production Code、schema 或 API 修改须单独批准 Current Slice Contract（当前 S11-B 见 §19）。
+的设计；具体 Production Code、schema 或 API 修改须单独批准 Current Slice Contract（已交付 S11-A/B 见 §18–19）。
 
 ## 1. Decision summary
 
@@ -828,8 +828,8 @@ Architecture Impact: in-boundary physicalization of approved Learning Domain mod
 New ADR Required: NO
 Phase Slice Plan: APPROVED
 Production Baseline: M1-S8T COMPLETE（PR #25 merge `c2dbb4f`）
-Current Candidate: M1-S11-B implementation / verification complete（Contract 见 §19）
-Current Gate: S11-B User Review ACCEPTED / Commit Decision APPROVED（见 §19.5）
+Current Progress: M1-S11-A/B COMMITTED；S11 overall PARTIAL（见 §20）
+Current Gate: 迁移前 documentation closeout；后续 UX implementation 未获批
 ```
 
 本设计不改变 Persistent Learner Model、Multi-language Isolation、AI vs Java Authority、Provider-agnostic Model
@@ -1061,3 +1061,55 @@ S11-B 整体 User Review ACCEPTED，当前 S11-B 与获准 CSRF 修复的 Commit
 不记作用户 Human Touch，不因本次接受自动提高模块掌握等级。此前 §19.3 的 browser / PostgreSQL /
 Redis evidence 为 2026-10-13 的 prior 验证；§19.4 的 44/44 为 2026-10-15 定向验证，不声称重跑全部环境。
 授权不包含 push / merge、S11-C / S12 或 CURRENT_HANDOFF 刷新。
+
+## 20. S11 Migration Checkpoint — 2026-10-21
+
+用户要求先完成状态／Review 收口，再处理统一提交与迁移；后续明确暂不 merge 或开新分支。
+本节是恢复开发入口，不是新 implementation approval；§18–19 保留历史合同与验证。
+
+### 20.1 已交付与当前 Git
+
+- S11-A：`d7aa32e`，经 Java 校验的 supportObservation 与首次回答原子保存；same-text replay 返回首次
+  durable snapshot。用户已接受整体 Review；Human Core 已明确转交 Codex，不补记用户 hands-on。
+- S11-B：`958ac95`，最小 Vue 登录／当前身份／退出与 native fetch client；失败只读重查、不自动重放写请求。
+  包含 internal ERROR dispatch 放行以保留真实 CSRF 403；普通 REQUEST /error 仍受保护。
+  用户已接受整体及修复 Review；没有待补的 S11-A/B code / user Review。
+- `a486ef7` 仅补充 Phase Plan 的 M3 技术评估与后续 Observability 规划，没有重复修改 S11-B 代码。
+- 核对时分支 `feature/m1s11-VuePracticeUX`、HEAD `a486ef7`；本地 main 为 `c2dbb4f`。
+  S9、S10、S11-A/B 均已提交但尚未合入此本地 main；远端是否变化须另查。
+- 已有验证均为 PRIOR：A unit 88 / integration 43；B client 16、build、HTTP 27、Session 2 与本地 browser；
+  CSRF 修复 targeted HTTP 44。日期、失败历史与局限见 §18.5、§19.3–19.4，本次不重跑或扩大结论。
+
+### 20.2 尚未交付的最小页面闭环
+
+| 建议后续子 slice（待重新定合同） | 目标行为 | 当前边界／恢复时重点 |
+|---|---|---|
+| S11-C Language Profile / task | 选择语言档案，provider-free planning，展示 Java 返回的真实 task | Vue 未接；planning POST 非幂等，无已批准自动重试或刷新恢复方案 |
+| S11-D guided practice / response | 启动 Session，展示示范／解释／guided step，累计 support observation，提交回答并显示 accepted / replay | A 只提供校验／持久化，Vue capture 未实现；隐藏 UI 不证明独立掌握；不承诺任意刷新恢复回答 |
+| S11-E completion / assessment | 说明缺失回答，完成 Session，呈现 deterministic assessment 与 completed replay | Java 决定完成／评分；SEMANTIC_ONLY 不伪造确定性语义正确；页面未实现 |
+| S11-F optional evaluation | Provider / Credential 配置与 evaluation 触发／查询，呈现 pending、failure 与已有结果 | provider-free practice/completion 不依赖它；不盲目重放已有 Run/Job；迁移后重核执行／消费接口 |
+
+以上分组沿用讨论建议，C–F 的具体文件、API、验收、学习重点和分工均未批准。
+整体目标仍为 task → guided practice → response / support-condition → completion → deterministic assessment
+→ optional evaluation；当前只有认证 UI，没有该页面闭环、S11 end-to-end 或 S12 closeout PASS。
+完整学习体系、kana 教学、开放对话、新语义评分引擎和 live DeepSeek 不在最小 UX 默认范围。
+
+### 20.3 迁移后恢复顺序与不变量
+
+1. 从 [Project Status](../planning/PROJECT_STATUS.md)、Git 与迁移实施结果恢复事实；
+   不沿用旧 S9 / S10 snapshot，不重开已完成的 S11-A/B Review。
+2. 核对前端位置与身份入口：C26 计划独立 Vue 仓库，Identity / Gateway 的路由、Cookie / CSRF、Session
+   和应用授权会影响 B；迁移尚未实现。保留 App.vue → api.ts → backend 身份确认／失败重查语义。
+3. 重核 Profile / Planner / Practice / Evaluator 的实际 API 与 Behavior Flow、owner/profile、response /
+   completion replay 与 pending / unknown / failure。当前没有 response-read 恢复 API；接口迁移不能默认补足，
+   若需扩展先给证据和方案。
+4. 结合 C25 的 Language 切换与所需 AI 接口验证结果收敛下一 UX slice，再由用户批准 Current Slice Contract；
+   不一次批准 C–F。优先复用已有结构，声明 Expected Files、impact、AC、验证、Stop Point 与 1–2 个 Learning Focus。
+   Human Core 按最新规则提议并由用户选择，A 的明确转交不因规则变化重开。
+
+长期状态归后端，按 languageProfileId 隔离；Java 持有 validation、deterministic transition 与 persistence。
+Credential 在后端仅临时使用，禁止进入 DB / Redis / Log / Trace / durable Job。C19 允许未来在用户设备持久
+保存的方向不等于具体存储／保护实现已批准，也不让浏览器成为身份或学习状态的长期真相。
+迁移后的 API／依赖和运行行为为 UNKNOWN，须 fresh 回归，不能沿用历史测试数量宣布兼容。
+
+Stop Point：只完成文档／状态收口；不改业务代码，不开始 S11 后续实现、S12 或 Identity。

@@ -1,6 +1,6 @@
 # Guided Language Learning — 输入、理解与独立使用
 
-> Updated: 2026-10-11 — S11-A observation API 已实现并验证；REVIEW_PENDING，Vue capture 尚未实现
+> Updated: 2026-10-21 — S11-A 已完成用户 Review 并提交 `d7aa32e`；B 认证 UI 已提交，Vue practice / capture 未实现；恢复入口见 M1 Feature §20
 > Direction: APPROVED — 用户同意补充教学流程并复用现有模块
 > Product design / V1 phase allocation: APPROVED — 2026-09-07
 > Current Slice Contract: APPROVED — S8T-A / S8T-B / S8T-C
@@ -115,7 +115,7 @@ Grammar Repair 继续用于真实使用后重复、高置信的问题。首次�
 - M1 工程验收：guided material validation、legacy default、exact-version planning/start、safe projection、
   support-condition migration/round-trip、owner/profile isolation 与 Evaluator input regression 已由 unit/integration
   tests 覆盖。
-- S11-A fresh verification：unit 88/88、独立 PostgreSQL / Redis integration 43/43 PASS，0 skipped；
+- S11-A prior verification（2026-10-11）：unit 88/88、独立 PostgreSQL / Redis integration 43/43 PASS，0 skipped；
   真实 HTTP 保存的 snapshot 可进入 Evaluator input，非法观察／跨 owner/profile／缺 CSRF 被拒绝，replay 不覆盖。
 - 当前能力限制：Vue capture、M2 qualification/aggregation 与后续 Review 尚未实现。HTTP 校验不证明
   浏览器观察真实、不证明学习有效性，也不能把隐藏支架后的表现直接判为独立成功。
@@ -153,8 +153,10 @@ Flyway V1–V14；Planner 7/7、Practice 35/35、Grounded Evaluator Reader 5/5 i
 `TextStepKind` 与 `TextLearningPurpose` 的正交语义、`UNKNOWN` 与 `NOT_PROVIDED` 的证据差异、首次 response/support
 snapshot 不可覆盖、exact material version 的历史可重现性，以及单次 candidate 不直接修改长期状态；Understanding
 `UNDERSTOOD`，Human Touch `NOT_REQUIRED`。PR #25 已于 2026-09-10 merge to main as `c2dbb4f`；以上验证是
-merge candidate 的 prior evidence，本次 post-merge 文档收口未重跑测试。S8T 已无剩余 Gate，下一阶段为
-M1-S9 Design / Scope Review。
+merge candidate 的 prior evidence，本次 post-merge 文档收口未重跑测试。S8T 已无剩余 Gate；
+其后的 S9 / S10 / S11-A/B 记录以 [Project Status](../planning/PROJECT_STATUS.md) 为入口。
+当前 S11 整体 PARTIAL，先进行平台迁移准备；剩余 UX 与恢复顺序见
+[M1 Feature §20](M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21)。
 
 ## 8. Reference
 

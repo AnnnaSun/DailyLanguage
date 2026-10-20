@@ -675,8 +675,11 @@ Ownership Debt：
 
 # 13. Human Touch Tracking / 人工操作记录
 
-Human Touch 按学习价值在 Scope 阶段选择，不是每个 A 类 Feature 的必经步骤；
-已选择的 `Human Core` 仍按 Slice Contract 完成或由用户明确重新分配，不为记录而制造修改。
+有明确学习价值且范围可控的关键逻辑或测试，在 Scope 阶段优先选为 `Human Core`，由用户先实现；
+不是每个 Slice 的必经步骤，选择理由与分工写入 Slice Contract。
+实施分工与逐级辅助遵循 [AGENTS §5](../../AGENTS.md#5-user--codex-collaboration--项目内协作)。
+如实区分独立实现、提示后实现和 Codex 示范；Codex 示范不计作用户 hands-on，也不自动提高 Ownership。
+已选择的 Human Core 按合同完成或由用户明确重新分配，不为记录而制造修改；不追溯要求重做已完成的 Slice。
 
 有效行为包括：
 
@@ -879,7 +882,9 @@ Code Ownership 与 Architecture Ownership 相关，但不完全相同。
 Feature 开发：
 
 ```
-Joint Decision / Scope + Learning Focus + optional Human Core
+Joint Decision / Scope + Learning Focus + Human Core Selection
+    ↓
+User Implementation + Graduated Assistance (if selected)
     ↓
 Implementation
     ↓

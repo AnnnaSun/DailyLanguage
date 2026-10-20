@@ -22,6 +22,10 @@
 >
 > Agent / LLM / Tool 运行链路见 `AGENT_FLOW.md`。
 
+> 后续平台化设计见 [统一学习平台架构变更方案](PLATFORM_ARCHITECTURE_PROPOSAL.md) 与
+> [ADR-0005 草案](../adr/0005-unified-learning-platform-microservices.md)。它们区分已确认方向与待决设计，
+> 不代表微服务或统一权限已经实现；当前仅方案与文档工作。
+
 ---
 
 ## 1. System Identity / 系统定位
