@@ -4,10 +4,11 @@
 
 - Date: 2026-10-21
 - Slice: R1-A — 独立 Identity 账户原子持久化，包含默认 Language 授权。
-- Gate: REVIEW_PENDING；R1-A 验收通过，待完整代码导读和用户 Critical Review；不进入 READY_TO_COMMIT。
+- Gate: COMMITTED；R1-A 验收通过，用户在代码导读与 Review 讨论后已本地提交 `9b3ef1a`。
 - 用户已确认本 slice、首次骨架预算例外及由用户实现事务方法，并要求增加便于阅读的中文业务注释。
 - Architecture / Scope / Commit 仍由用户负责，不自动开始下一 slice。
-- Git baseline: `architecture/microservices-migration` / `f5a729a`，与合并后的 main 一致。
+- 实现基线：`architecture/microservices-migration` / `f5a729a`，迁移启动时与合并后的 main 一致。
+- 实现提交：`9b3ef1a` — `feat(identity): add atomic account creation with language access`，由用户于 2026-10-21 本地提交，共 23 个文件。
 - 上位决定：[ADR-0005](../adr/0005-unified-learning-platform-microservices.md)、
   [平台方案 C24–C28 / §4.1 / §9](../architecture/PLATFORM_ARCHITECTURE_PROPOSAL.md)。
 
@@ -21,7 +22,7 @@ Identity 独立为一个 Maven 运行模块，使用独立数据库和专用账�
 代价是本 slice 完成后仍不能通过浏览器注册或登录，不代表 R1 整体完成。
 
 Non-scope：注册 / 登录 / 退出 / Session、Redis、Dubbo / Nacos / mTLS、Gateway、业务消费者、管理员指定、
-账号停用及授撤权 API、旧数据迁移、前端、S11 剩余功能、SAA / 模型、生产部署、仓库重命名与 commit / push。
+账号停用及授撤权 API、旧数据迁移、前端、S11 剩余功能、SAA / 模型、生产部署、仓库重命名与自动 commit / push。
 C31 工程和补丁已按用户要求删除，本 slice 不恢复它们；未来补丁必须重新给出用途、影响和替代方案供用户决定。
 
 ## 目录、构建与安全边界
@@ -70,7 +71,7 @@ Acceptance Criteria：
 3. 凭据写入或最后一步授权写入实际失败时，外层账户写入全部回滚，失败向调用者传播。
 4. 不捕获异常后继续返回成功，不加入自动重试、Session、任意 appCode 或管理员引导逻辑。
 
-事务方法的增量 Review 已无阻塞项，4 项行为测试及当前候选的集中验收均通过；下一步为完整导读与用户 Review。
+事务方法的增量 Review 已无阻塞项，4 项行为测试及提交候选的集中验收均通过；后续代码导读与 Review 讨论完成后，用户已自主提交 `9b3ef1a`。
 求助按“定位 / 思路 → 必要时伪代码 / 局部示例”逐级进行；用户明确要求示范或转交后才完整代写。
 不将 Codex 编码或测试通过记作用户 hands-on / Ownership PASS。
 
@@ -84,6 +85,14 @@ Acceptance Criteria：
 Learning Focus：Spring 事务代理怎样覆盖多次 SQL；数据库唯一约束如何裁决并发，以及应用准入与业务归属的区别。
 不安排用户编写 Python 验证脚本。
 
+## Review 与提交记录
+
+- 已结合真实代码讨论事务代理与四次 Mapper 写入、数据库唯一约束与并发冲突回滚、默认 LANGUAGE 准入，以及真实 SQL 失败注入测试为何不能依赖测试外层事务。
+- 已导读健康检查放行、其他入口拒绝、CSRF 与无 Session 的安全边界，以及新增文件、本地初始化脚本和 Maven 聚合 / 继承 / 依赖的职责。
+- 用户指出提交阶段连接中断时不能盲目重试；讨论中进一步澄清：连接中断不等于事务失效或已回滚，提交结果可能为 UNKNOWN。此项是失败边界讨论，未进行提交确认丢失实验。
+- 用户在上述讨论后作出 Commit Decision，并完成本地提交 `9b3ef1a`。Codex 自查不记作独立作者 Review；用户 Human Core 仍记为提示后实现，不据此提高模块掌握等级或标记整体 Identity Ownership PASS。
+- 本次仅同步本文件与 PROJECT_STATUS；未改代码、未重跑构建或测试，也未创建新的提交。
+
 ## Verification
 
 本节仅记录此新服务的证据，不沿用 C31 的历史通过作为 Identity 兼容结论。
@@ -95,7 +104,7 @@ PRIOR — 本 slice 前期骨架证据：HTTP 9/9、Mapper / schema / 账号边�
 2 failures / 2 errors。第一版用户实现保留了成功路径的占位异常，回滚测试 2 项 PASS、成功相关测试 2 项 ERROR；
 去除占位异常及不安全的异常打印后，用户事务方法 4/4 PASS。以上历史不代替本次集中验收。
 
-FRESH 2026-10-21 — 当前候选验收：
+FRESH 2026-10-21 — R1-A 提交候选的实际验收（现已提交为 `9b3ef1a`；本次记录同步未重跑）：
 
 | 检查 | 结果与证明边界 |
 |---|---|
@@ -107,23 +116,23 @@ FRESH 2026-10-21 — 当前候选验收：
 | 数据来源与环境 | 隔离 PostgreSQL 18.6；验收前已有 2 个合成账户，本轮测试新增 2 个完整合成账户；没有连接旧业务库或清库，未遗留失败注入 trigger |
 | 候选一致性与清理 | 运行前后 source 摘要一致，两次启动 JAR 摘要一致；两个临时应用 JVM 已正常停止，隔离数据库保留 |
 
-本轮命令（先加载仓库外的私有环境文件）：
+验收命令（先加载仓库外的私有环境文件）：
 
 ```sh
 mvn -q package -o -pl services/identity -am -Dtest=IdentityBoundaryHttpTests,IdentityMapperIntegrationTests,LocalAccountPersistenceIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-运行报告位于忽略的 `services/identity/target/surefire-reports/`；本轮日志为 `target/r1-acceptance.log`、
+运行报告位于忽略的 `services/identity/target/surefire-reports/`；验收日志为 `target/r1-acceptance.log`、
 `target/r1-start-1.log`、`target/r1-start-2.log`，source / JAR 摘要及三份逐行数据摘要也在 target 中。
 数据摘要仅包含表名、内部记录标识和行摘要，不保存邮箱或 verifier 原文。实际密码及运行产物不提交。
 重启验收写入端是 production 事务 bean，读取端是 Identity 专用账号的 SQL；当前没有公开账户读取 API。
 此处验证的是应用 / JVM 重启，未重启数据库容器或模拟数据库崩溃。未设置数据库测试开关产生的 SKIPPED 不能算通过。
 
 非阻塞 Review 项：当前 POM 额外显式声明 `spring-context:7.0.9`，与 Boot 4.1.1 BOM 的实际管理版本一致，
-本次未出现版本偏移；重复固定版本会影响未来统一升级，是否去除显式声明留给 Review，本轮保留原样。
+验收时未出现版本偏移；本次提交保留该声明，后续统一升级需复核版本覆盖，不作为本 slice 阻塞项。
 
 NOT_RUN / 尚未证明：真实密码 policy / Argon2 验证、完整注册 HTTP、Session、跨服务认证 / 授权、
 Dubbo 原版兼容、Cloud runtime、SAA、旧业务回归、前端、生产部署、数据库故障恢复、提交确认丢失及外层事务传播场景。
 
 Acceptance: PASS（仅 R1-A 本地内部账户持久化）。[已实现事务 Flow](../flow/identity-account-persistence.md) 已按当前 source / tests 核对。
-Codex 自查不替代用户 Critical Review；单一 Next Action 为当前 R1-A 代码导读与用户 Review，不提高 Ownership，不进入下一 slice。
+当前 R1-A 已本地提交；单一 Next Action 为等待用户启动 R1 下一 slice 的设计与合同确认，不自动开始后续实现，不提高 Ownership。
