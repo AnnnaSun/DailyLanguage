@@ -1,0 +1,21 @@
+name: dailylanguage-r1-identity
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: identity_test_admin
+      POSTGRES_PASSWORD: ${IDENTITY_TEST_ADMIN_PASSWORD:?必须设置隔离环境管理员密码}
+      IDENTITY_TEST_PASSWORD: ${IDENTITY_DATABASE_PASSWORD:?必须设置 Identity 专用账号密码}
+    ports:
+      - "127.0.0.1:${IDENTITY_DATABASE_PORT:-55441}:5432"
+    volumes:
+      - identity-postgres-data:/var/lib/postgresql
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/identity.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_test_admin -d identity"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  identity-postgres-data:
