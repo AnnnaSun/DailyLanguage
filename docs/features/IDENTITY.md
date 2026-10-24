@@ -3,10 +3,10 @@
 ## 当前 Gate
 
 - Date: 2026-10-24
-- Current Slice: R1-B — Identity 内部的受限密码散列与校验。
-- Gate: COMPLETE / COMMITTED；R1-B 代码已由用户提交 `3f0d36f`，工程验收 PASS，本 slice 的关键调用链 / 失败路径 Ownership Check 已完成。
-- R1-A 已提交 `9b3ef1a`；记录同步已提交 `2dda5de`，本 slice 从 `architecture/microservices-migration` / `2dda5de` 开始。
-- Human Core 与 slice 自查无阻塞问题；先前定向测试 38/38、本次数据库组合及回归 10/10 PASS，package 与独立 JAR 健康检查通过。详细合同见下方 R1-B。
+- Current Slice: R1-C — Identity 注册密码策略与离线 blocklist。
+- Gate: READY_TO_COMMIT；用户在提示后完成 `LocalPasswordPolicy.validate`，Code Review 与工程验收 PASS，本 slice 的 Human Review / Ownership 讨论已完成；提交由用户决定。
+- R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
+- 本次 policy 8/8、blocklist 12/12、既有密码 / 容量 / HTTP 38/38，共 58/58 PASS；package 退出码 0，JAR 内资源 checksum 一致。详细合同及验收边界见下方 R1-C。
 - 不自动 commit / push，不提高 Ownership，不开始下一 slice。
 
 ## R1-A 决定与交付记录
@@ -249,7 +249,7 @@ mvn -q test -o -pl services/identity -am -Dtest=LocalPasswordHasherTests,Identit
 
 Engineering Acceptance: PASS（仅获批 R1-B 范围）。Code State: COMMITTED `3f0d36f`。
 Current Gate: COMPLETE / COMMITTED；本 slice 的 Ownership Check 结论及范围见下方讨论证据，不自动提高模块整体掌握等级。
-单一 Next Action：进入下一 Identity slice 的 Design / Scope，明确目标、边界与 Human Core 分工后由用户决定；不自动实现下一 slice 或提交本轮文档。
+R1-B 收口后的 Design / Scope 动作已由下方 R1-C 合同履行；后续实现范围与人工分工以当前合同为准。
 NOT_RUN / 不证明：生产性能与容量、完整注册 / 登录 / Session、跨服务授权、生产部署与数据库故障恢复。
 
 ### User Review / Ownership — 2026-10-24
@@ -258,3 +258,106 @@ NOT_RUN / 不证明：生产性能与容量、完整注册 / 登录 / Session、
 - 用户独立解释失败路径：“已取得的名额会 release；数据库不会留下半成品，因为 verifier 生成成功之后才会写数据库，没生成成功会直接 throw。”该回答正确追踪了资源归还、调用顺序和异常阻断；Codex 补充区分后续 SQL 写入失败时由账户事务回滚。
 - Understanding: UNDERSTOOD（限定本次容量生命周期、散列前置与账户写入失败边界）。Human Core 仍记为提示后实现；不据此宣称独立实现、密码学全面掌握或 Identity 模块整体 Ownership PASS。
 - 决策复盘：既有合同选择进程共享容量、满额立即拒绝、散列在事务前完成；代价是突发请求可能被拒绝，本进程限额不能替代集群限流。验证覆盖拒绝 / 归还、真实散列、数据库往返与事务回滚，不证明生产容量。未来根据真实负载评估容量、排队或服务边界时再单独决策，本次不改合同。
+
+## R1-C — 注册密码策略与离线 blocklist
+
+### 已批准目标与边界
+
+2026-10-24 用户确认本方案、范围及 Human Core 分工；任务等级 A — Critical。
+Identity 内部新增 `LocalPasswordPolicy.validate(password, normalizedEmail)`，只返回注册密码是否满足输入规则及拒绝原因。
+沿用 [ADR-0002 Password Storage](../adr/0002-authentication-password-session-security.md#password-storage) 的既有政策，不改变密码规则、Argon2 参数、账户事务或 HTTP / Session 权限边界。
+
+- 接受 12–64 个 printable ASCII 字符（U+0020–U+007E，含普通空格），不要求字符类型组合。
+- 密码保留原样，不 trim、不改大小写、不做 Unicode normalization 或子串匹配。
+- null 密码返回 INVALID_LENGTH；非法字符优先于长度判断。语法和长度合法后，缺失 normalizedEmail 抛 NullPointerException，说明调用方违反内部前置条件。
+- 与 normalizedEmail 或其 local part 完全相同，或命中固定 blocklist 时返回 COMMON_OR_COMPROMISED；其余返回 ACCEPTED。
+- normalizedEmail 由未来调用方规范化；本组件不推断、不规范化邮箱。policy 不调用 hasher、不访问数据库、不记录密码或 fingerprint。
+- blocklist 只服务于注册等密码设置操作，不进入现有 `matches` 登录密码校验路径；查询仅计算本地 SHA-256 membership key，不能替代 Argon2 credential verifier。
+- 资源缺失、结构异常、条目数或 checksum 不符时拒绝创建组件，不能静默跳过规则。资源加载后保留防御性副本，支持并发只读查询。
+
+Non-scope：邮箱规范化、注册 Service、HTTP / RPC、登录、Session / Redis、Rate Limit、新 dependency / module、schema 或账户事务变更、旧 server 修改、上游 blocklist 更新、完整注册流程及生产容量结论。
+
+### 文件、资源与职责
+
+Production 新增仅三项：
+
+| 文件 | 作者与职责 |
+|---|---|
+| `services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordPolicy.java` | Codex 准备常量、构造器、enum 与字符 / 邮箱比较 helper；用户实现 validate |
+| `services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordBlocklist.java` | Codex；迁入已有固定资源校验与精确查询 |
+| `services/identity/src/main/resources/security/local-password-blocklist-v1.bin` | Codex；原样复制旧模块的已固定资源 |
+
+骨架两份 Java 共 191 行，Human Core 完成后共 204 行，仍在 250 行预算内；无新 POM / runtime 配置。
+采用 concrete 组件组合：Policy 隔离注册输入规则，Blocklist 隔离固定资源加载、完整性校验与只读查询；不新建 Interface、通用框架或跨模块实现依赖。
+新增两个同 package 测试类：LocalPasswordPolicyTests、LocalPasswordBlocklistTests；文档只同步当前合同与 PROJECT_STATUS。
+
+资源基线：2,071 entries / 66,272 bytes，SHA-256 为 `dc4260507736ce8464d32b760097c38e105c66158fb8a9192e0a324d25929aa8`。
+ADR / Phase Plan 中的 2,065 是 SecLists 过滤后的 baseline；现有生成器另加入六条项目相关值，得到当前 2,071 条，不构成规则冲突。
+本轮没有重新下载或生成上游源，只核对迁入资源与现有资产的字节 checksum 一致；生成器不进入新模块 runtime 或 Maven build。
+
+### Human Core 与验收
+
+用户入口：[LocalPasswordPolicy.validate](../../services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordPolicy.java)。
+只实现该方法并移除 TODO / UnsupportedOperationException；构造器、enum、helper、blocklist 与测试由 Codex 准备，不要求修改其他 production 文件。
+
+可使用的现有成员：`MINIMUM_LENGTH`、`MAXIMUM_LENGTH`、`containsOnlyPrintableAscii`、`matchesLoginIdentity` 和 `passwordBlocklist.contains`。
+验收包括 null、11 / 12 / 64 / 65 长度边界、完整 printable ASCII、空格保留、非法字符优先级、邮箱 / local part exact matching、固定弱密码拒绝以及敏感值不进入输出。
+非法语法 / 长度应在 blocklist 查询和 normalizedEmail 前置检查之前被拒绝；合法密码缺失 normalizedEmail 的错误消息固定为 `normalizedEmail must not be null`。
+测试直接调用真实 validate；不将未实现异常改成成功预期、不跳过 Human Core 测试，不由 Codex 代写该方法。
+
+Learning Focus：校验顺序如何决定失败结果；邮箱规范化不能反向改写密码。
+User Review 入口：validate 的分支顺序、原始密码比较与 blocklist 资源失败边界。求助沿用逐级提示，明确转交后才完整实现。
+完整行为、最终 Review / Ownership 和必要 Flow 同步留在 Human Core 完成后，不将尚未实现的 policy 写入已实现注册 Flow。
+
+### Verification — 2026-10-24 骨架阶段
+
+FRESH 命令：
+
+```powershell
+.\mvnw.cmd -q -pl services/identity -am test '-Dtest=LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+| 范围 | 实际结果与证明边界 |
+|---|---|
+| LocalPasswordBlocklistTests | 12/12 PASS；固定资源、精确查询、结构 / count / checksum / 缺失资源拒绝、防御性复制与并发只读；真实 Spring Policy / Blocklist bean 创建成功，但未执行 validate |
+| LocalPasswordPolicyTests | 8 项全部 RED：1 failure、7 errors，均来自真实 Human Core 占位 UnsupportedOperationException，包括期望 NullPointerException 的差异；不能称 policy 验收通过 |
+| 既有回归 | LocalPasswordHasherTests 17/17、PasswordHashConcurrencyGateTests 12/12、IdentityBoundaryHttpTests 9/9，共 38/38 PASS |
+| 集中结果 | 58 项、50 PASS、1 failure、7 errors、0 skipped；实际退出码 1，符合 HUMAN_CORE_READY 的占位状态，不是整体验收 PASS |
+
+日志为忽略的 `services/identity/target/r1c-scaffold-verification.log`，XML 报告位于同模块 `target/surefire-reports/`。
+资源 checksum 与旧资产一致，旧 server、POM、application.yml、hasher 和账户事务均未修改。
+NOT_RUN：上游源重新生成、完整 JAR / PostgreSQL / browser / Session / 跨服务验证；R1-B 历史数据库证据不当作本 slice fresh result。
+完成 Human Core 后先运行 policy / blocklist tests，再跑受影响回归与资源 / 组件启动检查；根据真实变化扩大验证，不运行无关全量测试。
+
+以上为骨架阶段的预期 RED；当前结果以下方 Human Core Review 为准。
+
+### Human Core Review / Verification — 2026-10-24
+
+- 用户先完成部分实现，再根据局部 Review 提示调整 null / 字符 / 长度顺序、补齐长度上限、邮箱前置条件和弱密码判断；Human Core 记为提示后实现，Codex 未修改用户方法，不记作独立实现。
+- Code Review: PASS，无 blocking finding；Scope MATCH。真实 validate 保持原始密码，不规范化邮箱或密码；返回原因与检查顺序符合合同。normalizedEmail 缺失仅在密码语法 / 长度合法后抛前置条件异常。
+- blocklist 迁入代码仍为 Codex 自查，不记作独立作者 Review；资源 pinned 校验、immutable lookup 与测试覆盖符合当前 Scope。无新增 dependency、HTTP / Session 放行、schema、账户事务或旧 server 修改。
+- FRESH：以下测试与 package 一次运行退出码 0；LocalPasswordPolicyTests 8/8、LocalPasswordBlocklistTests 12/12、LocalPasswordHasherTests 17/17、PasswordHashConcurrencyGateTests 12/12、IdentityBoundaryHttpTests 9/9，共 58/58 PASS，0 failures / errors / skipped。
+
+```powershell
+.\mvnw.cmd -q -pl services/identity -am package '-Dtest=LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- 校验生成 JAR 的 `BOOT-INF/classes/security/local-password-blocklist-v1.bin`：66,272 bytes，SHA-256 与批准的固定值一致；证明打包未遗漏或改变资源。真实 Spring Policy / Blocklist bean 创建由上述 12 项 blocklist 测试覆盖。
+- 日志为忽略的 `services/identity/target/r1c-human-core-review.log`，XML 报告位于 `target/surefire-reports/`。
+- Critical Flow：validate 接收原始密码 → null / 字符 / 长度拒绝 → normalizedEmail 前置条件 → exact identity / blocklist 拒绝 → ACCEPTED；只查询固定资源，没有账户或长期状态 mutation。
+- Human Review Focus：预期输入拒绝使用 ValidationResult，内部前置条件失效使用异常；字符错误优先级；密码原值与完整字符串比较；blocklist SHA-256 仅为查询 key，credential verifier 仍由 Argon2 负责。
+- Behavior Flow: NOT_REQUIRED；当前是同一 credential 包内可直接追踪的输入校验与固定表查询，未形成注册跨模块调用链，现有 hash / matches Flow 未改变；后续接注册流程时同步真实 Flow。
+- NOT_RUN：完整服务 JVM / PostgreSQL、浏览器、Session、跨服务及上游 blocklist 重新生成；本 slice 未修改这些路径，不以历史运行代替 fresh 证据。
+
+Engineering Acceptance: PASS（仅 R1-C 内部密码策略与 blocklist）。Current Gate: READY_TO_COMMIT；Human Review 证据见下方记录。
+单一 Next Action：由用户决定提交当前 R1-C；不自动 commit、push 或实现下一 slice。
+
+### User Review / Ownership — R1-C，2026-10-24
+
+- 用户实际编写 validate，并在局部 Review 后修正 null / 字符 / 长度顺序、最大长度、邮箱前置检查及身份 / blocklist 拒绝路径；该 Human Core 保持提示后实现记录。
+- 用户质疑密码输入拒绝与 normalizedEmail 缺失的比较，指出空邮箱可能来自未输入或上游处理问题，要求讨论基于真实调用层级而不是预设概念。当前内部前置条件合同保持不变；未来注册入口仍需明确邮箱输入校验及错误传播，不能把尚未接通的调用链视为已实现。
+- 用户针对显式 if / return 的繁琐提出 Review 意见，经讨论决定当前保留实现，未来触及相关代码时按实际需要评估简化；本次没有批准规则变更或额外重构。
+- Understanding: UNDERSTOOD（限定本 slice 的校验顺序、输入规则与调用边界判断）；以上实现、修正和真实 Review 讨论作为 Ownership evidence，不要求补答概念题，不提升整个 Identity 或密码学模块的掌握等级。
+- 收口核对：validate 当前 blob `22ecf134314165f77bd2692ad533c6ffa1668c9c` 与已 Review 的实现一致；沿用同日已记录的 58/58、package 与资源完整性验证，本次仅同步 Review 结论，未重跑测试。
+
+Human Review: COMPLETE。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
