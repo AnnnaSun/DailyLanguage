@@ -1,0 +1,2 @@
+# 沿用当前开发 JDK；Maven 版本由各构建入口的 Wrapper 管理。
+java=25.0.4-tem

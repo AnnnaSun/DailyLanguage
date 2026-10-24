@@ -6,17 +6,22 @@
 
 ## 凭据与启动
 
-首次使用时，将 `.env.example` 复制到仓库外的私有文件，填写两个不同的随机密码，文件权限设为 `600`。
-当前本机准备的文件为 `/private/tmp/dailylanguage-r1-identity.env`，没有提交实际密码。
+首次使用时，将本目录的 `.env.example` 复制到仓库外的私有文件，填写两个不同的随机密码，文件权限设为 `600`。
+例如在 Mac / WSL 中保存在 `$HOME/.config/dailylanguage/identity.env`，父目录按需创建。
+已有环境应直接使用原来的凭据文件，不因路径示例变化覆盖、重置密码或迁移数据。
+临时目录中的文件不应作为凭据的唯一长期备份；本次文档更新不创建、移动或读取实际凭据。
 后续继续使用同一文件：PostgreSQL 初始化 SQL 只对空的新卷执行，修改文件不会自动修改已有账号密码。
 文件丢失时先恢复凭据或明确处理账号，不默认删除卷、清库或重新初始化。
 
-在仓库根目录执行：
+在仓库根目录，先按根 README 选择 JDK，再将 `IDENTITY_ENV_FILE` 设为本机实际私有文件路径。
+下面的示例适用于 Mac / WSL 的 Bash / Zsh；每个新终端都需重新设置路径并加载变量：
 
-```sh
-docker compose --env-file /private/tmp/dailylanguage-r1-identity.env -f deploy/local/identity/compose.yaml up -d --wait
+```bash
+IDENTITY_ENV_FILE="$HOME/.config/dailylanguage/identity.env"
+chmod 600 "$IDENTITY_ENV_FILE"
+docker compose --env-file "$IDENTITY_ENV_FILE" -f deploy/local/identity/compose.yaml up -d --wait
 set -a
-source /private/tmp/dailylanguage-r1-identity.env
+source "$IDENTITY_ENV_FILE"
 set +a
 ```
 
@@ -30,13 +35,13 @@ set +a
 骨架 HTTP、Flyway、SQL 映射和账号边界：
 
 ```sh
-mvn -q test -pl services/identity -am -Dtest=IdentityBoundaryHttpTests,IdentityMapperIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
+./mvnw -q test -pl services/identity -am -Dtest=IdentityBoundaryHttpTests,IdentityMapperIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 用户完成事务方法后运行真正的账户行为验收：
 
 ```sh
-mvn -q test -pl services/identity -am -Dtest=LocalAccountPersistenceIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
+./mvnw -q test -pl services/identity -am -Dtest=LocalAccountPersistenceIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 后者包含正常提交、并发重复邮箱，以及凭据 / 默认授权写入失败时的整笔回滚。
@@ -49,7 +54,7 @@ Mapper 样本随测试事务回滚；未来账户行为测试提交的合成账�
 ## 手动启动
 
 ```sh
-mvn -q package -pl services/identity -am -DskipTests
+./mvnw -q package -pl services/identity -am -DskipTests
 java -jar services/identity/target/identity-service-0.0.1-SNAPSHOT.jar
 ```
 
@@ -64,7 +69,7 @@ java -jar services/identity/target/identity-service-0.0.1-SNAPSHOT.jar
 先加载上述环境并执行当前版本的 18 项集中测试和打包：
 
 ```sh
-mvn -q package -o -pl services/identity -am -Dtest=IdentityBoundaryHttpTests,IdentityMapperIntegrationTests,LocalAccountPersistenceIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
+./mvnw -q package -o -pl services/identity -am -Dtest=IdentityBoundaryHttpTests,IdentityMapperIntegrationTests,LocalAccountPersistenceIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 这些测试通过 production bean 提交合成账户。使用 `identity_app` 执行下面的只读 SQL，
