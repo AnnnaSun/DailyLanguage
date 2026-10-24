@@ -1,6 +1,15 @@
-# R1 Identity — 首个 slice 合同与 Human Core
+# R1 Identity — Slice 合同与 Human Core
 
-## 决定与当前 Gate
+## 当前 Gate
+
+- Date: 2026-10-22
+- Current Slice: R1-B — Identity 内部的受限密码散列与校验。
+- Gate: HUMAN_CORE_READY；用户已接受 slice、新增 `bcprov-jdk18on:1.86`，并选择实现并发控制方法。
+- R1-A 已提交 `9b3ef1a`；记录同步已提交 `2dda5de`，本 slice 从 `architecture/microservices-migration` / `2dda5de` 开始。
+- 密码组件、配置和测试已准备；真实并发方法保留明确失败的占位，等待用户实现。详细合同见下方 R1-B。
+- 不自动 commit / push，不提高 Ownership，不开始下一 slice。
+
+## R1-A 决定与交付记录
 
 - Date: 2026-10-21
 - Slice: R1-A — 独立 Identity 账户原子持久化，包含默认 Language 授权。
@@ -135,4 +144,77 @@ NOT_RUN / 尚未证明：真实密码 policy / Argon2 验证、完整注册 HTTP
 Dubbo 原版兼容、Cloud runtime、SAA、旧业务回归、前端、生产部署、数据库故障恢复、提交确认丢失及外层事务传播场景。
 
 Acceptance: PASS（仅 R1-A 本地内部账户持久化）。[已实现事务 Flow](../flow/identity-account-persistence.md) 已按当前 source / tests 核对。
-当前 R1-A 已本地提交；单一 Next Action 为等待用户启动 R1 下一 slice 的设计与合同确认，不自动开始后续实现，不提高 Ownership。
+R1-A 已本地提交；当前 Gate 与 Next Action 以上方当前 slice 和下方 R1-B 合同为准，不提高 Ownership。
+
+## R1-B — 受限密码散列与校验
+
+### 已批准目标与边界
+
+2026-10-22 用户接受本 slice、新增 Bouncy Castle 依赖，并选择实现并发控制方法；任务等级 A — Critical。
+Identity 在内部提供 `hash(CharSequence)` 与 `matches(CharSequence, String)`，不开放 HTTP / RPC 注册或登录入口。
+采用 concrete 组件组合；并发组件负责进程资源生命周期，异常类型区分容量不足与密码不匹配，不增加通用认证框架或共享实现模块。
+
+- 参数沿用现有实现：`{argon2id-v1}`、Argon2id v19、memory 19456 KiB、iterations 2、parallelism 1、salt 16 bytes、hash 32 bytes。
+- 每次散列使用随机 salt；原始密码不 trim、不改大小写，邮箱 / 密码 policy 由后续注册合同处理。
+- 散列和校验共用一个进程级限额。配置 `app.security.password-hashing.max-concurrent`，环境变量 `IDENTITY_PASSWORD_HASH_MAX_CONCURRENT`，本地默认 1；非正数或非整数配置启动失败。
+- 满额时立即拒绝，不等待、不排队；返回 false / null 或抛异常时也须归还本次已经取得的名额，被拒绝调用不得归还他人的名额。
+- `matches` 对 null 密码、未知格式、非法 Base64 或非固定参数返回 false，且不执行 Argon2；容量不足传播专用异常，不伪装为密码不匹配。
+- 组件不访问数据库、不启事务、不输出密码或 verifier；真实 verifier 与 R1-A 的组合只通过隔离集成测试验证，不新增账户 API 或 schema。
+
+依赖只增加在 Identity POM：`org.bouncycastle:bcprov-jdk18on:1.86`。Java 25 / Boot 4.1.1 / Cloud 2025.1.3 基线不变；
+旧 server 的 `1.85.2` 不修改，不恢复 C31 工程或补丁，不更换框架或引入 fork。
+本次实际密码测试使用 Security Crypto 7.1.1 与 Bouncy Castle 1.86；不据此外推完整生产组合兼容。
+
+Non-scope：完整注册、邮箱 / 密码 policy、blocklist、账户查找、密码升级、未知账号防枚举流程、Session / Redis、
+HTTP / RPC 放行、Nacos / mTLS、跨服务授权、旧数据迁移、旧 server / 前端 / S11 修改及生产部署。
+进程限额不等于集群限流或生产容量结论；本 slice 不添加自动重试或新的事务边界。
+
+### 文件与调用链
+
+新增 production Java 位于 `services/identity/src/main/java/com/dailylanguage/identity/credential/`：
+
+| 文件 | 作者与职责 |
+|---|---|
+| LocalPasswordHasher.java | Codex；固定参数的真实散列 / 校验，以及执行前的 verifier 格式检查 |
+| PasswordHashConcurrencyGate.java | Codex 准备构造器与注释；用户实现 `runWithAvailableSlot` |
+| PasswordHashCapacityExceededException.java | Codex；表达暂时容量不足，不包含敏感输入 |
+
+另修改 Identity POM 和 application.yml，新增 LocalPasswordHasherTests、PasswordHashConcurrencyGateTests、
+IdentityPasswordHashingIntegrationTests；文档仅同步本合同与 PROJECT_STATUS。
+当前 3 个 production Java 文件共 129 行，POM / 配置新增 11 行；用户核心方法完成后预计仍在 250 行预算内。
+
+真实目标调用链：`hash / matches` → 共享 `runWithAvailableSlot` → Spring Security PasswordEncoder → Bouncy Castle Argon2。
+数据库组合测试先生成 verifier，再调用已有 `createAccountWithLanguageAccess`；该方法及四条 SQL 不修改。
+
+### Human Core 与分工
+
+入口：[PasswordHashConcurrencyGate.runWithAvailableSlot](../../services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGate.java)。
+用户只实现该方法的并发控制并移除占位异常；保留已有 null 检查、构造器和配置边界，不需要修改密码算法或其他生产文件。
+
+验收条件：仅成功取得名额后执行 Supplier；满额立即抛 PasswordHashCapacityExceededException；结果原样返回，
+异常原样传播；所有已取得名额在执行结束后归还一次，未取得名额不能归还；不记录敏感内容。
+Codex 负责其余实现、Java 测试、隔离 PostgreSQL 验证与必要环境准备，不安排用户编写 Python 验证脚本。
+Learning Focus：Semaphore 的容量与资源归还；原始密码、随机 salt、verifier 的边界。
+求助先给定位 / 思路或伪代码，只有用户明确转交后才完整实现，不将测试替身记作用户核心方法的实现。
+
+### Verification — 2026-10-22 骨架阶段
+
+| 范围 | 实际结果与证明边界 |
+|---|---|
+| LocalPasswordHasherTests | 17/17 PASS；真实 Argon2 往返、随机 salt、密码原样处理、非法格式 / 参数拒绝和异常传播。容量组件使用直接执行操作的 mock，不证明真实并发控制 |
+| IdentityBoundaryHttpTests | 9/9 PASS；保持已有健康检查 / 拒绝入口 / 无 Session 的 HTTP 骨架边界；该测试不启动真实数据库或完整 Identity 组件扫描 |
+| PasswordHashConcurrencyGateTests | 12 项中 7 PASS、4 failures、1 error；配置 / null 防御通过，其余为 Human Core 占位导致的预期 RED，包含操作未执行造成的 latch 超时；不能算容量行为通过 |
+| 集中命令 | 下述 Maven test 实际退出码 1，共 38 项、33 PASS、4 failures、1 error、0 skipped；不是整体验收 PASS |
+| PostgreSQL / wider regression | 新真实 verifier 持久化集成测试已编译，未运行；R1-A 的 Mapper / 事务数据库回归本轮未运行，待用户核心实现后由 Codex 验证 |
+
+```sh
+mvn -q test -o -pl services/identity -am -Dtest=LocalPasswordHasherTests,IdentityBoundaryHttpTests,PasswordHashConcurrencyGateTests -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+实际日志为忽略的 `services/identity/target/r1b-scaffold-verification.log`，报告在同一模块的 `target/surefire-reports/`，
+骨架 source 摘要为 `target/r1b-scaffold-source.sha256`。旧 R1-A 的 18/18 是 2026-10-21 已提交候选的历史证据，不替代 R1-B 实际回归。
+候选一致性风险：准备期间多次观察到 Identity POM 的新增依赖声明消失；用户确认非主动删除并授权补回。
+期间未运行 Maven 的 55 秒观察未复现变化，后续仍观察到声明消失；写入来源 UNKNOWN，不能归因于 Maven 或 IDE。
+声明已按批准合同补回，最终交接前核对骨架 source 摘要；下一次验收仍须先复核 POM 与源码，不将短时稳定当成根因已解决。
+尚未通过：真实并发容量验收（Human Core 待实现）。NOT_RUN：真实 verifier 数据库往返、R1-B 独立 package / 完整服务启动、性能与生产容量、注册 / 登录 / Session 和跨服务验证。
+Acceptance: NOT_COMPLETE。单一 Next Action：用户实现 Human Core，随后 Codex Review 与定向验证；当前停在 HUMAN_CORE_READY。
