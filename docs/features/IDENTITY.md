@@ -4,9 +4,9 @@
 
 - Date: 2026-10-24
 - Current Slice: R1-B — Identity 内部的受限密码散列与校验。
-- Gate: REVIEW_PENDING；用户已提示后实现并发控制方法，补回 `bcprov-jdk18on:1.86` 后定向测试 38/38 PASS。
+- Gate: COMPLETE / COMMITTED；R1-B 代码已由用户提交 `3f0d36f`，工程验收 PASS，本 slice 的关键调用链 / 失败路径 Ownership Check 已完成。
 - R1-A 已提交 `9b3ef1a`；记录同步已提交 `2dda5de`，本 slice 从 `architecture/microservices-migration` / `2dda5de` 开始。
-- Human Core 逻辑 Review 无阻塞问题；数据库组合验证、整体 Review 与用户 Ownership 待完成。详细合同见下方 R1-B。
+- Human Core 与 slice 自查无阻塞问题；先前定向测试 38/38、本次数据库组合及回归 10/10 PASS，package 与独立 JAR 健康检查通过。详细合同见下方 R1-B。
 - 不自动 commit / push，不提高 Ownership，不开始下一 slice。
 
 ## R1-A 决定与交付记录
@@ -227,4 +227,34 @@ mvn -q test -o -pl services/identity -am -Dtest=LocalPasswordHasherTests,Identit
 - 默认权限首次重跑在 Mockito attach 时遇 Windows 管道访问拒绝，已终止；上述 PASS 来自获准的正常权限环境重跑。报告位于 `services/identity/target/surefire-reports/`。
 - 证明范围：真实 Argon2 往返、真实并发拒绝与名额归还、配置校验、既有 HTTP 边界。NOT_RUN：数据库组合与 R1-A 数据库回归、独立 package / 完整服务启动、生产容量、注册 / 登录 / Session 和跨服务验证。
 
-Acceptance: NOT_COMPLETE。当前 REVIEW_PENDING；单一 Next Action：继续隔离 PostgreSQL 组合验证及受影响的 R1-A 数据库回归，随后整体 Review；不自动 commit 或开始下一 slice。
+该批次结束时尚待数据库验证；当前结论以下方剩余验收记录为准。
+
+### Verification — 2026-10-24 剩余验收与整体自查
+
+- Candidate：用户已提交 `3f0d36ffda52c9ea051d1bedfffd7192142b2137`，验收前工作区干净；本轮未修改 production / test source 或依赖。
+- FRESH：新建一次性 PostgreSQL 18.6（官方 `postgres:18`，镜像 digest `sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6`），独立随机凭据、仅绑定 loopback、tmpfs 存储，初始化后核对隔离标识；应用使用无集群管理权限的 `identity_app`，没有连接旧业务数据库。
+- 空 schema Flyway V1 成功；显式启用 `IDENTITY_DATABASE_TESTS=true`，执行以下命令，实际 package 退出码 0。
+
+```powershell
+.\mvnw.cmd -q -pl services/identity -am package '-Dtest=IdentityPasswordHashingIntegrationTests,IdentityMapperIntegrationTests,LocalAccountPersistenceIntegrationTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- IdentityPasswordHashingIntegrationTests 1/1 PASS：真实 Argon2 verifier 经已有账户事务保存、读回，相同密码匹配、不同密码拒绝。
+- IdentityMapperIntegrationTests 5/5、LocalAccountPersistenceIntegrationTests 4/4 PASS：schema / 账号边界、UUIDv7、四表写入、重复邮箱并发与凭据 / 默认授权失败回滚。合计 10/10，0 failures / errors / skipped。
+- 独立 JVM 启动本次生成的 JAR，`/actuator/health` 返回 UP；本次没有重做两次 JVM 启动的逐行摘要比较，不替代 R1-A 的历史证据。
+- 验证后停止本次 JVM，停止并自动移除本次数据库容器及 tmpfs 合成数据；未删除现有卷或业务数据。
+- 运行摘要为忽略的 `services/identity/target/r1b-final-verification-summary.json`，Maven 日志为同目录 `r1b-database-package-verification.log`，测试报告在 `surefire-reports/`；没有持久保存本次临时密码。
+- 整体自查基于 `2dda5de..3f0d36f` 的 Identity Diff、当前 source / tests 与上述证据：Scope MATCH，未发现 blocking finding；依赖已获批准，无新增 API、schema 或账户事务边界变化。Codex 对自己所写部分的检查属于自查，不记作独立作者 Review。
+- Behavior Flow：[内部密码处理](../flow/identity-password-hashing.md) CURRENT；保持内部组件与组合测试边界，不把未来注册流程写为已实现。
+
+Engineering Acceptance: PASS（仅获批 R1-B 范围）。Code State: COMMITTED `3f0d36f`。
+Current Gate: COMPLETE / COMMITTED；本 slice 的 Ownership Check 结论及范围见下方讨论证据，不自动提高模块整体掌握等级。
+单一 Next Action：进入下一 Identity slice 的 Design / Scope，明确目标、边界与 Human Core 分工后由用户决定；不自动实现下一 slice 或提交本轮文档。
+NOT_RUN / 不证明：生产性能与容量、完整注册 / 登录 / Session、跨服务授权、生产部署与数据库故障恢复。
+
+### User Review / Ownership — 2026-10-24
+
+- 已结合真实代码导读 `hash → runWithAvailableSlot → Argon2 → 归还名额 → createAccountWithLanguageAccess`，明确当前持久化组合由 integration test 调用，尚无公开注册入口。
+- 用户独立解释失败路径：“已取得的名额会 release；数据库不会留下半成品，因为 verifier 生成成功之后才会写数据库，没生成成功会直接 throw。”该回答正确追踪了资源归还、调用顺序和异常阻断；Codex 补充区分后续 SQL 写入失败时由账户事务回滚。
+- Understanding: UNDERSTOOD（限定本次容量生命周期、散列前置与账户写入失败边界）。Human Core 仍记为提示后实现；不据此宣称独立实现、密码学全面掌握或 Identity 模块整体 Ownership PASS。
+- 决策复盘：既有合同选择进程共享容量、满额立即拒绝、散列在事务前完成；代价是突发请求可能被拒绝，本进程限额不能替代集群限流。验证覆盖拒绝 / 归还、真实散列、数据库往返与事务回滚，不证明生产容量。未来根据真实负载评估容量、排队或服务边界时再单独决策，本次不改合同。

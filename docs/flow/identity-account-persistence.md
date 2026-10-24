@@ -10,7 +10,8 @@
 输入为 Identity 内部已规范化邮箱和已编码 password verifier，不是公开注册 HTTP / RPC 接口。
 成功创建账户、LOCAL_EMAIL 身份、密码凭据和 LANGUAGE 准入，返回数据库生成的 userId。
 不接受外部指定 userId / appCode，不创建 PERSONAL_NOTE 授权、管理员资格、Session 或业务数据。
-邮箱 / 密码 policy、Argon2、限流、登录及跨服务会话核验尚未迁移。
+本事务入口不负责邮箱 / 密码 policy、Argon2、限流、登录或跨服务会话核验。
+R1-B 已提供内部密码组件，及先散列再持久化的组合测试，见 [密码处理流程](identity-password-hashing.md)；账户事务本身未改变。
 
 ## 2. Main Call Chain
 
