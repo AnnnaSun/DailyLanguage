@@ -404,3 +404,24 @@ Evidence 决定：
 - 不自动扩大为 Java package、Maven 坐标、服务注册名、数据库或业务应用的一并重命名。
 
 本记录不批准当前执行 GitHub 外部修改、目录移动、代码修改或 commit；具体实施 slice 仍需明确范围。
+
+## IDEA-016 — Preserve PersonalNote requirements for future development
+
+- Status: INBOX
+- Priority: UNASSESSED
+- Target: UNDECIDED
+- Type: FUTURE_PRODUCT
+
+### Context
+
+2026-10-24，用户要求在 DailyLanguage 内保存原 PersonalNote 的想法，便于后续跨设备读取、讨论与更新；旧项目后期可能重做，具体范围尚未决定。需求与边界整理见 [PersonalNote 需求与想法备忘](PERSONAL_NOTE_IDEAS.md)，包含只读 Obsidian 来源、可写 Native Notes、搜索与引用式问答、采集草稿确认、知识复习及恢复验收目标。
+
+本仓库已有平台架构方案及 ADR-0005，不新建第二套架构决定。备忘区分旧单应用选择与后来已确认的平台方向；原项目的 SQLite、无用户系统、独立前端与服务端模型配置不能直接恢复为目标平台合同。
+
+### Follow-up
+
+- 开始 PersonalNote 工作前，结合最新平台决定与本备忘确认复用 / 重做范围，再形成具体 Feature / Slice 合同。
+- 保持原 Vault 只读、Native 确认写入、本人专属准入及 Language / PersonalNote 状态归属边界。
+- 新想法在备忘中注明来源、日期与确认状态；正式决定仍进入相应 Feature / Architecture / ADR，避免多份真相。
+
+本条目只批准保存开发输入，不批准当前重做、搬迁或删除代码，不改变当前 Gate，不执行 commit 或远程写入。
