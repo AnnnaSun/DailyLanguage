@@ -2,11 +2,11 @@
 
 ## 当前 Gate
 
-- Date: 2026-10-22
+- Date: 2026-10-24
 - Current Slice: R1-B — Identity 内部的受限密码散列与校验。
-- Gate: HUMAN_CORE_READY；用户已接受 slice、新增 `bcprov-jdk18on:1.86`，并选择实现并发控制方法。
+- Gate: REVIEW_PENDING；用户已提示后实现并发控制方法，补回 `bcprov-jdk18on:1.86` 后定向测试 38/38 PASS。
 - R1-A 已提交 `9b3ef1a`；记录同步已提交 `2dda5de`，本 slice 从 `architecture/microservices-migration` / `2dda5de` 开始。
-- 密码组件、配置和测试已准备；真实并发方法保留明确失败的占位，等待用户实现。详细合同见下方 R1-B。
+- Human Core 逻辑 Review 无阻塞问题；数据库组合验证、整体 Review 与用户 Ownership 待完成。详细合同见下方 R1-B。
 - 不自动 commit / push，不提高 Ownership，不开始下一 slice。
 
 ## R1-A 决定与交付记录
@@ -216,5 +216,15 @@ mvn -q test -o -pl services/identity -am -Dtest=LocalPasswordHasherTests,Identit
 候选一致性风险：准备期间多次观察到 Identity POM 的新增依赖声明消失；用户确认非主动删除并授权补回。
 期间未运行 Maven 的 55 秒观察未复现变化，后续仍观察到声明消失；写入来源 UNKNOWN，不能归因于 Maven 或 IDE。
 声明已按批准合同补回，最终交接前核对骨架 source 摘要；下一次验收仍须先复核 POM 与源码，不将短时稳定当成根因已解决。
-尚未通过：真实并发容量验收（Human Core 待实现）。NOT_RUN：真实 verifier 数据库往返、R1-B 独立 package / 完整服务启动、性能与生产容量、注册 / 登录 / Session 和跨服务验证。
-Acceptance: NOT_COMPLETE。单一 Next Action：用户实现 Human Core，随后 Codex Review 与定向验证；当前停在 HUMAN_CORE_READY。
+2026-10-22 骨架阶段结论（历史）：真实并发容量未通过，Human Core 待实现，停在 HUMAN_CORE_READY；真实 verifier 数据库往返、R1-B 独立 package / 完整服务启动、性能与生产容量、注册 / 登录 / Session 和跨服务验证均 NOT_RUN。
+
+### Verification — 2026-10-24 Human Core 与依赖修复
+
+- 用户在逐级提示与局部示例后完成 `runWithAvailableSlot`；Codex 基于实际 Diff Review，未发现并发控制阻塞问题。该实现记作提示后实现，不记作独立实现或自动提高 Ownership。最终核对时过期的实现 TODO 已移除。
+- 修复前定向测试实际为 38 项、35 PASS、3 errors、0 skipped，退出码 1；三个错误均为缺少 `org.bouncycastle.crypto.params.Argon2Parameters$Builder`。
+- 用户明确授权修复后，Codex 仅在 Identity POM 补回已批准的 `org.bouncycastle:bcprov-jdk18on:1.86`，未改用户方法。此前依赖声明缺失来源仍 UNKNOWN。
+- FRESH：使用根目录 `mvnw.cmd` 执行同一组 LocalPasswordHasherTests、PasswordHashConcurrencyGateTests、IdentityBoundaryHttpTests；分别 17/17、12/12、9/9，共 38/38 PASS，0 failures / errors / skipped，退出码 0。
+- 默认权限首次重跑在 Mockito attach 时遇 Windows 管道访问拒绝，已终止；上述 PASS 来自获准的正常权限环境重跑。报告位于 `services/identity/target/surefire-reports/`。
+- 证明范围：真实 Argon2 往返、真实并发拒绝与名额归还、配置校验、既有 HTTP 边界。NOT_RUN：数据库组合与 R1-A 数据库回归、独立 package / 完整服务启动、生产容量、注册 / 登录 / Session 和跨服务验证。
+
+Acceptance: NOT_COMPLETE。当前 REVIEW_PENDING；单一 Next Action：继续隔离 PostgreSQL 组合验证及受影响的 R1-A 数据库回归，随后整体 Review；不自动 commit 或开始下一 slice。

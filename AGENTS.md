@@ -48,11 +48,11 @@ Persistent Learner Model → Planner → Practice → Evaluator → Learning Mem
 ## 3. Task Entry / 接手与按需读取
 
 每次接手按顺序：
-本文件 → [CURRENT_HANDOFF](docs/planning/CURRENT_HANDOFF.md) →
-[PROJECT_STATUS](docs/planning/PROJECT_STATUS.md) → 当前已批准 Phase / Feature / Slice 的相关章节。
+本文件 → [PROJECT_STATUS](docs/planning/PROJECT_STATUS.md) →
+当前已批准 Phase / Feature / Slice 的相关章节。
 
-修改前核对 branch、HEAD、status 和相关 Diff；快照与 Git、source、tests 或正式决定冲突时，
-标记 stale / UNKNOWN，在受影响范围内停止修改。快照不是 Scope authority 或 concurrency lock。
+修改前核对 branch、HEAD、status 和相关 Diff；进度记录与 Git、source、tests 或正式决定冲突时，
+标记 stale / UNKNOWN，在受影响范围内停止修改。进度记录不是 Scope authority 或 concurrency lock。
 
 先找标题、symbol、关键词，再读入口、直接依赖和相关测试；不默认加载整个文档目录。
 按下表读取详细合同的相关章节，不要求每个任务通读整个合同；已选择的 Skill 仍须完整读取。
@@ -168,21 +168,14 @@ User Implementation + Graduated Assistance (if selected) → Codex Implementatio
 只同步真实受影响的计划 / 产品 / Architecture / ADR；最终正式决定不能只留在 Backlog。
 TECH_DEBT 指当前存在的已知不足或取舍；Future Idea 不等于当前缺陷，二者不可混写。
 
-## 7. CURRENT_HANDOFF / 条件维护
+## 7. 进度同步与恢复
 
-快照用于跨 session 恢复，不再代表双 Agent 开发交接；历史作者与验证保留为历史事实。
-仅用户明确要求创建 / 刷新，或 Codex 准备停止且可确认自己的剩余额度严格低于 10% 时更新。
-普通 Stop Point、commit、Scope Decision、测试结果与 Worktree 变化不自动触发更新；
-不从 Context 长度、时间或 token 用量猜额度，须 host usage signal、用户 /status / dashboard 或明确说明。
+使用 [PROJECT_STATUS](docs/planning/PROJECT_STATUS.md) 同步当前 Phase / Slice、Gate、Stop Point、
+验证摘要、Blocker 与单一 Next Action；详细 Scope、Decision、Human Core 分工与验收证据保留在对应 Feature / Phase 文档。
+不再维护独立 CURRENT_HANDOFF 快照，避免多个当前状态入口漂移。
 
-更新是离开前最后一项 documentation action；随后有代码、文档、验证或 commit 变化须再次同步。
-突然耗尽且无法更新时，接手者根据 Git / 正式文档重建，标 Handoff State: RECOVERED，
-不能确认的意图 / 验证 / Ownership 标 UNKNOWN。快照维护不授权自动 commit。
-
-必填：Updated At / By、State / Reason、Branch / HEAD / Worktree、Phase / Slice / Gate / Stop Point、
-Approved Scope / Non-scope、Completed Work、fresh / prior / NOT_RUN Verification、
-本 Slice 与接手前未提交工作、Decisions / Blockers / Risks / UNKNOWN、单一 Next Action、用户待决事项。
-原地更新，不写累积日志；禁止 Secret、完整私密 Prompt / Conversation 与未脱敏用户数据。
+获批决定、实现或验证使当前进度变化时，同步真正受影响的记录；不把历史验证描述为 fresh，
+不能确认的意图、验证与 Ownership 标 UNKNOWN。恢复时仍须核对 Git 与源码，文档同步不授权自动 commit。
 
 ## Final Rule
 

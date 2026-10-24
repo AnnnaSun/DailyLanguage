@@ -1,8 +1,8 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-10-22 — R1-A 已提交；R1-B 合同获批、骨架与测试准备完成，当前 HUMAN_CORE_READY，等待用户实现并发控制方法。
+> Last updated: 2026-10-24 — R1-B Human Core 提示后实现，补回 Bouncy Castle 依赖后定向测试 38/38 PASS；当前 REVIEW_PENDING，数据库组合验证与整体验收待完成。旧 CURRENT_HANDOFF 已删除。
 > 当前状态入口；详细合同在 Feature / Phase / ADR，早期历史见 [历史快照](history/PROJECT_STATUS_2026-10-10.md)。
-> R1-A Human Core 为用户提示后实现；R1-B 核心方法仍为占位。密码组件与 HTTP 定向测试通过，不代表真实并发或整体验收通过。
+> R1-A / R1-B Human Core 均为用户提示后实现；R1-B 真实并发、密码组件与 HTTP 定向测试通过，不代表数据库组合或整体验收通过。
 
 ## Current Gate
 
@@ -10,15 +10,15 @@
 |---|---|
 | Product Phase | M1 — Minimum Text Practice Loop；尚未达到 S11 / S12 exit |
 | S11 | PARTIAL；A observation API、B 最小认证 UX 已实现、用户 Review 接受并提交；其余 UI 未实现 |
-| Current work | R1-B / HUMAN_CORE_READY — 受限密码散列与校验；密码组件、配置和测试已准备，用户实现并发控制方法后再验收；R1-A 保持 COMMITTED `9b3ef1a` |
+| Current work | R1-B / REVIEW_PENDING — Human Core 提示后实现，逻辑 Review 无阻塞问题；缺失依赖已补回，定向测试 38/38 PASS，数据库组合验证与整体 Review 尚未完成；R1-A 保持 COMMITTED `9b3ef1a` |
 | C31 | PRIOR PATCHED_C31_PASS；一次性工程、临时补丁与运行产物已按用户要求删除；不证明官方原版兼容或 Identity 行为 |
-| Git baseline | `architecture/microservices-migration` / `2dda5de`（R1-A 记录同步）；R1-A 实现提交 `9b3ef1a`；本 slice 开始工作区干净，当前 R1-B 未提交修改以 Git 为准 |
+| Git baseline | 2026-10-24 恢复核对：`architecture/microservices-migration` / `d4d127c`；R1-B 骨架已提交 `a46fa1a`，后续为规划记录与跨平台 / Maven Wrapper 配置；本次文档调整前工作区干净，当前修改以 Git 为准 |
 | Main baseline | 迁移启动时核对的本地 main、origin/main 与远端 main 均为 `f5a729a`，即 PR #28 合并提交；本次未重新查询远端 |
 | Current scope | 用户已批准 R1-B 和 Identity 新增 bcprov-jdk18on:1.86，选择实现 runWithAvailableSlot；不开放注册 / 登录入口，不更改既有账户事务 |
-| Next Action | 用户实现 [并发控制方法](../../services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGate.java)，随后 Codex Review / 验证；合同见 [Identity R1-B](../features/IDENTITY.md#r1-b--受限密码散列与校验) |
+| Next Action | 继续 R1-B 隔离 PostgreSQL 组合验证及受影响的 R1-A 数据库回归，随后整体 Review；合同见 [Identity R1-B](../features/IDENTITY.md#r1-b--受限密码散列与校验) |
 
-旧 PROJECT_STATUS 的 S10 READY_TO_COMMIT 与旧 CURRENT_HANDOFF 的 S9 Gate 已失效；不据此重开已完成的 Review。
-CURRENT_HANDOFF 本轮未自动刷新，仍为旧 S9 快照；当前迁移入口为 [Identity R1-A](../features/IDENTITY.md)。
+旧 PROJECT_STATUS 的 S10 READY_TO_COMMIT 与已删除交接快照的 S9 Gate 均为历史状态，不据此重开已完成的 Review。
+当前迁移入口为 [Identity R1-B](../features/IDENTITY.md#r1-b--受限密码散列与校验)；恢复顺序为 AGENTS → 本文件 → 当前 Feature / Slice 合同，再核对 Git 与源码。
 S11 恢复入口保留在 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21)。
 
 ## Delivery Summary
@@ -32,7 +32,7 @@ S11 恢复入口保留在 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.
 | M1-S11-B | COMPLETE / COMMITTED `958ac95`；最小 Vue 认证、API client、CSRF ERROR-dispatch 修复；`a486ef7` 另补 Phase Plan，无代码修改 | [M1 Feature §19](../features/M1_MINIMUM_TEXT_PRACTICE.md#19-m1-s11-b-current-slice-contract--implementation)、[Browser Flow](../flow/browser-authentication.md) |
 | S11 剩余 / S12 | Language Profile、task、guided practice、response/support capture、completion、结果与 optional evaluation 的页面闭环尚未实现；后续 slice 合同未批准；S12 未开始 | [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21) |
 | 平台迁移 / R1-A | 首个账户 slice 验收 PASS / COMMITTED `9b3ef1a`；用户在代码导读与 Review 讨论后自主提交，Human Core 为提示后实现；完整 ADR 仍 DESIGN_REVIEW，业务消费者未切换，Ownership 未自动提升 | [Identity R1-A](../features/IDENTITY.md)、[ADR-0005](../adr/0005-unified-learning-platform-microservices.md)、[C31 摘要](../architecture/PLATFORM_ARCHITECTURE_PROPOSAL.md#93-c31-证据摘要与当前边界--2026-10-21) |
-| 平台迁移 / R1-B | SCOPE_APPROVED / HUMAN_CORE_READY；Bouncy Castle 1.86、密码组件与测试已准备；真实并发方法仍未实现，整体验收未完成 | [Identity R1-B](../features/IDENTITY.md#r1-b--受限密码散列与校验) |
+| 平台迁移 / R1-B | REVIEW_PENDING；Human Core 提示后实现；补回 Bouncy Castle 1.86 后定向测试 38/38 PASS；整体验收未完成 | [Identity R1-B](../features/IDENTITY.md#r1-b--受限密码散列与校验) |
 
 S11-A 的 Human Core 曾由用户明确转交 Codex；S11-B / C31 由 Codex 实现。不记作用户 hands-on，
 Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](../ownership/OWNERSHIP_MATRIX.md) 保持既有等级。
@@ -59,7 +59,8 @@ Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](.
 | 2026-10-21 / PRIOR | C31 断言 unit 9/9 PASS；核对 summary、补丁 hash、源码快照与清理记录；97 个本地文档路径可解析、两个新 checkpoint anchor 与 diff whitespace 检查 PASS | 不重新证明真实 RPC / TLS；两个 PersonalNote 引用为本机相邻项目路径，不承诺独立 clone 可用 |
 | 2026-10-21 / PRIOR | 已提交 R1-A 候选 HTTP 9 + Mapper / schema / 账号边界 5 + 用户事务 4，共 18/18 PASS，0 skipped；独立 package PASS；同一 JAR 两个 JVM 启动健康，四表逐行摘要跨启动保持一致 | 验收限定 R1-A 内部账户持久化，不代替 R1-B 验收或注册 / Session / 跨服务验收；完整证据与历史 RED 见 [Identity R1-A](../features/IDENTITY.md#verification) |
 | 2026-10-21 / 记录同步 | 核对用户提交 `9b3ef1a`、23 个文件及同步前干净工作区；仅修改 Status 与 Identity 合同 | 本次未重跑构建或测试；沿用上述有日期的验收证据，不新增运行验证结论 |
-| 2026-10-22 / FRESH | R1-B 密码组件 17/17、HTTP 边界 9/9 PASS；真实并发 / 配置测试 12 项中 7 PASS、4 failures、1 error，均无 skipped；集中命令实际退出码 1 | 5 项为 Human Core 占位的预期 RED；密码测试的容量 mock 不证明真实并发。新数据库集成与 R1-A 数据库回归本轮 NOT_RUN；当前不是整体验收 PASS |
+| 2026-10-22 / PRIOR | R1-B 密码组件 17/17、HTTP 边界 9/9 PASS；真实并发 / 配置测试 12 项中 7 PASS、4 failures、1 error，均无 skipped；集中命令实际退出码 1 | 5 项为 Human Core 占位的预期 RED；密码测试的容量 mock 不证明真实并发。新数据库集成与 R1-A 数据库回归本轮 NOT_RUN；当前不是整体验收 PASS |
+| 2026-10-24 / FRESH | R1-B 补回依赖前 38 项中 35 PASS、3 errors，均为缺少 Bouncy Castle 类；补回 `bcprov-jdk18on:1.86` 后密码组件 17/17、真实并发 / 配置 12/12、HTTP 边界 9/9，共 38/38 PASS，0 skipped，退出码 0 | 默认权限下 Mockito attach 遇 Windows 管道访问拒绝，终止后在获准的正常权限环境完成重跑；未改 Human Core。数据库组合、独立 package / 完整服务启动仍 NOT_RUN |
 | 本轮 / NOT_RUN | 完整注册 / 密码验证 / Session、旧 Java / Vue / 浏览器回归、跨服务认证、真实 C31 重跑、live Provider、SAA、K3s / Tekton、生产部署、数据库故障恢复和提交确认丢失 | 应用重启不等于数据库崩溃恢复；不以当前内部持久化或历史结果代替后续业务迁移回归 |
 
 完整 S11 批次、失败与局限见 Feature §18–19；C31 仅保留平台方案 §9.3 的脱敏摘要。
@@ -70,8 +71,8 @@ C31 一次性验证源码及本机诊断日志／构建产物已按用户 2026-1
 
 - S11-A/B 无待补 Review；C31 只保留脱敏历史证据，不要求恢复已删除代码或补丁，也不将它记作用户 hands-on / Ownership PASS。
 - R1-A 内部持久化验收 PASS，用户在代码导读与 Review 讨论后已本地提交 `9b3ef1a`，当前 COMMITTED；不据此提高 Ownership 或自动开始下一 slice。
-- R1-B 当前 HUMAN_CORE_READY，等待用户实现 runWithAvailableSlot；完成后由 Codex Review，再运行真实容量与数据库组合验证。骨架阶段通过项不能替代最终验收。
-- 准备期间 POM 新增依赖声明多次消失，来源 UNKNOWN；已获用户确认补回，交接与下一次验收均复核候选一致性，不将短时稳定当作根因已解决，也不归因于未经确认的 Maven / IDE 行为。
+- R1-B 当前 REVIEW_PENDING；Human Core 提示后实现且逻辑 Review 无阻塞问题，定向验证已通过；数据库组合验证、整体 Review 与用户 Ownership 尚未完成，不自动进入 READY_TO_COMMIT。
+- 2026-10-24 已按用户要求在 Identity POM 补回 `bcprov-jdk18on:1.86`，解决实际复现的 3 项缺类错误；此前声明缺失来源仍 UNKNOWN，未据此确认 Maven / IDE 根因。
 - 平台完整 ADR、跨服务认证／故障、前端迁出与仓库命名仍待后续决策；本轮没有批准这些后续实现。
 - S11 整体 PARTIAL，迁移后重新定义下一 slice；没有 S11 全页面端到端验收或 S12 closeout PASS。
 - S9 process-recovery、model result unknown、长期 qualification / Memory / Mastery、Hosted 容量与 TLS 的既有局限保留。测试不证明真实日语诊断质量、学习有效性或用户新掌握等级。

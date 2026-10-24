@@ -29,7 +29,15 @@ public final class PasswordHashConcurrencyGate {
      */
     <T> T runWithAvailableSlot(Supplier<T> passwordHashOperation) {
         Objects.requireNonNull(passwordHashOperation, "passwordHashOperation must not be null");
-        // TODO R1-B：由用户实现并发控制，并移除下面的占位异常。
-        throw new UnsupportedOperationException("R1-B Human Core 尚未实现");
+        boolean acquired = false;
+        acquired = availablePasswordHashSlots.tryAcquire();
+        if (!acquired) {
+            throw new PasswordHashCapacityExceededException();
+        }
+        try {
+            return passwordHashOperation.get();
+        }finally {
+            availablePasswordHashSlots.release();
+        }
     }
 }
