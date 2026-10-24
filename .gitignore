@@ -43,6 +43,7 @@ docs/**/*.pdf
 
 # Backend
 server/target/
+services/*/target/
 
 # Frontend
 client/node_modules/

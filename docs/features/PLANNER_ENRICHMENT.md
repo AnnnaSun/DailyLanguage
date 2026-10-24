@@ -400,6 +400,8 @@ evidence 作为 fresh result。
 
 ### Zcode execution and handoff requirements
 
+> 以下仅保留 S9A 当时的执行与授权记录。2026-10-24 已删除 CURRENT_HANDOFF，相关读取 / 维护要求不再适用；当前恢复与进度同步遵循 repository AGENTS.md 和 PROJECT_STATUS.md。
+
 1. 开始前按 repository `AGENTS.md` 读取 `docs/planning/CURRENT_HANDOFF.md`，并核对实际 branch、HEAD、
    `git status --short`、本 slice 相关 Diff 与 `PROJECT_STATUS.md`；Git / source / tests 优先于 snapshot；
 2. 保留当前已有 documentation changes，不覆盖、不提交、不把它们混入 Production implementation ownership；

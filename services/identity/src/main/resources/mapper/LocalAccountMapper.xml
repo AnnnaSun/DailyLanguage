@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dailylanguage.identity.account.LocalAccountMapper">
+    <select id="insertUser" resultType="java.util.UUID" affectData="true" flushCache="true">
+        INSERT INTO app_user DEFAULT VALUES RETURNING id
+    </select>
+    <select id="insertLocalEmailIdentity" resultType="java.util.UUID" affectData="true" flushCache="true">
+        INSERT INTO auth_identity (user_id, provider, provider_subject)
+        VALUES (#{userId, jdbcType=OTHER}, 'LOCAL_EMAIL', #{normalizedEmail, jdbcType=VARCHAR})
+        RETURNING id
+    </select>
+    <insert id="insertPasswordCredential">
+        INSERT INTO local_password_credential (auth_identity_id, password_verifier)
+        VALUES (#{identityId, jdbcType=OTHER}, #{encodedPasswordHash, jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertDefaultLanguageAccess">
+        INSERT INTO app_access_grant (user_id, app_code) VALUES (#{userId, jdbcType=OTHER}, 'LANGUAGE')
+    </insert>
+</mapper>
