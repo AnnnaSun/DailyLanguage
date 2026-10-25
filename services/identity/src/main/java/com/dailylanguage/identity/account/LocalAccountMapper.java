@@ -1,13 +1,16 @@
 package com.dailylanguage.identity.account;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-/** 单次 SQL 不承诺完整注册成功，四次写入的原子性由外层账户事务负责。 */
+/** 账户写入与本地凭据读取；四次注册写入的原子性由外层账户事务负责。 */
 @Mapper
 interface LocalAccountMapper {
+
+    Optional<LocalPasswordCredential> findLocalPasswordCredential(@Param("normalizedEmail") String normalizedEmail);
 
     UUID insertUser();
 

@@ -3,12 +3,12 @@
 ## 当前 Gate
 
 - Date: 2026-10-25
-- Current Slice: R1-D — Identity 内部 LOCAL_EMAIL 注册闭环；2026-10-25 用户确认范围并承担 Human Core。
-- Gate: READY_TO_COMMIT；工程验收、Flow 和本 Slice Human Review 已收口，等待用户 Commit Decision。Ownership 结论只限定当前注册编排与错误边界，不提升模块整体等级。R1-C COMPLETE / COMMITTED `1738792`，不重开 Review。
+- Current Slice: R1-E — 内部 LOCAL_EMAIL 凭据认证；2026-10-25 用户同意完整内部闭环与推荐 Human Core 分工。
+- Gate: READY_TO_COMMIT；R1-E 工程验收与整体自查 PASS，认证 Flow CURRENT，用户已接受本 Slice Human Review。Human Core 保持提示 / 局部示例后实现，不提高模块整体 Ownership。R1-D COMPLETE / COMMITTED `c1be36d`，不重新打开。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 当前基线：`migrate/identity` / `e6b8e22fbbe15f6c61e5c131558c35a4cea4951c`（PR #29 合并提交），包含 R1-C `173879256a161093381ff1c2e0110c33be719b8a`；2026-10-25 同步前工作区干净，沿用用户已切换分支。
-- PRIOR（2026-10-24）：R1-C 58/58、package 与 JAR 资源 checksum 验收保留为历史证据；R1-D 同日 65/65 和数据库 9/9 两批验收及 package 见下方记录。本次 Review 收口未重跑测试或构建。
-- 不自动 commit / push，不提高模块整体 Ownership；停在 READY_TO_COMMIT，不自动开始下一 Slice。
+- 当前基线：`migrate/identity` / `c1be36de052b47ba2a08fc67e720548718105432`（注册验证邮箱密码）；2026-10-25 核对提交包含 R1-D 与已授权测试去重 / 文档，提交后的工作区干净。register blob 与已验收候选一致。
+- PRIOR：R1-C 2026-10-24 的 58/58、package 与 JAR 资源 checksum，以及 R1-D 2026-10-25 的 65/65、数据库 9/9 与 package 保留为历史证据；本轮 R1-E fresh 骨架验证见下方记录。
+- 不自动 commit / push，不提高模块整体 Ownership；当前 R1-E READY_TO_COMMIT，等待用户 Commit Decision，不开始下一 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -515,5 +515,129 @@ Service 行为测试应因 Human Core 未完成保持 RED；数据库链、完�
 - 工程复盘：复用既有规则、受限散列与独立账户事务，通过 concrete Service 形成内部闭环；保留具体输入拒绝，同时对底层故障作安全转换。代价是尚无公开入口 / 前端文案映射；未来公开注册与更细错误合同仍需单独 Scope。提交确认丢失仍可能 UNKNOWN，不引入自动重试。
 - 本次仅核对 Git 与 register blob b498eb26134012e91fb715c1443f7fd43eace94a，和已验收候选一致；沿用同日 65/65 与数据库 9/9 两批 PASS、package 与 Flow 证据，未新增测试或重跑验证，未修改 production。
 
-Human Review: COMPLETE（仅 R1-D）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
-Next Action：由用户决定提交当前 R1-D 及已授权测试去重 / 文档改动；Codex 不自动 commit、push 或开始下一 Slice。
+Human Review: COMPLETE（仅 R1-D）。R1-D Gate: COMPLETE / COMMITTED `c1be36d`。
+2026-10-25 提交状态同步：用户已提交 c1be36de052b47ba2a08fc67e720548718105432；register blob 仍为 b498eb26134012e91fb715c1443f7fd43eace94a，未重开 Review 或重跑测试。
+Next Action：下一 Identity Slice 的 Design / Scope 建议见当前对话，等待用户决定范围与分工；本次不自动实现、commit 或 push。
+
+## R1-E — 内部 LOCAL_EMAIL 凭据认证
+
+### 已批准目标、方案与边界
+
+2026-10-25 用户回复“同意”，采纳推荐的完整内部认证闭环和用户承担 Human Core 分工；等级 A — Critical。
+当前 R1-A–D 已提供账户事务、受限 hasher、注册 policy 和内部注册，但 Identity 尚无凭据认证入口。
+沿用 Spring AuthenticationProvider 生命周期，直接组合现有 Mapper 与 hasher；相比只增加凭据读取，完整闭环可验证身份产生条件与失败边界，代价是新增认证安全逻辑与 Review。
+不增加 Repository 包装层、Service Interface、公共认证 module 或新 dependency。
+
+目标链：authenticate → 邮箱规范化 → Mapper 只读 LOCAL_EMAIL credential → 真实 / dummy verifier 受限校验
+→ 安全拒绝或只含 userId 的 AuthenticatedAccount → finally 清除请求 token 的 credentials。
+
+- 有效邮箱复用 LocalEmailNormalizer；未知账户、非法邮箱与错误密码统一 BadCredentialsException / Invalid credentials。
+- 未知账户 / 非法邮箱仍执行合法 dummy verifier 校验，即使匹配也不能返回身份；dummy 在组件创建时经现有 hasher.hash 生成一次，初始化失败拒绝创建组件，不落库。
+- 原始有效密码不 trim、不改写，登录不调用注册 policy / blocklist；非 CharSequence credentials 按空字符串验证。
+- 规范化输入拒绝与 Mapper 查询故障分开捕获，Mapper 的 IllegalArgumentException 也归 authentication unavailable。
+- Mapper / hasher 故障转换为 AuthenticationServiceException / Local authentication unavailable；日志仅 stage 与 exception type，不附带原始 cause。密码校验容量不足直接 unavailable，不记 ERROR；dummy 初始化失败记录安全阶段并拒绝创建组件。
+- 成功 token 的 principal 仅 userId、credentials 为 null、authorities 为空；finally 在成功 / 失败时清除原始请求 token 的密码引用，不声称擦除 JVM 中的 String。
+- 只读取 auth_identity 与 local_password_credential；不读写 app_access_grant。当前 app_user 无停用状态，本 Slice 不引入账号启停；凭据认证成功不表示应用准入。
+
+Architecture / Security Impact：增加内部认证边界与 identity principal，需 A 类 Review；沿用既有框架、package、密码参数与共享容量。
+无 schema、对外 API、事务、cache、应用授权机制或 dependency 改变。
+Non-scope：HTTP 登录 / 注册、Session / Redis、Rate Limit、Gateway、Dubbo / Nacos / mTLS、业务消费者、前端、账号启停、恢复授权、schema / dependency 升级及旧 server 修改。
+
+### 文件与代码预算
+
+Production 共 5 文件：account 下新增 LocalPasswordAuthenticationProvider.java、LocalPasswordCredential.java、AuthenticatedAccount.java；
+扩展 LocalAccountMapper.java 与 resources/mapper/LocalAccountMapper.xml，只增加凭据 SELECT 和构造器结果映射。
+credential 仅内部可见，toString 脱敏；principal 不持有邮箱、密码或 verifier。
+原预计 production 180–230 行；骨架约 160 行，工程验收候选约 173 行。用户在 Review 时删除 3 行已完成的骨架说明并留空行，当前新增 / 实质修改约 171 行（3 个新增文件 155 行，Mapper Java / XML 约 16 行），仍在预算内。
+
+测试只新增 LocalPasswordAuthenticationProviderTests.java（177 行），扩展既有 IdentityPasswordHashingIntegrationTests.java（35 行），合计约 212 行。
+新文件验证此前没有的 Provider 认证行为与安全失败合同；复用现有 Mockito / OutputCapture / 数据库 fixture，不新增测试工具、基类、依赖或测试工厂。
+注册 → Mapper 读取 → 真实认证 → 已撤销应用准入不恢复的组合证据放在现有数据库测试中，不复制账户事务 / 并发测试。
+文档只同步本合同与 PROJECT_STATUS；核心段和真实链完成后再按 Flow 规则补认证行为，不将骨架写成已实现 Flow。
+
+### Human Core、分工与验收
+
+- 用户：LocalPasswordAuthenticationProvider.authenticate 内 try 块中，lookupCredential 之后的核心判定，预计 15–25 行；替换明确的 UnsupportedOperationException 占位。
+- 已提供：storedCredential、submittedPassword、unknownAccountPasswordVerifier、verifySubmittedPassword、INVALID_CREDENTIALS；finally 清除密码由 Codex 完成。
+- 核心行为：选择真实 / dummy verifier，调用受限校验；账户存在且匹配才允许返回身份，其余统一凭据拒绝。
+- 成功结果使用 Spring UsernamePasswordAuthenticationToken，principal 为 AuthenticatedAccount(userId)，credentials 为 null，authorities 为空。
+- Codex：Mapper / XML、两个数据类型、dummy 初始化、输入 / 故障转换 helper、框架衔接、finally 清理、日志、Unit / Integration Tests 与后续获准验证。
+- Learning Focus：凭据认证与应用授权的边界；dummy 校验结果与账户存在性是两个独立判断。
+- User Review 入口：authenticate 核心分支、lookupCredential 的两个 catch 范围、verifySubmittedPassword 的故障分类，以及真实数据库组合。
+
+Acceptance Criteria：真实存在账户且密码匹配才产生身份；未知 / 非法邮箱执行 dummy 但不能认证；有效密码原样传递；基础设施故障不伪装为错误凭据；成功 / 失败均清除请求 token 密码；异常与日志不泄露敏感材料；认证不恢复应用准入。
+骨架阶段 Human Core 留给用户，Codex 未提供完整替换答案；用户后续实现与修正见下方增量 Review 记录，不据此自动标记整体 Ownership 已完成。
+
+### Verification — 2026-10-25 骨架阶段
+
+- FRESH：根目录 mvnw.cmd 离线 test-compile 退出码 0，全部测试源码（含数据库组合）编译成功。
+- FRESH：既有 normalizer 8、Service 11、policy 7、blocklist 8、hasher 14、capacity 8、HTTP 9，共 65/65 PASS；新 Provider 11 项中 5 PASS、5 failures、1 error，六项 RED 均包含核心判定占位异常。总计 76 项、70 PASS、0 skipped，实际退出码 1，不是 Slice 验收 PASS。
+- 默认权限首轮停在 Mockito 自附加阶段且无行为结果，已终止；上述结果来自获准的正常 Windows 权限重跑，未修改 POM / agent 配置。diff whitespace 检查 PASS。
+- PostgreSQL / Flyway / 真实 Mapper 映射 / 完整组件初始化与注册认证组合、package / 独立 JAR、公开登录 / Session、旧 server / browser / 跨服务本轮 NOT_RUN。
+- R1-D 65/65 与数据库 9/9 为 PRIOR，不代替 R1-E 证据。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am test '-Dtest=LocalPasswordAuthenticationProviderTests,LocalEmailNormalizerTests,LocalRegistrationServiceTests,LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+报告入口：services/identity/target/surefire-reports/；本轮测试输出为 services/identity/target/r1e-scaffold-tests.log。
+骨架自查仅确认 Scope、只读 SQL、catch 范围、脱敏和密码清理结构；dummy / 密码校验 helper 的完整调用、实际身份成功条件与真实数据库结果待核心段完成后验证，不代替用户 Review。
+
+Current Gate: HUMAN_CORE_READY。Next Action：用户实现 authenticate 核心判定后，进行增量 Review 与受影响验证。
+
+### Human Core 增量 Review — 2026-10-25
+
+- 用户在 verifier 选择提示与成功 token 局部示例后完成核心段；Human Core 记录为提示 / 局部示例后实现，不记为独立实现。Codex 未修改用户 production 或测试。
+- Scope MATCH；成功条件同时检查密码匹配与账户存在，成功 principal 只持有 userId，credentials 为 null、authorities 为空，finally 清除原始请求密码。
+- Blocking finding：authenticate 的凭据拒绝分支使用 AuthenticationServiceException(INVALID_CREDENTIALS)，不符合已批准的 BadCredentialsException 合同；会把错误密码 / 未知账户 / 非法邮箱归入服务故障类型。交回用户修正该分支及 import，基础设施故障 helper 保持原分类。
+- FRESH：仅运行 LocalPasswordAuthenticationProviderTests，11 项中 8 PASS、3 failures、0 errors / skipped，退出码 1；三项失败均为预期 BadCredentialsException、实际 AuthenticationServiceException。成功 token、Mapper 故障、hasher 故障 / 容量、初始化失败及脱敏等本类其余测试通过；mock 不证明真实数据库组合。
+- 命令：根目录 mvnw.cmd -q -o -pl services/identity -am test '-Dtest=LocalPasswordAuthenticationProviderTests' '-Dsurefire.failIfNoSpecifiedTests=false'，沿用获准正常 Windows 权限。输出：services/identity/target/r1e-human-core-review.log；diff whitespace PASS。
+- 本批 wider regression / PostgreSQL / package / 完整服务 / Flow 未执行或补齐；骨架批次 65/65 为 PRIOR。当前未完成整体验收，不提升模块整体 Ownership。
+
+Current Gate: REVIEW_BLOCKED。Next Action：用户将凭据拒绝分支改用 BadCredentialsException，随后仅检查增量并重跑 Provider 定向测试。
+
+### Human Core 修正与定向验证 — 2026-10-25
+
+- 用户将凭据拒绝分支改为 BadCredentialsException(INVALID_CREDENTIALS)，并添加 import；基础设施 / 容量故障仍使用 AuthenticationServiceException。此前异常分类 finding 已解除。
+- FRESH：相同 Provider 定向测试 11/11 PASS，0 failures / errors / skipped，退出码 0；diff whitespace PASS。输出：services/identity/target/r1e-human-core-correction.log。
+- Codex 未修改用户 production 或测试，仅同步 Review / 验证记录；Human Core 保持提示 / 局部示例后实现，不自动提高模块 Ownership。
+- 本批仅验证修正增量；既有 65/65 为 PRIOR，数据库 / 真实组件组合、package / 独立 JAR、整体 Review 与认证 Flow 尚未完成，不能称为 R1-E 整体验收 PASS。
+
+Current Gate: REVIEW_PENDING。Next Action：在当前 R1-E 范围完成整体工程验收与必要认证 Flow，再进行代码导读 / Human Review；不进入下一 Slice。
+
+### 整体 Review / 工程验收与 Flow — 2026-10-25
+
+- 基线仍为 migrate/identity / c1be36de052b47ba2a08fc67e720548718105432。Scope MATCH：production 5 文件约 173 行，测试 2 文件新增 / 实质修改 212 行；未改 schema、dependency、公开入口、应用授权、安全配置、密码参数、旧 server 或用户 Human Core。
+- 本轮未新增或修改 production / 测试代码；仅执行现有验证、新增认证 Flow、补关联 Flow 调用方说明与同步记录。新 Provider 测试文件的必要性与复用策略见上方预算，不增加测试工具或依赖。
+- FRESH 第一批：Provider 11、normalizer 8、注册 Service 11、policy 7、blocklist 8、hasher 14、真实容量 8、HTTP 9，共 76/76 PASS、0 failures / errors / skipped，package 退出码 0；使用获准正常 Windows 权限。输出：target/r1e-full-review-package.log 与 r1e-full-review-reports.json。
+- FRESH 第二批：一次性 PostgreSQL 18.6，缓存镜像 postgres:18，digest sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6；loopback 随机端口、tmpfs 与随机临时凭据，复用 deploy/local/identity/init-databases.sql。没有运行中的既有容器，未读取 / 修改旧业务库或既有卷。
+- 显式启用 IDENTITY_DATABASE_TESTS=true，密码容量保持 1，从空 schema 执行 Flyway V1；隔离库标识由验证编排与现有 fixture 核对，应用使用非集群管理员 identity_app。
+- 数据库新 / 既有组合：IdentityPasswordHashingIntegrationTests 2/2（含新增注册 → Mapper / Optional / constructor mapping → Provider / 真实 Argon2 认证，并确认撤销的应用准入不恢复、verifier 不变）；LocalRegistrationIntegrationTests 1/1、账户事务 4/4、Mapper / schema / 专用账号 3/3，共 10/10 PASS、0 failures / errors / skipped，package 退出码 0。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=LocalPasswordAuthenticationProviderTests,LocalEmailNormalizerTests,LocalRegistrationServiceTests,LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+# 下一条只在已核对标识的一次性数据库环境执行，凭据只在当前进程内设置，不保存。
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=LocalRegistrationIntegrationTests,LocalAccountPersistenceIntegrationTests,IdentityMapperIntegrationTests,IdentityPasswordHashingIntegrationTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- 两批独立运行，不将 86 项描述为一次命令的结果。第二批脱敏证据：target/r1e-final-verification-summary.json、r1e-database-package-verification.log、r1e-verification-cleanup.log（均在 services/identity/ 下，受 Git ignore）。
+- 验证后 app_user / auth_identity / local_password_credential 各 5 行，app_access_grant 4 行；一条准入由新增认证组合有意撤销，认证未恢复。Flyway 成功记录 1 条，测试 trigger 遗留 0。容器 dailylanguage-r1e-review-d0e0193a76 已停止并自动移除，tmpfs 已清理，进程环境恢复；未输出或持久保存密码。
+- Provider 验证前后 blob 均为 2476e0afd6af9da71f5f82f159532814991f7bf9；Codex 未修改用户核心实现。既有注册 blob b498eb26134012e91fb715c1443f7fd43eace94a 保持不变。
+- 新增并登记 [内部凭据认证 Flow](../flow/identity-local-authentication.md)，仅补充密码 Flow 的当前调用方说明。Flow 来自 source 与上述证据，不把未来 HTTP / Session / 跨服务行为写成已实现。
+- 自查结果：Code Review PASS，无 blocking finding；账户存在性与密码匹配分离、dummy 不产生身份、查询与规范化 catch 分离、安全异常 / 日志、finally 清理、最小 principal 与只读 SQL 符合合同。Architecture 边界符合批准范围；concrete composition，Extensibility Fit RIGHT_SIZED。此自查不冒充独立作者 Review。
+- NOT_RUN：独立 JAR JVM / 双启动、公开登录 / Session、browser / 旧 server / 跨服务、生产容量、防枚举耗时与 live Provider；真实 Spring 测试启动不替代独立部署验收。没有这些范围的 PASS 或新 Ownership 等级结论。
+- Human Review 入口：authenticate 的两个条件与成功 token；lookupCredential 的两个 catch 范围；verifySubmittedPassword 的容量 / 故障映射；数据库组合对撤销应用准入的断言。用户实现与异常分类讨论可作局部 evidence，整个 Slice 的用户 Review 尚未确认，不安排固定问答或自动标记 UNDERSTOOD。
+
+Engineering Acceptance: PASS（仅 R1-E 内部凭据认证及相关回归）。Behavior Flow: CURRENT。
+Current Gate: OWNERSHIP_PENDING。Next Action：用户结合真实代码与认证 Flow Review 当前 R1-E；不自动 commit / push 或进入下一 Slice。
+
+### User Review / Ownership 收口 — R1-E，2026-10-25
+
+- 用户完成代码导读并自行查看实现后表示，部分判断初看感觉多余，整体看过后接受保留，未提出待修问题；本 Slice Human Review 已接受。
+- Ownership evidence 来自用户实际实现 / 修正核心判定、对凭据拒绝与服务故障分类的提问和修正，以及本次真实代码 Review 接受；不只以测试通过或笼统同意判定。结论限定于 R1-E 当前凭据认证与失败边界，不升级模块整体等级，不记作独立实现。
+- 当前 Provider blob 为 3fc6e7749ced047c5d635889ffad2b4f6c68ae25；与已验收的 2476e0afd6af9da71f5f82f159532814991f7bf9 逐 blob 对比，仅删除 3 行 Human Core 说明并留空行，逻辑没有变化。保留用户修改，不重跑无行为变化的测试。
+- 本次只同步收口记录；76/76、数据库 10/10 两批与 package 成功保留为同日 PRIOR 证据，不标为本轮 fresh。diff whitespace PASS，认证 Flow 仍与当前行为一致。
+- 工程取舍：沿用现有 AuthenticationProvider、Mapper 和受限 hasher，分别处理输入拒绝、查询故障和计算故障；代价是 helper 增加初次阅读成本。用户借助普通 if 与局部示例完成核心段，之后通过真实异常分类修正和调用链导读完成本次 Review，不增加新 abstraction 或固定问答。
+
+Human Review: COMPLETE（仅 R1-E）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
+Next Action：由用户决定提交当前 R1-E 实现、测试与相关文档；Codex 不自动 commit / push 或开始下一 Slice。

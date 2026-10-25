@@ -9,6 +9,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,6 +23,15 @@ class IdentityPasswordHashingIntegrationTests {
 
     @Autowired
     private LocalAccountPersistence accounts;
+
+    @Autowired
+    private LocalRegistrationService registrations;
+
+    @Autowired
+    private LocalAccountMapper mapper;
+
+    @Autowired
+    private LocalPasswordAuthenticationProvider authentication;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -49,5 +59,30 @@ class IdentityPasswordHashingIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM app_user WHERE id = ?", Integer.class, userId)).isOne();
         assertThat(jdbc.queryForList("SELECT app_code FROM app_access_grant WHERE user_id = ?",
                 String.class, userId)).containsExactly("LANGUAGE");
+    }
+
+    @Test
+    void authenticatesRegisteredCredentialWithoutRestoringRevokedApplicationAccess() {
+        String email = IdentityDatabaseTestData.uniqueEmail();
+        String password = "  R1E original password 42  ";
+        UUID userId = registrations.register(email, password);
+        LocalPasswordCredential stored = mapper.findLocalPasswordCredential(email).orElseThrow();
+        assertThat(stored.userId()).isEqualTo(userId);
+        assertThat(stored.passwordVerifier()).startsWith("{argon2id-v1}$argon2id$");
+        assertThat(mapper.findLocalPasswordCredential(IdentityDatabaseTestData.uniqueEmail())).isEmpty();
+        jdbc.update("DELETE FROM app_access_grant WHERE user_id = ?", userId);
+
+        var request = UsernamePasswordAuthenticationToken.unauthenticated(" " + email.toUpperCase(java.util.Locale.ROOT)
+                + " ", password);
+        var result = authentication.authenticate(request);
+
+        assertThat(result.isAuthenticated()).isTrue();
+        assertThat(result.getPrincipal()).isEqualTo(new AuthenticatedAccount(userId));
+        assertThat(result.getCredentials()).isNull();
+        assertThat(result.getAuthorities()).isEmpty();
+        assertThat(request.getCredentials()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM app_access_grant WHERE user_id = ?",
+                Integer.class, userId)).isZero();
+        assertThat(mapper.findLocalPasswordCredential(email)).contains(stored);
     }
 }

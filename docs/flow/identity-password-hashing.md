@@ -11,6 +11,7 @@
 `matches` 检查输入格式和固定参数后校验密码，返回匹配结果。当前没有注册 / 登录 HTTP 或 RPC 入口。
 邮箱 / 密码 policy、密码升级、Session、集群限流不在本 slice；组件不访问数据库、不启动事务、不记录密码或 verifier。
 R1-D 的 [内部注册调用方](identity-local-registration.md) 已在 hash 前完成邮箱 / 密码 policy，再调用独立账户事务；本组件与容量机制没有改变。
+R1-E 的 [内部凭据认证调用方](identity-local-authentication.md) 在组件初始化时生成 dummy verifier，并使用 matches 校验真实 / dummy 凭据；登录不调用注册 policy，hasher 与容量机制不变。
 
 ## 2. Main Call Chain
 
