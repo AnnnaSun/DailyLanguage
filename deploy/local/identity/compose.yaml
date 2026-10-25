@@ -17,5 +17,18 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
+  redis:
+    image: redis:7.2.16-alpine3.21
+    ports:
+      - "127.0.0.1:${IDENTITY_REDIS_PORT:-55442}:6379"
+    # 本地验证不保存会话快照；Redis 重启后需要重新登录，不影响 PostgreSQL 账户。
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
 volumes:
   identity-postgres-data:

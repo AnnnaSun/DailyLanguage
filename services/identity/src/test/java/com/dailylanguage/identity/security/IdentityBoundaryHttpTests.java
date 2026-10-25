@@ -26,12 +26,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** 使用真实 HTTP 检查安全骨架；不把无数据库的健康检查当作完整服务启动证据。 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        classes = IdentityBoundaryHttpTests.TestApplication.class)
+        classes = IdentityBoundaryHttpTests.TestApplication.class,
+        properties = {"spring.data.redis.host=127.0.0.1", "management.health.redis.enabled=false"})
 class IdentityBoundaryHttpTests {
 
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class, UserDetailsServiceAutoConfiguration.class})
-    @Import(IdentitySecurityConfiguration.class)
+    @Import({IdentitySecurityConfiguration.class, SessionConfiguration.class})
     static class TestApplication {
     }
 

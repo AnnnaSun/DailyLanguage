@@ -2,13 +2,13 @@
 
 ## 当前 Gate
 
-- Date: 2026-10-25
-- Current Slice: R1-E — 内部 LOCAL_EMAIL 凭据认证；2026-10-25 用户同意完整内部闭环与推荐 Human Core 分工。
-- Gate: READY_TO_COMMIT；R1-E 工程验收与整体自查 PASS，认证 Flow CURRENT，用户已接受本 Slice Human Review。Human Core 保持提示 / 局部示例后实现，不提高模块整体 Ownership。R1-D COMPLETE / COMMITTED `c1be36d`，不重新打开。
+- Date: 2026-10-26
+- Current Slice: R1-F — Redis Session 基础；2026-10-25 用户批准范围、160–220 行测试预算及 Codex 完整实现分工。
+- Gate: READY_TO_COMMIT；R1-F 工程验收与自查 PASS，Session Flow CURRENT，用户已接受本 Slice Human Review。Codex 完整实现，不记为用户 hands-on，不提高模块整体 Ownership。R1-E COMPLETE / COMMITTED `8630e6f`，不重新打开。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 当前基线：`migrate/identity` / `c1be36de052b47ba2a08fc67e720548718105432`（注册验证邮箱密码）；2026-10-25 核对提交包含 R1-D 与已授权测试去重 / 文档，提交后的工作区干净。register blob 与已验收候选一致。
-- PRIOR：R1-C 2026-10-24 的 58/58、package 与 JAR 资源 checksum，以及 R1-D 2026-10-25 的 65/65、数据库 9/9 与 package 保留为历史证据；本轮 R1-E fresh 骨架验证见下方记录。
-- 不自动 commit / push，不提高模块整体 Ownership；当前 R1-E READY_TO_COMMIT，等待用户 Commit Decision，不开始下一 Slice。
+- 当前基线：`migrate/identity` / `8630e6fddefaad53acc01dc721c757705a17c1a5`（email登录认证）；2026-10-25 核对提交包含 R1-E 实现、测试与相关文档，本次同步前工作区干净。Provider blob 与收口候选 3fc6e7749ced047c5d635889ffad2b4f6c68ae25 一致。
+- PRIOR：R1-F 2026-10-25 的 80/80 与数据库 10/10 两批、package 与清理证据见下方记录；2026-10-26 Review 收口只核对 Git / source 并同步文档，未重跑测试。更早各 Slice 的有日期证据保留为历史。
+- 不自动 commit / push，不提高模块整体 Ownership；当前 R1-F READY_TO_COMMIT，等待用户 Commit Decision，不自动开始下一 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -639,5 +639,73 @@ Current Gate: OWNERSHIP_PENDING。Next Action：用户结合真实代码与认�
 - 本次只同步收口记录；76/76、数据库 10/10 两批与 package 成功保留为同日 PRIOR 证据，不标为本轮 fresh。diff whitespace PASS，认证 Flow 仍与当前行为一致。
 - 工程取舍：沿用现有 AuthenticationProvider、Mapper 和受限 hasher，分别处理输入拒绝、查询故障和计算故障；代价是 helper 增加初次阅读成本。用户借助普通 if 与局部示例完成核心段，之后通过真实异常分类修正和调用链导读完成本次 Review，不增加新 abstraction 或固定问答。
 
-Human Review: COMPLETE（仅 R1-E）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
-Next Action：由用户决定提交当前 R1-E 实现、测试与相关文档；Codex 不自动 commit / push 或开始下一 Slice。
+Human Review: COMPLETE（仅 R1-E）。R1-E Gate: COMPLETE / COMMITTED `8630e6f`。
+2026-10-25 提交状态同步：用户已提交 8630e6fddefaad53acc01dc721c757705a17c1a5；提交共 12 文件，Provider blob 与收口候选一致，本次未重跑测试或重开 Review。
+Next Action：下一 Slice 进入 Design / Scope；建议 R1-F 先迁入 Redis Session 基础，再单独设计公开 login / logout / me。当前提案与实现分工仍待用户决定，不生成代码骨架。
+
+## R1-F — Redis Session 基础
+
+### 已批准范围与取舍
+
+2026-10-25 用户回复“ok，执行”，批准本 Slice、新 Session Redis starter、独立本地 Redis 与 Codex 完整实现分工；A — Critical。
+测试预计 160–220 行、production 70–100 行，可能超过两倍，用户已一并批准该预算；不强制安排 Human Core。
+R1-E 仅产生单次调用的认证结果，本 Slice 增加框架管理的 Session 存取基础；先分离存储验证，再单独实现公开 login / logout / me。
+替代方案是一次接通 Session 与公开接口，但会同时引入 rotation、CSRF 与 HTTP 错误映射，本次不采用。
+
+- 引入 Boot-managed spring-boot-starter-session-data-redis，不单独指定 Session / Redis client 版本；JAR 核对 Spring Session / Data Redis 4.1.1、Lettuce 7.5.2.RELEASE。
+- SessionConfiguration 只提供固定 springSessionDefaultRedisSerializer bean。Jackson JSON 使用 SecurityJacksonModules，只额外允许 final record AuthenticatedAccount；不扩大到整个 package，不修改该 record 或 R1-E Provider。
+- 复用 Boot 自动配置、default 非索引 RedisSessionRepository；namespace daily-language:identity:session:v1、24h idle TTL，连接 / 操作 timeout 1s。Redis host 显式由 IDENTITY_REDIS_HOST 提供，端口默认 55442。
+- Cookie 默认 SESSION / HttpOnly / Secure / SameSite=Lax / Path=/，无 Domain / Max-Age；未来本地 HTTP 仅通过显式 IDENTITY_SESSION_COOKIE_SECURE=false 覆盖，当前只验证配置绑定。
+- 保存 Redis 失败传播 DataAccessException，无内存 repository fallback。JSON 未许可类型还原失败，不退回 Java native serialization；serializer 不承担任意 Session 属性的敏感字符串过滤。
+- 当前 HTTP SecurityConfiguration 保持 STATELESS 与已有拒绝规则，不创建登录会话。生产 authenticate 到 Session 的写入尚未接通；当前存取入口是工程验证，不宣称 HTTP failure handler、rotation 或浏览器会话已经实现。
+- 本地新增 Redis 7.2.16-alpine3.21（旧根 Compose / server 不动）；官方 Open Source 7.2 分支维护与镜像依据见 deploy README。loopback / tmpfs、禁用 RDB / AOF，重启丢失 Session；不作为生产 Redis 部署 / 凭据 / TLS / 高可用 / 持久化方案。
+
+Architecture / Security Impact：增加获批的 Session Redis dependency、运行依赖与受限 JSON 还原边界；不创建自定义 Session abstraction / repository / filter / key lifecycle，不使用 @EnableRedisHttpSession。
+Non-scope：公开注册 / login / logout / me、Session ID 轮换 / 浏览器过期 / 退出链路、Rate Limit、Gateway、Dubbo / Nacos / mTLS、应用准入 / 账号启停、前端、旧 server、schema / 事务 / 密码机制或其他 dependency 升级。
+
+### 文件、规模与验证策略
+
+Production 4 文件、约 73 行：新增 security/SessionConfiguration.java（35 行），修改 services/identity/pom.xml（4）、application.yml（21）、deploy/local/identity/compose.yaml（13）。
+测试 4 文件、约 167 行：新增 SessionSerializationTests（47）、RedisSessionIntegrationTests（80）、RedisSessionUnavailableIntegrationTests（37），修改既有 IdentityBoundaryHttpTests（约 3 行）。均在原预算内，未增加测试依赖、基类或 fixture 工厂。
+三个新文件分别验证纯 JSON 类型边界、真实 Redis 状态恢复、独立不可用地址的故障行为；共 4 个代表性测试，不复制旧 server 全套或穷举输入。
+复用现有 IdentityBoundaryHttpTests.TestApplication，仅将 SessionConfiguration 加入 import；HTTP 测试显式给本机 Redis host 并关闭其最小上下文的 Redis health，不连接实际 Redis。真实存储 / 故障由显式开启的 integration 证明。
+文档：本合同、PROJECT_STATUS、本地 README、Session Flow 与 Flow index；无 Schema / API / provider 修改。
+
+### Verification / 自查 — 2026-10-25
+
+- 初始离线编译因新增 starter 未缓存退出 1；获准下载 Boot 管理依赖后 test-compile 成功。未改版本或增加替代 dependency。
+- 首轮定向测试 11 项：JSON 2/2 PASS、HTTP 9 errors，原因是默认权限阻止本机连接导致 Tomcat 无法启动；获准正常 Windows 权限重跑后 11/11 PASS、0 skipped。没有修改生产或测试逻辑掩盖错误。
+- FRESH 第一批：显式 IDENTITY_REDIS_TESTS=true / IDENTITY_REDIS_UNAVAILABLE_TESTS=true，新 JSON 2、真实 Redis 1、不可用 1、既有 Provider / 组件 / Service / HTTP 76，共 80/80 PASS、0 failures / errors / skipped，package 退出码 0。
+- 真实 Redis 第二 repository 读取同一随机 Session，身份 UUID / authenticated / null credentials 保持；独立 namespace 与 24h metadata、实际 key TTL（23–24h 区间）通过；Cookie 安全配置绑定通过。finally 删除后 key 不存在，整次实例 DBSIZE=0。
+- FRESH 第二批：一次性 PostgreSQL 18.6、隔离标识 / identity_app、空 schema Flyway V1、密码容量 1；既有真实注册 / 认证组合 3、账户事务 4、Mapper / 权限 3，共 10/10 PASS、0 failures / errors / skipped，package 退出码 0。两批分开记录，不描述为单次 90 项运行。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=SessionSerializationTests,RedisSessionIntegrationTests,RedisSessionUnavailableIntegrationTests,LocalPasswordAuthenticationProviderTests,LocalEmailNormalizerTests,LocalRegistrationServiceTests,LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+# 上一条需独立 Redis 环境及显式 integration 开关；下一条复用 R1-E 数据库回归命令和隔离库要求。
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=LocalRegistrationIntegrationTests,LocalAccountPersistenceIntegrationTests,IdentityMapperIntegrationTests,IdentityPasswordHashingIntegrationTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- Redis digest sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a；新容器 dailylanguage-r1f-redis-dbcd59e420 与 PostgreSQL dailylanguage-r1f-review-98c6a88cf3 均停止 / 自动移除，tmpfs 清理、进程环境恢复。无旧实例 / 既有卷操作，无 FLUSHDB / FLUSHALL，随机数据库密码未输出或保存。
+- 脱敏证据在 services/identity/target/：r1f-redis-verification-summary.json、r1f-session-module-package.log、r1f-final-verification-summary.json、r1f-database-package-verification.log 与对应 cleanup log。SessionConfiguration blob 29f0694464e57a4b20187075a58077192e6cca4e；R1-E Provider 保持 3fc6e7749ced047c5d635889ffad2b4f6c68ae25。
+- 额外检查：Compose config --quiet 退出 0（只用合成占位密码），JAR 依赖与管理版本一致；diff whitespace PASS。已创建 / 登记 [Session Storage Flow](../flow/identity-session-storage.md)，依据真实 source 与本批证据。
+- 自查：Scope MATCH，Code Review PASS，无 blocking finding；精确业务类型许可、框架生命周期、独立 namespace / 超时与存储故障不回退符合合同；concrete framework configuration，Extensibility Fit RIGHT_SIZED。Codex 自查不记作独立作者 Review。
+- NOT_RUN：独立 JAR JVM、生产 Redis 健康故障响应、真实 24h 等待过期 / Redis 重启恢复、浏览器 Cookie 实际发送、公开登录 / Session rotation / logout、跨服务认证、生产容量与部署；Cookie binding / TTL 读值不等于这些场景已验收。
+
+### 分工与 Human Review 入口
+
+本 Slice 由 Codex 实现和验证，不记为用户 hands-on；现有模块掌握等级不变。
+Learning Focus：类型许可与 Session 内容之间的边界；Cookie / 框架 Session 存储与生产认证入口是不同职责。
+User Review 入口：SessionConfiguration serializer bean / AuthenticatedAccount 精确许可；application.yml 的 namespace / idle TTL / Secure；真实 Redis 与不可用测试的证明和局限。
+Engineering Acceptance: PASS（仅 Session 存储基础及相关 Identity 回归）。Behavior Flow: CURRENT。
+Current Gate: OWNERSHIP_PENDING。Next Action：用户 Review 当前 R1-F 实现与 Session Flow；不自动 commit / push 或进入下一 Slice。
+
+### User Review 收口 — R1-F，2026-10-26
+
+- 用户针对没有 Human Core、Slice 是否只做序列化提出疑问；讨论明确本次采用 Codex 完整实现分工，包含依赖、Redis repository 自动配置、JSON 类型许可、namespace / TTL / Cookie 配置与存取 / 故障验证，尚未接通生产登录写 Session。用户随后表示“ok没问题了”，接受当前 Slice。
+- 用户未选择接管测试的备选分工，不删除或改写已完成测试，不补记 Human Core。此记录确认当前范围与实现的 Human Review 接受，不将笼统同意推断为序列化安全或 Spring Session 生命周期的独立掌握，不更新模块等级或记为用户 hands-on。
+- 当前仍为 migrate/identity / 8630e6fddefaad53acc01dc721c757705a17c1a5，尚未提交 R1-F。核对 SessionConfiguration blob 29f0694464e57a4b20187075a58077192e6cca4e 与 R1-E Provider 3fc6e7749ced047c5d635889ffad2b4f6c68ae25，均与验收记录一致；diff whitespace PASS。
+- 本轮只同步 Review 收口记录，未修改 production / 测试，未重跑验证；2026-10-25 的 80/80、数据库 10/10 两批及 package PASS 为 PRIOR，不标为本轮 fresh。
+- 工程取舍：通过框架提供 Session 存取生命周期，业务新增 Java 主要是 serializer 边界；代价是新增 Redis 运行依赖，以及必须分清存储基础与后续 HTTP 登录生命周期。后续公开接口仍需独立 Slice Contract，不以本次 Review 扩大授权。
+
+Human Review: COMPLETE（仅 R1-F）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
+Next Action：用户决定提交当前 R1-F 实现、测试与相关文档；Codex 不自动 commit / push 或开始下一 Slice。

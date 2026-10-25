@@ -1,4 +1,4 @@
-# R1-A 本地隔离验证环境
+# Identity 本地隔离验证环境
 
 此目录仅准备 Identity 的本地学习环境，不是生产部署，也不操作旧 Language / PersonalNote 实例。
 独立 PostgreSQL 18 容器使用端口 `127.0.0.1:55441` 和本项目专用新卷，不加载 pgvector extension。
@@ -23,6 +23,8 @@ docker compose --env-file "$IDENTITY_ENV_FILE" -f deploy/local/identity/compose.
 set -a
 source "$IDENTITY_ENV_FILE"
 set +a
+export IDENTITY_REDIS_HOST=127.0.0.1
+export IDENTITY_REDIS_PORT=55442
 ```
 
 `identity_test_admin` 仅用于隔离实例初始化；Identity 使用 `identity_app`，该角色不是超级用户，
@@ -94,3 +96,30 @@ ORDER BY relation_name, record_key;
 
 摘要只用于合成数据的一致性比较，不输出邮箱或 verifier 原文，不作为密码算法或防篡改机制。
 本轮具体结果见 `docs/features/IDENTITY.md`；运行日志和摘要位于忽略的 `services/identity/target/`，实际密码不提交。
+
+## R1-F Redis Session 基础
+
+Compose 新增独立 Redis `7.2.16-alpine3.21`，仅绑定 `127.0.0.1:55442`，不连接旧应用的 Redis。
+Redis 7.2 分支的维护状态见 [Redis Open Source version management](https://redis.io/docs/latest/operate/oss_and_stack/install/version-mgmt/)，
+固定镜像 tag 来自 [官方镜像清单](https://github.com/docker-library/official-images/blob/master/library/redis)；不升级旧 server 或根 Compose。
+本地验证禁用 RDB / AOF，数据放在 tmpfs，Redis 停止或重启后会话丢失，账户数据仍在 PostgreSQL。
+这是本机学习环境，不是生产 Redis 的访问控制、传输保护或持久化方案。
+
+Identity 必须显式配置 `IDENTITY_REDIS_HOST`；端口默认 55442，连接与操作超时均为 1s。
+使用独立 namespace `daily-language:identity:session:v1`、default 非索引 repository、24h idle TTL。
+JSON 只额外允许 AuthenticatedAccount，预期属性来自 R1-E 的空 credentials 认证结果，不保存原始密码或 verifier；serializer 不负责清理任意属性中的敏感字符串，不使用 Java native serialization。
+Redis 不可用时保存失败，不回退到 JVM 内存 Session；完整服务的健康检查也会反映 Redis 故障。
+
+Cookie 默认 SESSION / HttpOnly / Secure / SameSite=Lax / Path=/，不设 Domain / Max-Age。
+当前 HTTP 仍不创建登录会话；未来本机 HTTP 登录验收需要显式设置 `IDENTITY_SESSION_COOKIE_SECURE=false`，
+不得因此关闭 Hosted 默认 Secure。会话轮换、退出、登录接口与跨服务核验尚未实现。
+
+```sh
+# 单独执行 serializer 与现有 HTTP 边界，不需要真实 Redis。
+./mvnw -q -o -pl services/identity -am test -Dtest=SessionSerializationTests,IdentityBoundaryHttpTests -Dsurefire.failIfNoSpecifiedTests=false
+# 确认以上 Redis 地址指向独立验证实例后，显式开启真实存取与不可用测试。
+IDENTITY_REDIS_TESTS=true IDENTITY_REDIS_UNAVAILABLE_TESTS=true ./mvnw -q -o -pl services/identity -am test -Dtest=RedisSessionIntegrationTests,RedisSessionUnavailableIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+真实存取测试只创建随机 Session 并在 finally 删除，不执行 FLUSHDB / FLUSHALL；默认未开启时两项 integration 会跳过，
+跳过不能算验收通过。HTTP 测试仅关闭其最小上下文的 Redis health contributor，真实 Redis 存取由显式 integration 验证。

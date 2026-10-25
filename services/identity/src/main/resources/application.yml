@@ -10,6 +10,19 @@ spring:
       connection-timeout: 3000
   flyway:
     clean-disabled: true
+  data:
+    redis:
+      # 独立配置 Identity 的 Redis，不沿用旧 Language 的默认地址或凭据。
+      host: ${IDENTITY_REDIS_HOST}
+      port: ${IDENTITY_REDIS_PORT:55442}
+      connect-timeout: 1s
+      timeout: 1s
+  session:
+    timeout: 24h
+    data:
+      redis:
+        namespace: daily-language:identity:session:v1
+        repository-type: default
 
 app:
   security:
@@ -20,6 +33,14 @@ app:
 server:
   address: 127.0.0.1
   port: ${IDENTITY_HTTP_PORT:8081}
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        secure: ${IDENTITY_SESSION_COOKIE_SECURE:true}
+        same-site: lax
+        path: /
 
 management:
   endpoints:

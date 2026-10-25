@@ -201,6 +201,7 @@ Ownership 收口或进入 `READY_TO_COMMIT`。这属于 Documentation / Ownershi
 | Identity Account Persistence | IMPLEMENTED | R1-A | [`identity-account-persistence.md`](identity-account-persistence.md) |
 | Identity Local Registration | IMPLEMENTED | R1-D | [`identity-local-registration.md`](identity-local-registration.md) |
 | Identity Local Authentication | IMPLEMENTED | R1-E | [`identity-local-authentication.md`](identity-local-authentication.md) |
+| Identity Session Storage | IMPLEMENTED | R1-F | [`identity-session-storage.md`](identity-session-storage.md) |
 | Browser Authentication | IMPLEMENTED | M1-S11-B | [`browser-authentication.md`](browser-authentication.md) |
 | Text Generation Credential Propagation | IMPLEMENTED | M0-S7A / M0-S8C / M0-S8D | [`text-generation-credential-propagation.md`](text-generation-credential-propagation.md) |
 | OpenAI-compatible Text Provider Call | IMPLEMENTED | M0-S7B / M0-S7C / M0-S8A / M0-S8D | [`text-generation-openai-compatible-provider.md`](text-generation-openai-compatible-provider.md) |
