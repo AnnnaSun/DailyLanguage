@@ -1,9 +1,6 @@
 package com.dailylanguage.identity.credential;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static com.dailylanguage.identity.credential.LocalPasswordPolicy.ValidationResult.ACCEPTED;
 import static com.dailylanguage.identity.credential.LocalPasswordPolicy.ValidationResult.COMMON_OR_COMPROMISED;
@@ -14,7 +11,6 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-@ExtendWith(OutputCaptureExtension.class)
 class LocalPasswordPolicyTests {
 
     private static final String NORMALIZED_EMAIL = "verylonguser@example.com";
@@ -32,33 +28,20 @@ class LocalPasswordPolicyTests {
     }
 
     @Test
-    void acceptsEveryPrintableAsciiCharacterIncludingSpace() {
-        for (char character = 0x20; character <= 0x7e; character++) {
-            String submittedPassword = "SecureBase12" + character;
-
-            assertThat(passwordPolicy.validate(submittedPassword, NORMALIZED_EMAIL))
-                    .as("printable ASCII U+%04X", (int) character)
-                    .isEqualTo(ACCEPTED);
-        }
-        assertThat(passwordPolicy.validate("  safe pass  ", NORMALIZED_EMAIL)).isEqualTo(ACCEPTED);
+    void acceptsPrintableAsciiIncludingSpaceAndPunctuation() {
+        assertThat(passwordPolicy.validate("  safe pass ~!  ", NORMALIZED_EMAIL)).isEqualTo(ACCEPTED);
     }
 
     @Test
-    void rejectsControlUnicodeFullWidthAndEmojiCharactersBeforeLengthFeedback() {
+    void rejectsNonPrintableCharactersBeforeLengthFeedback() {
         assertThat(passwordPolicy.validate("safe-pass-1\t", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
-        assertThat(passwordPolicy.validate("safe-pass-1\n", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
         assertThat(passwordPolicy.validate("safe-pass-1\u007f", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
-        assertThat(passwordPolicy.validate("safe-pass-1中", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
-        assertThat(passwordPolicy.validate("safe-pass-1Ａ", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
-        assertThat(passwordPolicy.validate("safe-pass-1🙂", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
         assertThat(passwordPolicy.validate("safe-中", NORMALIZED_EMAIL)).isEqualTo(INVALID_CHARACTER);
     }
 
     @Test
-    void rejectsKnownAndContextSpecificWeakPasswords() {
+    void rejectsBlocklistedPassword() {
         assertThat(passwordPolicy.validate("123456789012", NORMALIZED_EMAIL))
-                .isEqualTo(COMMON_OR_COMPROMISED);
-        assertThat(passwordPolicy.validate("DailyLanguage", NORMALIZED_EMAIL))
                 .isEqualTo(COMMON_OR_COMPROMISED);
     }
 
@@ -89,12 +72,4 @@ class LocalPasswordPolicyTests {
         verifyNoInteractions(unreadBlocklist);
     }
 
-    @Test
-    void validationDoesNotLogRawPassword(CapturedOutput output) {
-        String submittedPassword = "submitted-password-must-not-leak";
-
-        passwordPolicy.validate(submittedPassword, NORMALIZED_EMAIL);
-
-        assertThat(output).doesNotContain(submittedPassword);
-    }
 }

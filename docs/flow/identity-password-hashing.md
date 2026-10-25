@@ -10,6 +10,7 @@
 `hash` 保留原始密码的空格和大小写，以随机 salt、固定 Argon2id 参数生成 `{argon2id-v1}` verifier。
 `matches` 检查输入格式和固定参数后校验密码，返回匹配结果。当前没有注册 / 登录 HTTP 或 RPC 入口。
 邮箱 / 密码 policy、密码升级、Session、集群限流不在本 slice；组件不访问数据库、不启动事务、不记录密码或 verifier。
+R1-D 的 [内部注册调用方](identity-local-registration.md) 已在 hash 前完成邮箱 / 密码 policy，再调用独立账户事务；本组件与容量机制没有改变。
 
 ## 2. Main Call Chain
 

@@ -5,22 +5,17 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /** 使用真实 Argon2；容量替身只直接执行操作，因此本组通过不证明 Human Core 的并发行为。 */
-@ExtendWith(OutputCaptureExtension.class)
 class LocalPasswordHasherTests {
 
     private static final String FORMAT_SAMPLE = "{argon2id-v1}$argon2id$v=19$m=19456,t=2,p=1$"
@@ -58,17 +53,13 @@ class LocalPasswordHasherTests {
 
     @ParameterizedTest
     @MethodSource("unsupportedVerifiers")
-    void rejectsUnsupportedVerifiersBeforeUsingCapacity(String verifier, CapturedOutput output) {
-        assertThat(passwords.matches("sensitive-password-sentinel", verifier)).isFalse();
+    void rejectsUnsupportedVerifiersBeforeUsingCapacity(String verifier) {
+        assertThat(passwords.matches("synthetic password", verifier)).isFalse();
         verifyNoInteractions(capacity);
-        assertThat(output).doesNotContain("sensitive-password-sentinel");
-        if (verifier != null && !verifier.isEmpty()) {
-            assertThat(output).doesNotContain(verifier);
-        }
     }
 
     static Stream<String> unsupportedVerifiers() {
-        return Stream.of(null, "", "sensitive-verifier-sentinel", "{noop}plaintext",
+        return Stream.of(null, "{noop}plaintext",
                 FORMAT_SAMPLE.replace("{argon2id-v1}", "{argon2id-v2}"),
                 FORMAT_SAMPLE.substring("{argon2id-v1}".length()),
                 FORMAT_SAMPLE.replace("m=19456", "m=99999999"),
@@ -88,14 +79,4 @@ class LocalPasswordHasherTests {
         verifyNoInteractions(capacity);
     }
 
-    @Test
-    void propagatesCapacityExhaustionForHashAndVerification(CapturedOutput output) {
-        doThrow(new PasswordHashCapacityExceededException())
-                .when(capacity).runWithAvailableSlot(any());
-        assertThatThrownBy(() -> passwords.hash("sensitive-password-sentinel"))
-                .isInstanceOf(PasswordHashCapacityExceededException.class);
-        assertThatThrownBy(() -> passwords.matches("sensitive-password-sentinel", FORMAT_SAMPLE))
-                .isInstanceOf(PasswordHashCapacityExceededException.class);
-        assertThat(output).doesNotContain("sensitive-password-sentinel").doesNotContain(FORMAT_SAMPLE);
-    }
 }

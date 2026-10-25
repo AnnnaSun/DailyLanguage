@@ -10,16 +10,14 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.dailylanguage.identity.account.IdentityDatabaseTestData.PASSWORD_VERIFIER;
 import static com.dailylanguage.identity.account.IdentityDatabaseTestData.uniqueEmail;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** 这里的测试事务只隔离 Mapper 样本，不证明尚未实现的 Human Core 事务。 */
+/** 测试事务只隔离 Mapper 样本；四表提交、并发与回滚由账户事务测试覆盖。 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnabledIfEnvironmentVariable(named = "IDENTITY_DATABASE_TESTS", matches = "true")
 @Transactional
@@ -37,34 +35,9 @@ class IdentityMapperIntegrationTests {
     }
 
     @Test
-    void mapsAllFourWritesWithNativeUuidAndOnlyLanguageAccess() {
-        UUID userId = mapper.insertUser();
-        UUID identityId = mapper.insertLocalEmailIdentity(userId, uniqueEmail());
-        mapper.insertPasswordCredential(identityId, PASSWORD_VERIFIER);
-        mapper.insertDefaultLanguageAccess(userId);
-
-        assertThat(userId.version()).isEqualTo(7);
-        assertThat(identityId.version()).isEqualTo(7);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM local_password_credential WHERE auth_identity_id = ?",
-                Integer.class, identityId)).isOne();
-        assertThat(jdbc.queryForObject("SELECT password_verifier FROM local_password_credential WHERE auth_identity_id = ?",
-                String.class, identityId)).isEqualTo(PASSWORD_VERIFIER);
-        assertThat(jdbc.queryForList("SELECT app_code FROM app_access_grant WHERE user_id = ?",
-                String.class, userId)).containsExactly("LANGUAGE");
-    }
-
-    @Test
-    void databaseRejectsDuplicateEmailAcrossUsers() {
-        String email = uniqueEmail();
-        mapper.insertLocalEmailIdentity(mapper.insertUser(), email);
-        UUID secondUserId = mapper.insertUser();
-        assertThatThrownBy(() -> mapper.insertLocalEmailIdentity(secondUserId, email))
-                .isInstanceOf(DuplicateKeyException.class);
-    }
-
-    @Test
     void databaseRejectsPlaintextPasswordStorage() {
         UUID identityId = mapper.insertLocalEmailIdentity(mapper.insertUser(), uniqueEmail());
+        assertThat(identityId.version()).isEqualTo(7);
         assertThatThrownBy(() -> mapper.insertPasswordCredential(identityId, "plaintext-is-not-a-verifier"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }

@@ -2,8 +2,8 @@
 
 - Document Status: `IMPLEMENTED`
 - Feature / Slice: `R1-A`
-- Last Verified: `2026-10-21`
-- Entry: Spring bean `LocalAccountPersistence.createAccountWithLanguageAccess()`；当前由 Java integration test 调用。
+- Last Verified: `2026-10-25`
+- Entry: Spring bean `LocalAccountPersistence.createAccountWithLanguageAccess()`；当前由内部注册 Service 和 Java integration test 调用。
 
 ## 1. Behavior Boundary
 
@@ -12,6 +12,7 @@
 不接受外部指定 userId / appCode，不创建 PERSONAL_NOTE 授权、管理员资格、Session 或业务数据。
 本事务入口不负责邮箱 / 密码 policy、Argon2、限流、登录或跨服务会话核验。
 R1-B 已提供内部密码组件，及先散列再持久化的组合测试，见 [密码处理流程](identity-password-hashing.md)；账户事务本身未改变。
+R1-D 已接通 [内部 LOCAL_EMAIL 注册流程](identity-local-registration.md)，邮箱 / 密码规则和安全失败映射在该调用方负责；本事务与 SQL 未改变，2026-10-25 同候选的账户 4 项 / Mapper 3 项 / 密码数据库组合 1 项回归 PASS，0 skipped。
 
 ## 2. Main Call Chain
 

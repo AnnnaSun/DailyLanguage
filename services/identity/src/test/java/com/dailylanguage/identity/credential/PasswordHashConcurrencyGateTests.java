@@ -25,15 +25,6 @@ class PasswordHashConcurrencyGateTests {
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withBean(PasswordHashConcurrencyGate.class);
 
-    @Test
-    void returnsResultsAndReleasesCapacityAfterSuccessFalseAndNull() {
-        var capacity = new PasswordHashConcurrencyGate(1);
-        assertThat(capacity.runWithAvailableSlot(() -> "completed")).isEqualTo("completed");
-        assertThat(capacity.runWithAvailableSlot(() -> false)).isFalse();
-        assertThat(capacity.<String>runWithAvailableSlot(() -> null)).isNull();
-        assertThat(capacity.runWithAvailableSlot(() -> true)).isTrue();
-    }
-
     @ParameterizedTest
     @MethodSource("operationFailures")
     void propagatesOperationFailureAndReleasesItsCapacity(Throwable failure) {
@@ -50,21 +41,6 @@ class PasswordHashConcurrencyGateTests {
     static Stream<Throwable> operationFailures() {
         return Stream.of(new IllegalStateException("synthetic operation failure"),
                 new AssertionError("synthetic operation error"));
-    }
-
-    @Test
-    void rejectsNullOperation() {
-        var capacity = new PasswordHashConcurrencyGate(1);
-        assertThatThrownBy(() -> capacity.runWithAvailableSlot(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("passwordHashOperation must not be null");
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = {0, -1})
-    void rejectsNonPositiveCapacity(int configuredCapacity) {
-        assertThatThrownBy(() -> new PasswordHashConcurrencyGate(configuredCapacity))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

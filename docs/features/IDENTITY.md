@@ -2,12 +2,13 @@
 
 ## 当前 Gate
 
-- Date: 2026-10-24
-- Current Slice: R1-C — Identity 注册密码策略与离线 blocklist。
-- Gate: READY_TO_COMMIT；用户在提示后完成 `LocalPasswordPolicy.validate`，Code Review 与工程验收 PASS，本 slice 的 Human Review / Ownership 讨论已完成；提交由用户决定。
+- Date: 2026-10-25
+- Current Slice: R1-D — Identity 内部 LOCAL_EMAIL 注册闭环；2026-10-25 用户确认范围并承担 Human Core。
+- Gate: READY_TO_COMMIT；工程验收、Flow 和本 Slice Human Review 已收口，等待用户 Commit Decision。Ownership 结论只限定当前注册编排与错误边界，不提升模块整体等级。R1-C COMPLETE / COMMITTED `1738792`，不重开 Review。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 本次 policy 8/8、blocklist 12/12、既有密码 / 容量 / HTTP 38/38，共 58/58 PASS；package 退出码 0，JAR 内资源 checksum 一致。详细合同及验收边界见下方 R1-C。
-- 不自动 commit / push，不提高 Ownership，不开始下一 slice。
+- 当前基线：`migrate/identity` / `e6b8e22fbbe15f6c61e5c131558c35a4cea4951c`（PR #29 合并提交），包含 R1-C `173879256a161093381ff1c2e0110c33be719b8a`；2026-10-25 同步前工作区干净，沿用用户已切换分支。
+- PRIOR（2026-10-24）：R1-C 58/58、package 与 JAR 资源 checksum 验收保留为历史证据；R1-D 同日 65/65 和数据库 9/9 两批验收及 package 见下方记录。本次 Review 收口未重跑测试或构建。
+- 不自动 commit / push，不提高模块整体 Ownership；停在 READY_TO_COMMIT，不自动开始下一 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -349,8 +350,8 @@ NOT_RUN：上游源重新生成、完整 JAR / PostgreSQL / browser / Session / 
 - Behavior Flow: NOT_REQUIRED；当前是同一 credential 包内可直接追踪的输入校验与固定表查询，未形成注册跨模块调用链，现有 hash / matches Flow 未改变；后续接注册流程时同步真实 Flow。
 - NOT_RUN：完整服务 JVM / PostgreSQL、浏览器、Session、跨服务及上游 blocklist 重新生成；本 slice 未修改这些路径，不以历史运行代替 fresh 证据。
 
-Engineering Acceptance: PASS（仅 R1-C 内部密码策略与 blocklist）。Current Gate: READY_TO_COMMIT；Human Review 证据见下方记录。
-单一 Next Action：由用户决定提交当前 R1-C；不自动 commit、push 或实现下一 slice。
+Engineering Acceptance: PASS（仅 R1-C 内部密码策略与 blocklist，历史证据）。R1-C 已提交 `1738792`；Human Review 证据见下方记录。
+2026-10-25 提交状态同步：R1-C COMPLETE / COMMITTED；下一 slice 仅进入 Design / Scope，不自动 commit、push 或实现。
 
 ### User Review / Ownership — R1-C，2026-10-24
 
@@ -360,4 +361,159 @@ Engineering Acceptance: PASS（仅 R1-C 内部密码策略与 blocklist）。Cur
 - Understanding: UNDERSTOOD（限定本 slice 的校验顺序、输入规则与调用边界判断）；以上实现、修正和真实 Review 讨论作为 Ownership evidence，不要求补答概念题，不提升整个 Identity 或密码学模块的掌握等级。
 - 收口核对：validate 当前 blob `22ecf134314165f77bd2692ad533c6ffa1668c9c` 与已 Review 的实现一致；沿用同日已记录的 58/58、package 与资源完整性验证，本次仅同步 Review 结论，未重跑测试。
 
-Human Review: COMPLETE。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
+Human Review: COMPLETE。R1-C Gate: COMPLETE / COMMITTED `1738792`（2026-10-25 按 Git 同步；不重开 Review）。
+
+## R1-D — Identity 内部 LOCAL_EMAIL 注册闭环
+
+### 已批准目标与边界
+
+2026-10-25 用户确认完整内部闭环方案，并明确承担 Human Core；等级 A — Critical。
+在 R1-A 四表事务、R1-B 受限散列和 R1-C 密码策略之上新增注册调用方，不重写已完成的 validate。
+仅供内部 Java 调用与工程验证，当前没有公开 HTTP / RPC 注册入口。
+
+目标链：LocalRegistrationService.register → LocalEmailNormalizer.normalize → 既有 LocalPasswordPolicy.validate
+→ 既有 LocalPasswordHasher.hash / capacity gate → 既有 LocalAccountPersistence 事务代理 → 返回 UUID。
+成功时 app_user、auth_identity、local_password_credential、默认 LANGUAGE app_access_grant 一起提交。
+
+- 邮箱沿用既有 ASCII / 254 字符及 local part / domain label 规则：strip 首尾空白、先拒绝非 ASCII，再用 Locale.ROOT 小写化并检查语法；不合并 plus / dot，不查 DNS 或验证邮箱所有权。
+- 原始密码不改写，policy 拒绝后不能散列或写库；正常调用没有外层事务，Service 不标注 @Transactional，昂贵散列在进入账户事务前完成。
+- 不增加重复邮箱预查询；数据库唯一约束裁决并发。不得接收外部 verifier、userId、appCode 或管理员资格。
+- 仅复用 concrete 组件；新 Service 承担输入到计算、事务及安全失败之间的编排职责，不新增 Interface / Factory / module / dependency。
+- 不修改原账户事务、policy、hasher、容量参数、schema、安全配置或旧 server；不迁入旧三表 persistence。
+
+Non-scope：公开注册 / 登录、Session / Redis、Rate Limit、Gateway、Dubbo / Nacos / mTLS、业务消费者、前端、
+邮箱验证 / 恢复、自动重试 / 幂等、生产容量、提交确认丢失实验、依赖升级与额外重构。
+
+### 文件、预算与失败合同
+
+新增 production 文件均位于 services/identity/src/main/java/com/dailylanguage/identity/account/：
+LocalEmailNormalizer.java、LocalRegistrationService.java、LocalRegistrationException.java。
+旧参考实现共 234 行，预计最终 230–250 行 / 3 文件；明显超出时回到 Scope Decision，不牺牲可读性硬凑预算。
+新增同 package 测试 LocalEmailNormalizerTests、LocalRegistrationServiceTests、LocalRegistrationIntegrationTests。
+文档同步本合同与 PROJECT_STATUS；真实链验证完成后再创建注册 Behavior Flow 并登记索引，骨架不记作已实现 Flow。
+
+| 失败 | 内部 failure reason / 处理 |
+|---|---|
+| 邮箱 null / 非法 | INVALID_EMAIL；不进入 policy、散列或持久化 |
+| 密码长度 / 字符 / 弱密码 | INVALID_PASSWORD_LENGTH / INVALID_PASSWORD_CHARACTER / COMMON_OR_COMPROMISED_PASSWORD；不散列、不写库 |
+| policy 意外 RuntimeException | REGISTRATION_FAILED；只记 PASSWORD_POLICY stage 和 exception type |
+| hash 容量不足 | REGISTRATION_FAILED；立即拒绝，不排队、不写库、不记 ERROR |
+| 其他 hash RuntimeException | REGISTRATION_FAILED；只记 PASSWORD_HASH stage 和 exception type，名额由既有 gate 归还 |
+| persistence DuplicateKeyException | IDENTITY_UNAVAILABLE；经过独立事务代理传播后映射，不记录敏感异常 |
+| 其他 persistence RuntimeException | REGISTRATION_FAILED；只记 PERSISTENCE stage 和 exception type，不返回成功、不自动重试 |
+
+异常使用固定消息、不附带原始 cause chain；不记录邮箱、密码、verifier、SQL 参数或数据库异常正文。
+IDENTITY_UNAVAILABLE 是安全映射，不把任意唯一冲突都宣称为已精确识别的邮箱冲突；未来唯一键扩展时重新评估。
+已确认 SQL 写入失败可验证整笔回滚；提交确认丢失可能是 UNKNOWN，generic failure 不承诺账户不存在。
+Architecture / Data / external API Impact：无新增架构机制、schema、对外合同或权限放行；Security Impact：A 类内部编排。
+
+### Human Core、分工与验收
+
+- 用户：LocalRegistrationService.register(String submittedEmail, String submittedPassword) 的主流程与持久化失败分支，预计 20–30 行；不要求修改已有 validate。
+- Codex：normalizer、constructor、normalizeEmail / validatePassword / hashPassword / logUnexpectedFailure helper、异常模型、Unit / Integration Tests 与验证。
+- 骨架只提供签名、可调用的 helper、依赖字段和明确抛出的未实现占位；Codex 不给出完整 register 替换答案。
+- Learning Focus：计算资源与事务的边界；失败返回与数据库提交结果的区别。
+- User Review 入口：register 的顺序 / 拒绝短路 / catch 范围；helper 的安全映射；真实事务与并发测试。
+
+Acceptance Criteria：按邮箱 → policy → hash → persistence 顺序执行，传递规范化邮箱与原始密码；
+只成功返回真实 userId；唯一冲突和意外持久化异常安全映射；不扩大事务、不输出敏感值、不重试。
+helper 不写数据库，账户事务仍由独立 Spring bean 提供。用户实现后基于真实 Diff 与测试 Review，不安排固定概念问答。
+
+### Verification Plan
+
+1. Normalizer unit：首尾空白、小写化、plus / dot 保留、ASCII / 语法和长度边界、Unicode compatibility 拒绝。
+2. Service unit：顺序与原值、各拒绝分支短路、意外异常 / 唯一冲突 / 容量映射，以及固定异常与日志脱敏。
+3. 新注册 PostgreSQL integration 只验证真实组件接通、四表 / verifier 与 hash 无活动事务；输入拒绝和异常映射由 Service unit 覆盖。
+4. 并发唯一冲突及凭据 / 授权失败回滚复用既有 LocalAccountPersistenceIntegrationTests，不在新注册层复制协调线程和故障注入。
+5. 用户完成后执行既有 policy / blocklist / hasher / capacity / HTTP 回归、账户数据库回归与 package；输出真实 fresh / prior / skipped / NOT_RUN。
+
+骨架阶段不启动数据库执行占位流程；先编译测试并运行 normalizer、Service unit 和最相关既有回归。
+Service 行为测试应因 Human Core 未完成保持 RED；数据库链、完整 Slice 验收及 Ownership 仍待用户实现。
+
+### Verification — 2026-10-25 骨架阶段
+
+- 首次 testCompile 发现容量异常构造器仅包内可见；只调整新测试为 Mockito 按异常类型抛出，不扩大 production API。随后全部测试源码编译成功，包含 LocalRegistrationIntegrationTests。
+- 默认权限运行停留在 Mockito 自附加阶段，尚无行为测试结果；已结束受阻命令，随后在获准的正常 Windows 权限环境重跑同一定向测试，未修改 POM / agent 配置。
+- FRESH：LocalEmailNormalizerTests 25/25 PASS；既有 policy 8/8、blocklist 12/12、hasher 17/17、capacity 12/12、HTTP 9/9，共 58/58 PASS。
+- FRESH：LocalRegistrationServiceTests 14 项均因 register 未实现而 RED（13 failures、1 error）；XML 中 14 项失败均包含 Human Core 占位异常，未发现其他失败原因。总计 97 项，83 PASS、0 skipped，实际退出码 1，不是整体验收通过。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am test '-Dtest=LocalEmailNormalizerTests,LocalRegistrationServiceTests,LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- 日志：忽略的 services/identity/target/r1d-scaffold-tests-authorized.log；XML：target/surefire-reports/。骨架三个 production 文件共 206 行，最终实现仍需核对 250 行认知预算。
+- 自查边界：没有修改现有组件、事务、schema、安全配置、POM 或旧 server；register 保留明确失败占位，未替用户实现。helper 的端到端分支需用户完成主流程后由 Service tests 验证，不因 helper 存在就宣称链路可用。
+- NOT_RUN：新增 5 项真实数据库用例及既有数据库回归、package / JAR 资源校验、完整服务启动、提交确认丢失、浏览器 / Session / 跨服务。数据库测试仅编译，不以环境条件跳过记作通过。
+
+### 测试去重 — 2026-10-25
+
+用户要求只审视、删除 Identity 测试冗余；未修改 production、Human Core 或依赖，R1-C Review 不重开。
+检查 src/test 下全部 12 个 Java 文件，修改 8 个，测试总行数 1,302 → 1,058，净减少 244 行；没有新增文件、工具或测试依赖。
+
+- 删除新注册 integration 中重复的输入拒绝、并发唯一键与 trigger 回滚用例；这些分别由 Service unit 与既有账户事务测试承担。
+- 删除 Mapper 的重复四表成功 / 唯一约束用例，以及 hasher 的 mock 容量拒绝；真实账户事务与 capacity gate 测试保留。Mapper 原有 identity UUIDv7 断言移入剩余存储约束用例，没有删除该独有检查。
+- 精简同类非法邮箱排列、全 printable ASCII 枚举、重复 blocklist 结构校验 / 并行只读压力及纯组件无日志断言；保留真实资源完整性、密码边界和安全参数校验。
+- 既有 IdentityPasswordHashingIntegrationTests 保留：register 尚未实现，新的 RED 注册链不能替代已经可运行的 hasher / 持久化组合证据。
+- R1-D 的三个新增测试类仍分别验证纯邮箱规则、Service 安全失败 / 短路合同，以及真实 Spring / 数据库组合，不能靠新增文件数与 production 类一一对应来判断必要性。当前 R1-D 测试共 278 行 / 骨架 production 206 行，约 1.35 倍。
+- FRESH：定向运行 normalizer 8、policy 7、blocklist 8、hasher 14、capacity 8，共 45/45 PASS；Service 11 项占位 RED（10 failures、1 error），合计 56 项、0 skipped，退出码 1。此前 97 项结果是精简前的 PRIOR，不代表当前测试数量。
+- 新增注册 integration 当前只剩 1 项，全部测试源码已编译；新 / 既有数据库运行、HTTP 重跑、package 均 NOT_RUN。日志为忽略的 target/identity-tests-pruned.log；通过前后 SHA-256 核对 production 文件 0 改动，diff whitespace 检查通过。
+
+### Human Core 增量 Review — 2026-10-25
+
+- 用户在逐步提示后完成注册成功路径和唯一冲突映射；第二个 catch 当前捕获 LocalRegistrationException，不能捕获测试注入的 DataAccessResourceFailureException，且遗漏 PERSISTENCE 安全日志。Codex 只读 Review，未修改用户实现。
+- FRESH：仅运行 LocalRegistrationServiceTests，11 项中 10 PASS、1 failure、0 errors / skipped，退出码 1。失败项 mapsUnexpectedPersistenceFailureWithoutLeakingCauseOrRetrying 观察到原始数据库异常直接传播，尚未进入业务异常转换；安全日志要求也需补齐。
+- 日志：忽略的 target/r1d-register-review.log；其余 45 项组件测试及数据库 / HTTP / package 本批 NOT_RUN。此前占位 RED 与测试去重结果均保留为 PRIOR，不能当作当前实现结果。
+- 当前证据只说明用户提示后实现和这一处具体理解 / 实现缺口，不判定完整 Slice Ownership 或模块掌握等级。
+
+### Human Core 修正与定向验证 — 2026-10-25
+
+- 用户根据提示 / 局部 catch 示例，将第二个 catch 改为 RuntimeException，并补上 logUnexpectedFailure("PERSISTENCE", exception) 后抛固定 REGISTRATION_FAILED。此前具体 Finding 已解除；没有将原始数据库 cause 附加到业务异常。
+- Codex 未修改用户 register；Human Core 如实记录为提示 / 局部示例后实现，不记作独立实现，也不自动推高模块掌握等级。
+- FRESH：仅重跑既有 LocalRegistrationServiceTests，11/11 PASS、0 failures / errors / skipped，退出码 0。原有 10 PASS / 1 failure 是本日修正前的 PRIOR。
+- 代码增量自查：保持邮箱 → policy → hash → 独立账户事务顺序；具体唯一冲突先处理，其他持久化 RuntimeException 安全转换，不重试。register source blob：b498eb26134012e91fb715c1443f7fd43eace94a。
+- 日志：忽略的 target/r1d-register-fixed-review.log。新 / 既有数据库组合、其他组件 / HTTP 回归、package 与 Behavior Flow 本批尚未完成；11 项 mock-based Service tests 不证明真实提交 / 回滚，也不代替用户 Critical Review。
+
+### 整体 Code Review / Verification — 2026-10-25
+
+- Scope MATCH：R1-D 三个新增 production 文件最终共 215 行，新增测试 278 行；另含用户明确授权的 Identity 测试去重。没有新 dependency、schema、公开 API、安全配置、旧 server 或事务机制修改。采用 concrete composition，Extensibility Fit: RIGHT_SIZED。
+- 已核对真实 Git Diff、untracked 新增源文件、直接依赖、测试与合同；源码自查未发现新的正确性 / 安全缺陷。Codex 对自有实现的检查仅为自查，不冒充独立作者 Review。
+- FRESH：以下一次命令退出码 0；normalizer 8、Service 11、policy 7、blocklist 8、hasher 14、capacity 8、HTTP 9，共 65/65 PASS、0 failures / errors / skipped；package 成功。日志：忽略的 target/r1d-full-review-package.log。用户 register blob 仍为 b498eb26134012e91fb715c1443f7fd43eace94a，Review 未修改实现或测试。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=LocalEmailNormalizerTests,LocalRegistrationServiceTests,LocalPasswordPolicyTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,PasswordHashConcurrencyGateTests,IdentityBoundaryHttpTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- Verification: PARTIAL。阻塞缺口：LocalRegistrationIntegrationTests 的真实 Spring / Argon2 / 四表组合从未执行；同候选下现有 Mapper 3、账户事务 4、密码数据库组合 1、新注册组合 1，共 9 项数据库验收 NOT_RUN。Service 使用 mock，HTTP context 排除数据源，不能替代这些证据；不能去掉隔离标识或条件注解来制造通过。
+- Behavior Flow: MISSING。既有账户与密码 Flow 未覆盖新增 normalize / policy / registration failure 链；应在真实链验证后补齐并登记。Review 不自动创建 Flow 或修复实现。
+- Critical Flow：原始输入 → normalize / policy → hash 及名额归还 → 独立账户事务代理 → 四表写入 / 提交 → UUID；明确 SQL 失败与唯一冲突回滚后映射，提交确认丢失仍可能 UNKNOWN，不自动重试。
+- User Review Focus：register 的状态写入边界、helper 的安全异常转换与真实事务测试；Human Core 保留提示 / 局部示例后实现，不自动标记完整 Ownership，不追加固定概念题。
+
+### 工程验收与 Flow 修正 — 2026-10-25
+
+- 用户授权修正上一轮验收 / Flow 缺口。沿用 migrate/identity / e6b8e22；未修改 production、测试、依赖或用户 Human Core，register 前后 blob 均为 b498eb26134012e91fb715c1443f7fd43eace94a。
+- FRESH：新建一次性 PostgreSQL 18.6，使用已缓存官方镜像 postgres:18（digest sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6），loopback 随机端口、tmpfs、独立随机凭据，复用 deploy/local/identity/init-databases.sql；没有运行中的既有容器，未读取或修改旧业务库 / 既有卷。
+- 应用使用非集群管理员 identity_app；执行前核对 DAILYLANGUAGE_R1_ISOLATED_VERIFICATION_ONLY 标识。显式启用 IDENTITY_DATABASE_TESTS=true、容量保持 1，从空 schema 应用 Flyway V1 成功。
+- FRESH：LocalRegistrationIntegrationTests 1/1、LocalAccountPersistenceIntegrationTests 4/4、IdentityMapperIntegrationTests 3/3、IdentityPasswordHashingIntegrationTests 1/1，共 9/9 PASS、0 failures / errors / skipped，package 退出码 0。
+
+```powershell
+.\mvnw.cmd -q -o -pl services/identity -am package '-Dtest=LocalRegistrationIntegrationTests,LocalAccountPersistenceIntegrationTests,IdentityMapperIntegrationTests,IdentityPasswordHashingIntegrationTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- 证明范围：真实 Spring / policy / 受限 Argon2 / 四表事务接通，散列时无活动事务、密码空格保留；并发重复邮箱恰好一成功且无孤立账户，凭据 / 默认授权 SQL 失败回滚，专用账号 / schema 边界和真实 verifier 往返。新注册组合只验证成功链，失败映射仍由 Service unit 与既有真实事务回归分层证明，未重复新增故障测试。
+- 验证结束四表各 4 行合成样本，Flyway 成功记录 1 条、遗留测试 trigger 0。一次性容器 dailylanguage-r1d-review-f78e29ffb4 已停止并自动移除，tmpfs 数据清理；进程环境恢复，未输出或持久保存随机密码。
+- 脱敏证据：忽略的 target/r1d-final-verification-summary.json、r1d-database-package-verification.log、r1d-verification-cleanup.log；上批 65/65 与 package 是同日 PRIOR，不与这次 9 项混写为单次运行。
+- 新增并登记 [内部注册 Flow](../flow/identity-local-registration.md)，同时只更新已受影响的账户 / 密码 Flow 调用方说明；Flow 依据当前 source 与上述验证，不将未来公开注册、Session 或跨服务行为记为已实现。
+- delta-only 自查：两项缺口已解除，Scope MATCH，Code Review / Engineering Acceptance: PASS（仅 R1-D 内部闭环）；Behavior Flow: CURRENT。无新增生产 / 测试文件或代码行数；本次只新增 Flow 文档和同步相关记录。Codex 自查不冒充独立作者 Review。
+- NOT_RUN：独立 JAR JVM 健康重启 / 双启动摘要、数据库崩溃恢复、提交确认丢失、生产容量、公开认证 / Session / 浏览器 / 跨服务；这些不属于本次通过结论。
+
+### User Review / Ownership 收口 — 2026-10-25
+
+- 用户实际完成 register 的输入处理顺序、参数传递、账户调用和持久化失败分支，并在真实 10 PASS / 1 failure 的增量 Review 后修正异常捕获类型与安全日志；包含明确提示及局部 catch 示例，保持“提示 / 局部示例后实现”记录，不记作独立实现或无提示 Debug。
+- 用户看过代码后，提出邮箱 / 密码输入错误必须可区分、以支持未来前端通知的具体 Review 要求。核对 normalizeEmail / validatePassword 的 failureReason 及数据库 try 范围后，确认现有输入错误不会被持久化通用失败覆盖；邮箱目前仍只有 INVALID_EMAIL，不虚构已具备逐条邮箱规则 reason 或前端响应接口。
+- 用户在该问题澄清后要求继续。结合实际编写 / 修正、源码调用追踪及这次具体错误分类 Review，本 Slice Human Review 收口；不以“看过代码”或测试通过单独证明 Ownership，不追加固定概念问答。
+- Understanding: UNDERSTOOD，限定当前 register 的调用顺序、状态写入 / 成功返回，以及输入拒绝与持久化异常的传播边界；不据此认定整个 Identity、Argon2、Spring 事务或前端契约已掌握。OWNERSHIP_MATRIX 等级保持原样。
+- 工程复盘：复用既有规则、受限散列与独立账户事务，通过 concrete Service 形成内部闭环；保留具体输入拒绝，同时对底层故障作安全转换。代价是尚无公开入口 / 前端文案映射；未来公开注册与更细错误合同仍需单独 Scope。提交确认丢失仍可能 UNKNOWN，不引入自动重试。
+- 本次仅核对 Git 与 register blob b498eb26134012e91fb715c1443f7fd43eace94a，和已验收候选一致；沿用同日 65/65 与数据库 9/9 两批 PASS、package 与 Flow 证据，未新增测试或重跑验证，未修改 production。
+
+Human Review: COMPLETE（仅 R1-D）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
+Next Action：由用户决定提交当前 R1-D 及已授权测试去重 / 文档改动；Codex 不自动 commit、push 或开始下一 Slice。
