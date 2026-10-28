@@ -8,8 +8,9 @@
 ## 1. Behavior Boundary
 
 为 Identity 提供 Redis-backed Session 存取基础，使用 Boot 管理的 Spring Session / Spring Data Redis 4.1.1。
-IdentitySecurityConfiguration 未修改，仍为 STATELESS、关闭 formLogin / httpBasic / logout，当前 HTTP 不创建登录会话。
-R1-E authenticate 返回的身份尚未由生产 HTTP 登录入口写入 Session；保存、读取、Cookie 发送、Session ID 轮换、退出与跨服务核验不能混为已实现行为。
+R1-F 验收时 HTTP 仍为 STATELESS，没有生产登录入口。2026-10-26 的 R1-G 已准备 IF_REQUIRED / formLogin / logout 骨架，
+用户失败 handler 尚未实现、真实成功链未运行；本 Flow 保留已验收的 repository 存取边界。
+HTTP 保存、读取、Cookie 发送、Session ID 轮换、退出与跨服务核验不能混为本 Flow 已验收行为；完整 HTTP Flow 待 R1-G 验证后另建。
 
 配置固定 namespace `daily-language:identity:session:v1`、default 非索引 repository、24h idle TTL，连接 / 操作超时均为 1s。
 Identity Redis host 必须显式提供，不回退到旧 Language 地址或 namespace。
@@ -86,5 +87,5 @@ PostgreSQL 18.6 使用既有隔离标识、identity_app 与空 schema Flyway V1�
 - [SessionConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/SessionConfiguration.java)：固定 serializer bean 与精确业务类型许可。
 - [application.yml](../../services/identity/src/main/resources/application.yml)：独立 Redis / namespace、timeout、TTL 与 Cookie 配置。
 - [POM](../../services/identity/pom.xml)：Boot-managed Session Redis starter；JAR 核对 Session / Data Redis 4.1.1、Lettuce 7.5.2.RELEASE。
-- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/IdentitySecurityConfiguration.java)：现有 HTTP 与 STATELESS 边界，未修改。
+- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/IdentitySecurityConfiguration.java)：R1-F 原为 STATELESS；当前 R1-G HTTP 骨架边界见上文，完整链待验证。
 - [SessionSerializationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/SessionSerializationTests.java)、[RedisSessionIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/RedisSessionIntegrationTests.java)、[RedisSessionUnavailableIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/RedisSessionUnavailableIntegrationTests.java)：三组代表性证据。

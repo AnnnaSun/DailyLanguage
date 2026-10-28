@@ -1,6 +1,6 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-10-26 — R1-F READY_TO_COMMIT；工程验收 / 自查 PASS，Session Flow CURRENT，用户已接受本 Slice Human Review；80/80、数据库 10/10 两批及 package 为 2026-10-25 PRIOR。等待用户 Commit Decision，Codex 不自动提交。
+> Last updated: 2026-10-26 — R1-G HUMAN_CORE_READY；用户已批准范围并承担登录失败 handler，Codex 骨架与测试已准备。定向 15 项中 13 PASS、2 项为 handler 占位 RED，全部源码编译通过；尚未整体验收。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
 > 当前状态入口；详细合同在 Feature / Phase / ADR，早期历史见 [历史快照](history/PROJECT_STATUS_2026-10-10.md)。
 > R1-A / R1-B / R1-C Human Core 均为用户提示后实现；当前验证不代表公开注册 / 登录 / Session 或跨服务验收通过，也不自动提高模块整体 Ownership。
 
@@ -10,15 +10,15 @@
 |---|---|
 | Product Phase | M1 — Minimum Text Practice Loop；尚未达到 S11 / S12 exit |
 | S11 | PARTIAL；A observation API、B 最小认证 UX 已实现、用户 Review 接受并提交；其余 UI 未实现 |
-| Current work | R1-F READY_TO_COMMIT；Session 存储基础工程验收 / 自查 PASS，Flow CURRENT，Human Review COMPLETE；Codex 实现，不记用户 hands-on，尚未提交 |
+| Current work | R1-G HUMAN_CORE_READY；HTTP / Session 骨架已准备，用户登录失败 handler 待实现；定向 15 项、13 PASS / 2 预期 RED，0 skipped，非整体验收 PASS |
 | C31 | PRIOR PATCHED_C31_PASS；一次性工程、临时补丁与运行产物已按用户要求删除；不证明官方原版兼容或 Identity 行为 |
-| Git baseline | 2026-10-25 核对：`migrate/identity` / `8630e6fddefaad53acc01dc721c757705a17c1a5`（email登录认证）；提交包含 R1-E 的 12 个实现 / 测试 / 文档文件，同步前工作区干净，Provider 与收口 blob 3fc6e77 一致 |
+| Git baseline | 2026-10-26 核对：`migrate/identity` / `dc8df93a2aaf7dc4601d3e207907792db28ed611`（spring session初始化）；提交包含 R1-F 的 13 个实现 / 测试 / 文档文件，同步前工作区干净，SessionConfiguration 与验收 blob 29f06944 一致 |
 | Main baseline | 迁移启动时核对的本地 main、origin/main 与远端 main 均为 `f5a729a`，即 PR #28 合并提交；本次未重新查询远端 |
-| Current scope | 已批准 R1-F：Boot-managed Session Redis、精确 JSON 类型许可、独立 Redis / namespace / TTL / Cookie 配置与代表性存取 / 故障测试；Codex 完整实现，不接通公开认证入口 |
-| Next Action | 用户决定提交当前 [R1-F](../features/IDENTITY.md#r1-f--redis-session-基础) 实现、测试与相关文档；Codex 不自动 commit / push 或开始下一 Slice |
+| Current scope | 已批准 R1-G login / logout / me、CSRF、框架 Session lifecycle 与已知存储故障转换；4 个 production 文件；用户实现失败 handler，Codex 承担其余代码 / 验证，不扩展到注册 / 应用授权 / 限流 / Gateway |
+| Next Action | 用户实现 [R1-G Human Core](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期) 的登录失败 handler，随后增量 Review / 定向验证；Codex 不代写核心段 |
 
 旧 PROJECT_STATUS 的 S10 READY_TO_COMMIT 与已删除交接快照的 S9 Gate 均为历史状态，不据此重开已完成的 Review。
-当前迁移入口为 [Identity R1-F](../features/IDENTITY.md#r1-f--redis-session-基础)；恢复顺序为 AGENTS → 本文件 → 当前 Feature / Slice 合同，再核对 Git 与源码。
+当前迁移入口为 [Identity R1-G](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期)；恢复顺序为 AGENTS → 本文件 → 当前 Feature / Slice 合同，再核对 Git 与源码。
 S11 恢复入口保留在 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.md#20-s11-migration-checkpoint--2026-10-21)。
 
 ## Delivery Summary
@@ -36,14 +36,15 @@ S11 恢复入口保留在 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.
 | 平台迁移 / R1-C | COMPLETE / COMMITTED `1738792`；工程验收 PASS、Code Review 无阻塞问题、Human Review 完成；Human Core 提示后实现 | [Identity R1-C](../features/IDENTITY.md#r1-c--注册密码策略与离线-blocklist) |
 | 平台迁移 / R1-D | COMPLETE / COMMITTED `c1be36d`；工程验收 PASS，Flow CURRENT，Human Review COMPLETE；Human Core 保持提示 / 局部示例后实现，不提升模块整体 Ownership | [Identity R1-D](../features/IDENTITY.md#r1-d--identity-内部-local_email-注册闭环) |
 | 平台迁移 / R1-E | COMPLETE / COMMITTED `8630e6f`；工程验收、Flow 与 Human Review 已收口，Human Core 提示 / 局部示例后实现，不提升模块 Ownership | [Identity R1-E](../features/IDENTITY.md#r1-e--内部-local_email-凭据认证) |
-| 平台迁移 / R1-F | READY_TO_COMMIT；工程验收 / 自查 PASS，Flow CURRENT，Human Review COMPLETE；80/80、数据库 10/10 两批及 package 为 PRIOR，Codex 实现，不提升模块 Ownership | [Identity R1-F](../features/IDENTITY.md#r1-f--redis-session-基础) |
+| 平台迁移 / R1-F | COMPLETE / COMMITTED `dc8df93`；工程验收、Flow 与 Human Review 已收口；80/80、数据库 10/10 两批及 package 为 PRIOR，Codex 实现，不提升模块 Ownership | [Identity R1-F](../features/IDENTITY.md#r1-f--redis-session-基础) |
+| 平台迁移 / R1-G | HUMAN_CORE_READY；用户承担登录失败 handler，骨架定向 13 PASS / 2 占位 RED，尚无完整验收或 Ownership 结论 | [Identity R1-G](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期) |
 
 S11-A 的 Human Core 曾由用户明确转交 Codex；S11-B / C31 由 Codex 实现。不记作用户 hands-on，
 Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](../ownership/OWNERSHIP_MATRIX.md) 保持既有等级。
 
 ## Active Decisions / 迁移与恢复边界
 
-- 迁移前分支已通过 PR #28 合并，R1-A / R1-B / R1-C 已纳入 PR #29；R1-D 已提交 c1be36d，R1-E 已提交 8630e6f。2026-10-25 用户批准 R1-F 范围、160–220 行测试预算和 Codex 完整实现；不自动 commit / push。
+- 迁移前分支已通过 PR #28 合并，R1-A / R1-B / R1-C 已纳入 PR #29；R1-D 已提交 c1be36d，R1-E 已提交 8630e6f，R1-F 已提交 dc8df93。2026-10-26 用户确认 R1-G 范围与 Human Core 分工；不自动 commit / push。
 - R1-B 仅在 Identity 增加受限密码散列 / 校验和 bcprov-jdk18on:1.86；进程限额本地默认 1，散列与校验共享，容量不足立即拒绝。用户 Human Core 不由 Codex 代写，旧 server 及其依赖保持原样。
 - R1-C 只迁入既有注册密码 policy 与固定 blocklist，用户实现 validate；helper / 资源 / 测试由 Codex 准备。原始密码不改写，保持 12–64 printable ASCII 与 exact matching；不进入现有 matches 登录校验链，不启用注册 / Session，不新增 dependency 或数据库行为。
 - 已确认 C25：共同版本／基础合同 → Identity → PersonalNote 最小只读认证接入 → Language 身份／本地引用切换 → 扩大迁移。各步仍需小 slice 合同；完整设计、命名、身份接口和数据操作未整体获批。
@@ -84,6 +85,7 @@ Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](.
 | 2026-10-25 / R1-E Human Review 收口 | 用户实际查看代码后接受当前判断，无待修问题；当前 Provider 3fc6e77 与验收版 2476e0a 的 blob diff 仅为删除骨架说明，逻辑不变；diff whitespace PASS | 本轮未重跑测试，76/76 与数据库 10/10 为同日 PRIOR；Human Core 保持提示 / 局部示例后实现，不升级模块 Ownership，不自动提交 |
 | 2026-10-25 / FRESH，R1-F | 第一批 JSON 2、真实 Redis 1、不可用 Redis 1、既有 Identity 76，共 80/80 PASS；第二批 PostgreSQL 账户 / 认证组合 10/10 PASS；均 0 failures / errors / skipped、package 退出 0；JAR、Compose 与 diff whitespace 检查 PASS，Session Flow CURRENT | 初始 starter 缓存缺失与本机权限失败保留在 Feature；真实 TTL / Cookie 配置绑定不证明浏览器会话生命周期；Redis 测试键 0，两临时容器 / tmpfs 已清理，R1-E 核心未改；不自动提高 Ownership |
 | 2026-10-26 / R1-F Human Review 收口 | 用户在分工和真实 Slice 边界讨论后接受当前实现；关键 source blob 与验收记录一致，diff whitespace PASS | 未重跑测试或修改 production / 测试；沿用 2026-10-25 PRIOR，不记用户 hands-on 或独立掌握，不自动提交 |
+| 2026-10-26 / FRESH，R1-G 骨架 | 全部测试源码编译成功；定向 HTTP 11 项中 9 PASS / 2 failures、Redis 故障 2/2、JSON 2/2，共 15 项、13 PASS、2 failures、0 errors / skipped，退出 1 | 两项均为合法 CSRF 后进入 handler 占位返回 500，预期应为 401 / 503；故障 HTTP 用 mock 认证，不替代真实凭据 / Session 闭环；真实数据库与 Redis 组合、package 本批 NOT_RUN |
 | 本轮 / NOT_RUN | 独立 JAR JVM / 双启动摘要、JAR blocklist 单独完整性校验、公开注册 / 登录 / Session、旧 Java / Vue / 浏览器回归、跨服务认证、真实 C31 重跑、live Provider、SAA、K3s / Tekton、生产部署、数据库崩溃恢复和提交确认丢失 | 当前通过限于 Identity 内部注册及既有账户回归；不以测试代替公开认证、生产或用户 Ownership 结论 |
 
 完整 S11 批次、失败与局限见 Feature §18–19；C31 仅保留平台方案 §9.3 的脱敏摘要。
@@ -98,7 +100,8 @@ C31 一次性验证源码及本机诊断日志／构建产物已按用户 2026-1
 - R1-C COMPLETE / COMMITTED `1738792`；工程验收 PASS，无 blocking finding；用户的实际实现 / 修正、对邮箱调用边界的质疑与保留当前写法的设计判断构成本 slice 的 Human Review evidence。Human Core 保持提示后实现，不提升模块整体掌握等级，不重开 Review。
 - R1-D COMPLETE / COMMITTED `c1be36d`；65/65 与数据库 9/9 两批、package / Flow / Human Review 已收口，提示 / 局部示例后实现记录保留，不自动提高模块 Ownership。
 - R1-E COMPLETE / COMMITTED `8630e6f`；工程验收、自查、认证 Flow 与本 Slice Human Review 已收口，不重新打开，无公开登录 / 跨服务验收结论，不提升模块 Ownership。
-- R1-F READY_TO_COMMIT；工程验收 / 自查、Session Flow 与本 Slice Human Review 已收口，等待用户 Commit Decision；Codex 实现，不记用户 hands-on 或升级模块 Ownership，不自动提交或开始下一 Slice。生产登录写入 Session / rotation / logout 与跨服务核验仍未实现。
+- R1-F COMPLETE / COMMITTED `dc8df93`；工程验收、Session Flow 与本 Slice Human Review 已收口，不重新打开；Codex 实现，不记用户 hands-on 或升级模块 Ownership。
+- R1-G HUMAN_CORE_READY；登录失败 handler 待用户实现，核心未完成阻止整体工程验收 / Human Review / 提交。真实 HTTP 成功链已写测试但未运行，完整 Flow 待验证后补，不将骨架当作登录闭环 PASS；跨服务未实施。
 - 2026-10-24 已按用户要求在 Identity POM 补回 `bcprov-jdk18on:1.86`，解决实际复现的 3 项缺类错误；此前声明缺失来源仍 UNKNOWN，未据此确认 Maven / IDE 根因。
 - 平台完整 ADR、跨服务认证／故障、前端迁出与仓库命名仍待后续决策；本轮没有批准这些后续实现。
 - S11 整体 PARTIAL，迁移后重新定义下一 slice；没有 S11 全页面端到端验收或 S12 closeout PASS。

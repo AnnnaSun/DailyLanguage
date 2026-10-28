@@ -11,8 +11,9 @@
 Provider 读取 LOCAL_EMAIL credential，校验密码后返回认证 token；principal 仅为 AuthenticatedAccount(userId)，
 credentials 为 null、authorities 为空。凭据有效不等于获得应用准入。
 
-当前 Spring 已发现该 Provider，但没有公开登录 HTTP / RPC 入口；安全配置仍关闭 formLogin / httpBasic，
-健康检查之外的普通请求全部拒绝，不创建 Session。应用授权、账号启停、Redis、Rate Limit、业务消费者和前端不在本 Slice。
+R1-E 验收时仅内部调用，尚无登录 HTTP / RPC 入口。2026-10-26 的 R1-G 已进入 HTTP 接入骨架阶段，
+登录失败 handler 为用户 Human Core、真实成功链尚未运行；本 Flow 只描述已验收的 Provider 行为，不把骨架视为完整 HTTP 登录验收。
+应用授权、账号启停、Rate Limit、业务消费者和前端不在本 Flow；完整 HTTP / Session 流程待 R1-G 验证后单独记录。
 登录不执行注册 password policy / blocklist，不 trim 或改写有效密码。
 
 ## 2. Main Call Chain

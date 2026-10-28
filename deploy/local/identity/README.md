@@ -60,8 +60,8 @@ Mapper 样本随测试事务回滚；未来账户行为测试提交的合成账�
 java -jar services/identity/target/identity-service-0.0.1-SNAPSHOT.jar
 ```
 
-默认 HTTP 地址为 `http://127.0.0.1:8081`，只允许 `GET /actuator/health`。
-没有注册 / 登录 / 退出 / Session API；不能用旧应用的 `REGISTRATION_ENABLED=false` 开启自动身份。
+默认 HTTP 地址为 `http://127.0.0.1:8081`。R1-F 验收时只允许 `GET /actuator/health`；当前 R1-G 已准备 login / logout / me 骨架，但登录失败 handler 尚待用户实现，完整认证闭环未验收，不作为可用登录服务。
+注册接口仍关闭，不能用旧应用的 `REGISTRATION_ENABLED=false` 开启自动身份。
 `-DskipTests` 只是打包，不是验证证据。Cloud 在本 slice 仅导入 BOM，没有 Cloud starter/runtime 验证。
 
 暂停环境时可使用同一 compose 文件执行 `stop`，保留新卷；本合同不提供自动删卷或清库步骤。
@@ -111,8 +111,8 @@ JSON 只额外允许 AuthenticatedAccount，预期属性来自 R1-E 的空 crede
 Redis 不可用时保存失败，不回退到 JVM 内存 Session；完整服务的健康检查也会反映 Redis 故障。
 
 Cookie 默认 SESSION / HttpOnly / Secure / SameSite=Lax / Path=/，不设 Domain / Max-Age。
-当前 HTTP 仍不创建登录会话；未来本机 HTTP 登录验收需要显式设置 `IDENTITY_SESSION_COOKIE_SECURE=false`，
-不得因此关闭 Hosted 默认 Secure。会话轮换、退出、登录接口与跨服务核验尚未实现。
+R1-F 的测试只验证存储基础；当前 R1-G 的 HTTP Session 骨架尚未完成整体认证验收。本机 HTTP 登录验收需显式设置 `IDENTITY_SESSION_COOKIE_SECURE=false`，
+不得因此关闭 Hosted 默认 Secure；完整链证据以 R1-G 合同为准，跨服务核验仍未实现。
 
 ```sh
 # 单独执行 serializer 与现有 HTTP 边界，不需要真实 Redis。

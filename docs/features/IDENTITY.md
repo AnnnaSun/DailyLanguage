@@ -3,12 +3,12 @@
 ## 当前 Gate
 
 - Date: 2026-10-26
-- Current Slice: R1-F — Redis Session 基础；2026-10-25 用户批准范围、160–220 行测试预算及 Codex 完整实现分工。
-- Gate: READY_TO_COMMIT；R1-F 工程验收与自查 PASS，Session Flow CURRENT，用户已接受本 Slice Human Review。Codex 完整实现，不记为用户 hands-on，不提高模块整体 Ownership。R1-E COMPLETE / COMMITTED `8630e6f`，不重新打开。
+- Current Slice: R1-G — HTTP 认证与 Session 生命周期；2026-10-26 用户确认实施，用户承担登录失败 handler，Codex 完成其余范围。
+- Gate: HUMAN_CORE_READY；骨架与全部测试源码编译通过，定向 15 项中 13 PASS、2 项为 handler 占位 RED；尚未完成工程验收或 Human Review。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 当前基线：`migrate/identity` / `8630e6fddefaad53acc01dc721c757705a17c1a5`（email登录认证）；2026-10-25 核对提交包含 R1-E 实现、测试与相关文档，本次同步前工作区干净。Provider blob 与收口候选 3fc6e7749ced047c5d635889ffad2b4f6c68ae25 一致。
+- 当前基线：`migrate/identity` / `dc8df93a2aaf7dc4601d3e207907792db28ed611`（spring session初始化）；2026-10-26 核对提交包含 R1-F 的 13 个实现 / 测试 / 文档文件，本次同步前工作区干净。SessionConfiguration blob 与验收候选 29f0694464e57a4b20187075a58077192e6cca4e 一致。
 - PRIOR：R1-F 2026-10-25 的 80/80 与数据库 10/10 两批、package 与清理证据见下方记录；2026-10-26 Review 收口只核对 Git / source 并同步文档，未重跑测试。更早各 Slice 的有日期证据保留为历史。
-- 不自动 commit / push，不提高模块整体 Ownership；当前 R1-F READY_TO_COMMIT，等待用户 Commit Decision，不自动开始下一 Slice。
+- 不自动 commit / push，不提高模块整体 Ownership；停在 R1-G HUMAN_CORE_READY，Codex 不代写用户登录失败 handler 或开始下一 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -707,5 +707,64 @@ Current Gate: OWNERSHIP_PENDING。Next Action：用户 Review 当前 R1-F 实现
 - 本轮只同步 Review 收口记录，未修改 production / 测试，未重跑验证；2026-10-25 的 80/80、数据库 10/10 两批及 package PASS 为 PRIOR，不标为本轮 fresh。
 - 工程取舍：通过框架提供 Session 存取生命周期，业务新增 Java 主要是 serializer 边界；代价是新增 Redis 运行依赖，以及必须分清存储基础与后续 HTTP 登录生命周期。后续公开接口仍需独立 Slice Contract，不以本次 Review 扩大授权。
 
-Human Review: COMPLETE（仅 R1-F）。Current Gate: READY_TO_COMMIT。Code State: UNCOMMITTED。
-Next Action：用户决定提交当前 R1-F 实现、测试与相关文档；Codex 不自动 commit / push 或开始下一 Slice。
+Human Review: COMPLETE（仅 R1-F）。R1-F Gate: COMPLETE / COMMITTED `dc8df93`。
+2026-10-26 提交状态同步：用户已提交 dc8df93a2aaf7dc4601d3e207907792db28ed611，SessionConfiguration 与验收 blob 一致；本次未重跑测试或重开 Review。
+Next Action：下一 Slice 进入 Design / Scope，建议 R1-G 接通 HTTP login / logout / me 与 Session lifecycle；实现范围、测试预算与 Human Core 分工待用户决定，不直接生成代码。
+
+## R1-G — HTTP 认证与 Session 生命周期
+
+### 已批准范围与行为合同
+
+2026-10-26 用户回复“确认实施”，批准 A 类 R1-G：4 个 production 文件、预计 190–240 行，测试预计 280–360 行；用户实现登录失败 handler，Codex 实现框架衔接、其余代码与验证。
+Current Situation：R1-E 提供凭据认证，R1-F 提供 Session 存储，但此前没有生产 HTTP 认证入口。
+目标：通过 Spring Security form login / logout 与 Spring Session 形成一次可独立 Review 的 HTTP 闭环；不在 Controller 手写认证或 Session 生命周期。
+相比只开放 login，包含 logout / me 才能验证会话恢复与失效，代价是增加 CSRF 和存储故障边界；用户已确认这个完整小闭环。
+
+| 接口 | 成功 | 拒绝 / 故障 |
+|---|---|---|
+| POST /api/auth/login，form-urlencoded email / password | 204，无跳转；认证结果仅 userId，credentials=null；框架保存 Redis Session，已有 Session ID 轮换 | 凭据拒绝 401 INVALID_CREDENTIALS；认证服务故障 503 AUTHENTICATION_UNAVAILABLE；缺失 / 错误 CSRF 403 |
+| GET /api/auth/me | 200，仅 {userId}，读取已认证 principal，客户端 userId Header 不具 authority | 匿名 / 失效 Session 为 401 UNAUTHENTICATED；已知 Session 存储故障为固定 503 |
+| POST /api/auth/logout | 204，仅当前 Session 失效；重复匿名 logout 在有效 CSRF 下仍可 204 | 缺失 / 错误 CSRF 403；已知 Session 存储故障为固定 503 |
+
+- 使用现有 SPA CSRF 机制：GET health 等安全请求生成可读 XSRF-TOKEN，写请求回传 X-XSRF-TOKEN；SESSION cookie 仍为 HttpOnly。CSRF Cookie 的 Secure 与当前显式环境配置一致。
+- Session policy 从 STATELESS 改为 IF_REQUIRED，使用框架 changeSessionId；默认 HTML 登录页、request cache 与 HTTP Basic 关闭。只允许 auth/me 读取已认证身份，其余未批准入口仍拒绝，注册未开放。
+- AuthenticationHttpResponseWriter 由安全 handler 与 SessionStorageFailureFilter 共同使用，输出固定 code JSON，不接受原始异常作为输出；设置 no-store / nosniff，不返回 credential、SQL、Redis 地址或 cause。
+- SessionStorageFailureFilter 位于框架 SessionRepositoryFilter 外层，只作用 login / logout / me；转换 RedisConnectionFailureException、QueryTimeoutException、Redis SerializationException。其他 RuntimeException 不伪装为存储故障；已提交响应继续抛出，不承诺可重新写成 503。
+- Session 错误转换不手写存取、Session ID、Redis key 或 Cookie 删除；resetBuffer 保留已有安全响应头。503 不承诺超时写入一定未发生，不自动重试或新增会话回滚机制。
+- 无新 dependency / schema / module，复用 R1-E Provider 与 R1-F serializer / Redis / Cookie。保持应用绑定 loopback，本 Slice 不宣称公网部署准备完成。
+Non-scope：公开注册、应用准入 / 账号启停、Rate Limit、Gateway / Dubbo / Nacos / mTLS、跨服务、前端 / 浏览器、生产部署、remember-me / logout-all / 最大会话数及旧 server 修改。
+
+### 文件、测试预算与分工
+
+Production 4 文件：修改 security/IdentitySecurityConfiguration.java，新增 CurrentAccountController.java、AuthenticationHttpResponseWriter.java、SessionStorageFailureFilter.java。
+骨架新增 / 实质修改约 154 行（3 个新文件 125 行 + 安全配置约 29 行），核心完成后仍预计在 250 行内；实际小于最初预算，不增加无用代码填充。
+测试优先扩展 IdentityBoundaryHttpTests（约 57 行）、RedisSessionUnavailableIntegrationTests（约 63 行）；仅新增 account/IdentityAuthenticationHttpIntegrationTests（129 行），合计约 250 行，不超过 production 两倍，无新测试依赖 / 基类 / fixture 工厂。
+新文件必要性：现有 repository 组合测试不证明真实 HTTP、Cookie、Session ID 轮换与 logout；此文件复用既有数据库 fixture，在真实 PostgreSQL / Redis / Tomcat 上验证生产闭环，不复制底层事务失败 / 并发用例。
+边界测试复用现有最小 Web 配置；test-only AuthenticationProvider 只产生两种失败样本。Redis 故障测试用 Mockito 覆盖该 bean，模拟认证成功后遇 Session 保存失败，不记作真实凭据认证证据。
+
+### Human Core — 登录失败 handler
+
+- 用户编辑边界：IdentitySecurityConfiguration.identitySecurityFilterChain 内 formLogin.failureHandler lambda，替换 UnsupportedOperationException 占位，预计 5–10 行。
+- 已提供参数：request、response、exception；已注入 responses，可调用 writeInvalidCredentials(response)、writeAuthenticationUnavailable(response)。必要的异常类型 import 由用户补充。
+- Acceptance Criteria：将 AuthenticationServiceException 表示的服务故障映射为固定 503；凭据拒绝映射为固定 401；不返回或记录 exception.getMessage / cause，不重试、不改写密码、不修改其他框架配置。
+- 用户只完成这个实际失败行为判断；Codex 不提前提供完整替换答案，不修改用户方法。Codex 负责其余三个组件、HTTP / Session 配置与所有获准测试 / 工程验证。
+- Learning Focus：Java 内部异常类型如何变成外部 HTTP 合同；认证成功与 Session 成功保存之间的边界。
+- User Review 入口：failureHandler；SessionStorageFailureFilter 的顺序、捕获类型、isCommitted 与 resetBuffer；真实 HTTP 组合对 Session / principal / logout 的断言。
+
+### Verification — 2026-10-26 骨架阶段
+
+- FRESH：全部测试源码离线 test-compile 成功，退出 0；包含尚未运行的真实 HTTP / PostgreSQL / Redis 组合。
+- FRESH：仅定向运行 IdentityBoundaryHttpTests 11 项（9 PASS、2 failures）、RedisSessionUnavailableIntegrationTests 2/2、SessionSerializationTests 2/2；共 15 项、13 PASS、2 failures、0 errors / skipped，退出码 1。
+- 两项 RED 均为有合法 CSRF 的认证失败请求进入 Human Core 占位：预期 401 / 503，实际 500，运行日志包含对应固定 UnsupportedOperationException。没有将占位改成成功预期。
+- 通过部分证明真实 Tomcat CSRF 缺失 / 错误拒绝、匿名及伪造 Header 不产生身份、JSON 类型边界、Redis 保存 / 恢复失败为固定 503、保留 nosniff、响应无 Redis 地址或凭据细节；故障 HTTP 使用 mock 成功认证，不证明真实凭据链。
+
+```powershell
+$env:IDENTITY_REDIS_UNAVAILABLE_TESTS='true'
+.\mvnw.cmd -q -o -pl services/identity -am test '-Dtest=IdentityBoundaryHttpTests,RedisSessionUnavailableIntegrationTests,SessionSerializationTests' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+- 使用获准正常 Windows 权限；本阶段不启动真实数据库或 Redis 容器。证据：services/identity/target/r1g-test-compile.log、r1g-scaffold-focused.log 与 surefire XML。
+- NOT_RUN：新真实 HTTP / PostgreSQL / Redis 成功闭环、Session ID 轮换 / 当前会话 logout / Cookie 实际行为、真实凭据到 Session 组合、其余组件回归、package / 独立 JAR、浏览器 / 跨服务 / 生产。R1-E / F 历史 PASS 为 PRIOR，不替代本 Slice 验收。
+- 当前仅骨架自查，不能称工程验收 PASS。完整认证 Session Flow 待核心实现与真实链验证后再新增；既有 Flow 只保留其已验收行为并标明 R1-G 骨架边界。
+
+Current Gate: HUMAN_CORE_READY。Next Action：用户实现登录失败 handler，随后进行增量 Review / 定向测试；候选稳定后再做必要整体工程验收与 Flow。
