@@ -571,6 +571,42 @@ Docker volume 只覆盖指定 mount target，不会自动改变应用的 `PGDATA
 
 ---
 
+## LEARN-003 — 登录认证、Session 持久化与 HTTP 响应提交的失败边界
+
+**Category:** Java Backend / Security / Reliability
+**Source:** R1-G source walkthrough + User questions / discussion（2026-10-30–31）；工程验证由 Codex 执行。
+**Confidence:** PROVISIONAL — 保留用户对 Session 兼容性的正确推理及 scoped Human Review 接受证据；2026-10-31 已接受当前整批实现，但完整 SecurityFilterChain 的独立掌握 / 操作仍未据此确认，不自动更新模块 Ownership。
+
+**Problem / Constraints:** 登录凭据验证成功后，Redis Session 保存仍可能失败。successHandler 设置 204 只修改响应状态，不单独证明会话保存成功；需要在适当调用范围内把已知故障转换为安全的 HTTP 响应。
+
+**Call Chain / Why This Boundary:**
+
+- SecurityFilterChain 的 DSL 在配置阶段注册规则与 callback；请求阶段由框架执行，DSL 的书写顺序不直接代表实际 Filter 顺序。
+- Provider 判断凭据并返回最小认证身份；changeSessionId 负责登录成功时轮换已有 Session ID，身份保存由框架的 SecurityContext / Session 流程完成。
+- SessionStorageFailureFilter 通过 `@Order(SessionRepositoryFilter.DEFAULT_ORDER - 1)` 位于 Spring Session 外层。Filter 先进入、后退出；其 `try { chain.doFilter(...) }` 包含内层调用及 Spring Session 在收尾阶段的 commitSession，因此可以捕获此时向外传播的异常。若放在 Session Filter 内层，自己的 try/catch 结束后，外层保存仍可能失败。
+- shouldNotFilter 是“是否跳过”：命中 login / logout / me 时 switch=true，经 `!` 后返回 false，才会执行故障 Filter。路径匹配不等于所有异常都会转换；catch 仅列出 RedisConnectionFailureException、QueryTimeoutException、Redis SerializationException。
+- 已提交响应直接重新抛出；未提交时，resetBuffer 清理尚未发送的正文并保留响应头，然后调用 `responses.writeAuthenticationUnavailable(response)` → `writeError(response, 503, ...)` → `response.setStatus(503)`，写出固定 AUTHENTICATION_UNAVAILABLE JSON。
+
+**Response / Trade-off:** `setStatus` 本身不提交响应，写正文也可能先进入缓冲区；提交后状态码与响应头已固定，即使正文尚未全部发送，也不能重新承诺一个完整 503。当前实现只转换已知故障，不自动重试，不把其他 RuntimeException 统称存储失败；503 也不能证明故障前没有发生部分写入。认证 failureHandler、未认证 entry point、CSRF 拒绝与 Session 存储故障是不同处理入口。
+
+**Evidence / Limitations:** [Filter](../../services/identity/src/main/java/com/dailylanguage/identity/security/infrastructure/SessionStorageFailureFilter.java)、[响应 writer](../../services/identity/src/main/java/com/dailylanguage/identity/security/infrastructure/AuthenticationHttpResponseWriter.java)、[安全配置](../../services/identity/src/main/java/com/dailylanguage/identity/security/config/IdentitySecurityConfiguration.java) 及 [HTTP Flow](../flow/identity-http-authentication.md)。Codex 核对本机 Spring Session 4.1.1 的实际 commitSession 收尾调用；2026-10-30 完整分层 / Session v2 的 HTTP / Session 18/18、其余 Identity 77/77 与 package 为 PRIOR PASS，详细来源见 [R1-G 验收与 Review 收口](../features/IDENTITY.md)。2026-10-31 核对当前源码文件集合 / SHA-256 与该候选一致。Redis 不可用 HTTP 路径已验证，但认证成功样本为 mock；QueryTimeout / SerializationException / 已提交响应未逐项注入。本轮未重跑测试。
+
+**Participation / Interview Angle:** 用户请求完整 handler 示范后写入实现，随后追问 204、Filter 顺序、SecurityFilterChain 职责、changeSessionId、响应提交及跨方法的 503 调用位置；Codex 完成解释、框架实现核对、隔离验证与获准测试修正。可围绕“为什么认证成功后仍可能返回 503，以及异常边界为什么必须包住 Session 保存”讨论；属于本地工程设计与验证，不虚构线上事故、独立实现或生产收益。
+
+**Session 类型与 namespace 复核 — 2026-10-31:** 用户自行指出“即使保留 v1，迁移后新生成的 Session 也会保存新类名；问题是请求找到迁移前已存在的旧 Session，其中的旧类名无法按当前代码正确还原”，该推理正确，随后确认理解。这是针对本次兼容性问题的具体 reasoning evidence，不仅是笼统同意；不据此提高整个模块的掌握等级。
+
+- namespace v1 / v2 只是 Redis key 前缀标签，不是 Redis / Spring Session 软件版本；YAML 保存配置，实际会话属性位于 Redis Hash 的 `sessionAttr:SPRING_SECURITY_CONTEXT` 字段。
+- 当前 SecurityJacksonModules / Jackson serializer 在认证状态 JSON 的 `authentication.principal.@class` 中写入完整 Java 类名。演示 JSON 来自合成身份调用项目 serializer，旧会话回归样本也是隔离测试构造，未据此声称读取过真实旧业务会话。
+- 新会话写入什么类名由当前 Java 类型与 serializer 决定，不由 namespace 的 v1 / v2 标签决定。同一 v1 namespace 可同时存在含旧类名和新类名的会话；风险来自读取旧数据，不要求出现随机 Session key 冲突，也不限于登录请求。
+- 切换 v2 是本次已批准的“隔离旧数据并重新登录”策略，并非目录迁移或新 Session 正确序列化的必要条件。若保留 v1，也可另行设计旧类型兼容 / 转换；本轮没有实现这些替代方案。
+- Codex 先前将用户“找到已有旧 Session”的表达误读为“随机 key 冲突”，反复纠偏导致解释绕远；此处已更正，不能将该误读记录成用户的知识错误。2026-10-31 只进行代码 / 序列化说明与记录，完整 18/18、77/77 和 package 仍为 2026-10-30 PRIOR，未重跑。
+
+**Review 结论 — 2026-10-31:** 用户在上述真实代码与设计讨论后，明确接受当前 R1-G 实现、完整分层和 Session v2 取舍，scoped Human Review COMPLETE；这与既有验收共同支持 READY_TO_COMMIT，不构成自动提交授权，也不将 Codex 实现 / 验证记为用户独立操作。
+
+**Reusable Rule / Follow-up:** 先沿入口、检查、状态变化与最终响应追踪一个具体请求，再判断异常应在哪一层转换；区分已设置响应与已提交响应。目录整理也需核对序列化类型标识，但不能把具体兼容性策略说成必然依赖。整体 Review 已收口，学习置信度与模块等级独立保留；后续结合实际设计判断或操作补充证据，不为收口追加固定考试。
+
+---
+
 # 11. Interview-critical Learning Areas / 面试重点知识区
 
 以下知识属于项目最终应重点沉淀的领域。

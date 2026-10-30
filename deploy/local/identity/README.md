@@ -60,7 +60,7 @@ Mapper 样本随测试事务回滚；未来账户行为测试提交的合成账�
 java -jar services/identity/target/identity-service-0.0.1-SNAPSHOT.jar
 ```
 
-默认 HTTP 地址为 `http://127.0.0.1:8081`。R1-F 验收时只允许 `GET /actuator/health`；当前 R1-G 已准备 login / logout / me 骨架，但登录失败 handler 尚待用户实现，完整认证闭环未验收，不作为可用登录服务。
+默认 HTTP 地址为 `http://127.0.0.1:8081`。R1-F 验收时只允许 `GET /actuator/health`；2026-10-30 R1-G 已完成本地 login / logout / me 与 Session 生命周期工程验收，Human Review 待完成，尚非生产部署验收。
 注册接口仍关闭，不能用旧应用的 `REGISTRATION_ENABLED=false` 开启自动身份。
 `-DskipTests` 只是打包，不是验证证据。Cloud 在本 slice 仅导入 BOM，没有 Cloud starter/runtime 验证。
 
@@ -106,13 +106,23 @@ Redis 7.2 分支的维护状态见 [Redis Open Source version management](https:
 这是本机学习环境，不是生产 Redis 的访问控制、传输保护或持久化方案。
 
 Identity 必须显式配置 `IDENTITY_REDIS_HOST`；端口默认 55442，连接与操作超时均为 1s。
-使用独立 namespace `daily-language:identity:session:v1`、default 非索引 repository、24h idle TTL。
+当前使用独立 namespace `daily-language:identity:session:v2`、default 非索引 repository、24h idle TTL。
+2026-10-30 用户批准完整分层及 AuthenticatedAccount 移入 account/domain，同时从 v1 切换至 v2：已有 Identity 会话需重新登录，账户 / 密码数据不变。旧 Session key 不批量删除，依原 TTL 过期；不提供旧类型名兼容或会话数据转换。
 JSON 只额外允许 AuthenticatedAccount，预期属性来自 R1-E 的空 credentials 认证结果，不保存原始密码或 verifier；serializer 不负责清理任意属性中的敏感字符串，不使用 Java native serialization。
 Redis 不可用时保存失败，不回退到 JVM 内存 Session；完整服务的健康检查也会反映 Redis 故障。
 
 Cookie 默认 SESSION / HttpOnly / Secure / SameSite=Lax / Path=/，不设 Domain / Max-Age。
-R1-F 的测试只验证存储基础；当前 R1-G 的 HTTP Session 骨架尚未完成整体认证验收。本机 HTTP 登录验收需显式设置 `IDENTITY_SESSION_COOKIE_SECURE=false`，
-不得因此关闭 Hosted 默认 Secure；完整链证据以 R1-G 合同为准，跨服务核验仍未实现。
+R1-F 的测试只验证存储基础；R1-G 的本地 HTTP Session 闭环已另行验收。本机 HTTP 登录验收需显式设置 `IDENTITY_SESSION_COOKIE_SECURE=false`，
+不得因此关闭 Hosted 默认 Secure；完整链证据见 [R1-G HTTP Flow](../../../docs/flow/identity-http-authentication.md)，跨服务核验仍未实现。
+
+新真实 HTTP 成功链另需 `IDENTITY_HTTP_AUTH_TESTS=true`，并指向有隔离标识的 PostgreSQL 与专用 Redis：
+
+```sh
+IDENTITY_HTTP_AUTH_TESTS=true ./mvnw -q -o -pl services/identity -am test -Dtest=IdentityAuthenticationHttpIntegrationTests -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+该测试通过既有注册 bean 准备合成账户，不开放注册 HTTP；会验证 Session ID 轮换、me、当前会话 logout 和旧 Cookie 拒绝。
+未启用环境开关造成的跳过不能算通过；2026-10-30 的具体批次与清理证据见 R1-G 合同。
 
 ```sh
 # 单独执行 serializer 与现有 HTTP 边界，不需要真实 Redis。

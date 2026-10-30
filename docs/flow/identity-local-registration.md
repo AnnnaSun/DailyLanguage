@@ -103,13 +103,13 @@ IDENTITY_UNAVAILABLE 是当前安全映射，不将所有唯一键冲突都宣�
 
 ## 6. Source References
 
-- [LocalRegistrationService](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalRegistrationService.java)：register、normalizeEmail、validatePassword、hashPassword、logUnexpectedFailure。
-- [LocalEmailNormalizer](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalEmailNormalizer.java)：normalize。
-- [LocalRegistrationException](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalRegistrationException.java)：固定 reason / message。
-- [LocalPasswordPolicy](../../services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordPolicy.java)：validate；原有 R1-C 实现未改变。
-- [LocalPasswordHasher](../../services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordHasher.java) 与 [PasswordHashConcurrencyGate](../../services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGate.java)：固定散列与共享容量。
-- [LocalAccountPersistence](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalAccountPersistence.java) 与 [SQL Mapper](../../services/identity/src/main/resources/mapper/LocalAccountMapper.xml)：独立事务和四表写入。
-- [LocalRegistrationIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/LocalRegistrationIntegrationTests.java)、[LocalRegistrationServiceTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/LocalRegistrationServiceTests.java)、[LocalAccountPersistenceIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/LocalAccountPersistenceIntegrationTests.java)：真实组合、安全失败和账户事务证据。
+- [LocalRegistrationService](../../services/identity/src/main/java/com/dailylanguage/identity/account/application/LocalRegistrationService.java)：register、normalizeEmail、validatePassword、hashPassword、logUnexpectedFailure。
+- [LocalEmailNormalizer](../../services/identity/src/main/java/com/dailylanguage/identity/account/domain/LocalEmailNormalizer.java)：normalize。
+- [LocalRegistrationException](../../services/identity/src/main/java/com/dailylanguage/identity/account/application/LocalRegistrationException.java)：固定 reason / message。
+- [LocalPasswordPolicy](../../services/identity/src/main/java/com/dailylanguage/identity/credential/domain/LocalPasswordPolicy.java)：validate；原有 R1-C 实现未改变。
+- [LocalPasswordHasher](../../services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/LocalPasswordHasher.java) 与 [PasswordHashConcurrencyGate](../../services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/PasswordHashConcurrencyGate.java)：固定散列与共享容量。
+- [LocalAccountPersistence](../../services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalAccountPersistence.java) 与 [SQL Mapper](../../services/identity/src/main/resources/mapper/LocalAccountMapper.xml)：独立事务和四表写入。
+- [LocalRegistrationIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/LocalRegistrationIntegrationTests.java)、[LocalRegistrationServiceTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/application/LocalRegistrationServiceTests.java)、[LocalAccountPersistenceIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/LocalAccountPersistenceIntegrationTests.java)：真实组合、安全失败和账户事务证据。
 
 ## 7. Maintenance Rule
 

@@ -78,6 +78,12 @@ RAG、Tool / Context / Model Gateway / BYOK、Structured Output、Trace / Eval �
 没有足够证据时扩大读取；能回答“改哪里、为什么、影响谁、如何验证”后停止探索。
 实质性任务 / Scope 扩大时判断并使用 `token-efficient-work`，不为普通任务重复全库扫描。
 
+### 代码目录约定
+
+- 所有功能的新增与存量代码均采用“功能模块 → 职责分层”，沿用旧 server 的 api / application / domain / infrastructure / config 等结构；Controller、应用流程、规则、存储适配与框架配置按实际职责归层，不平铺在功能根包。
+- 测试跟随被测职责；跨层 HTTP / 数据库 / Redis 组合测试可放在该功能的 infrastructure 测试包。启动类可保留服务根包；不为凑层级创建空目录、pass-through Interface 或额外 abstraction。
+- 存量迁移在获批范围内执行，保留方法实现与用户未提交修改；同步 import、Mapper XML、扫描配置、测试与有效源码链接。持久化类名、Session 或其他外部合同受影响时，先明确兼容性决定，不把它当成纯文件移动。
+
 ## 4. Scope and Documentation Authority / 范围与文档权威
 
 判断当前是否实现，按以下顺序检查：

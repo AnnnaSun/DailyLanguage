@@ -77,10 +77,10 @@ sequenceDiagram
 
 ## 7. Source References
 
-- `services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordHasher.java`
-- `services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGate.java`
-- `services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashCapacityExceededException.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/LocalPasswordHasher.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/PasswordHashConcurrencyGate.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/PasswordHashCapacityExceededException.java`
 - `services/identity/src/main/resources/application.yml`
-- `services/identity/src/test/java/com/dailylanguage/identity/credential/LocalPasswordHasherTests.java`
-- `services/identity/src/test/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGateTests.java`
-- `services/identity/src/test/java/com/dailylanguage/identity/account/IdentityPasswordHashingIntegrationTests.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/credential/infrastructure/LocalPasswordHasherTests.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/credential/infrastructure/PasswordHashConcurrencyGateTests.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/IdentityPasswordHashingIntegrationTests.java`

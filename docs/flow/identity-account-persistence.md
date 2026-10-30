@@ -89,11 +89,11 @@ FRESH 当前候选：HTTP 9、Mapper / schema / 账号边界 5、用户事务 4�
 
 ## 7. Source References
 
-- `services/identity/src/main/java/com/dailylanguage/identity/account/LocalAccountPersistence.java`
-- `services/identity/src/main/java/com/dailylanguage/identity/account/LocalAccountMapper.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalAccountPersistence.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalAccountMapper.java`
 - `services/identity/src/main/resources/mapper/LocalAccountMapper.xml`
 - `services/identity/src/main/resources/db/migration/V1__create_identity_accounts.sql`
-- `services/identity/src/main/java/com/dailylanguage/identity/persistence/PostgreSqlUuidTypeHandler.java`
-- `services/identity/src/test/java/com/dailylanguage/identity/account/LocalAccountPersistenceIntegrationTests.java`
-- `services/identity/src/test/java/com/dailylanguage/identity/account/IdentityMapperIntegrationTests.java`
-- `services/identity/src/test/java/com/dailylanguage/identity/security/IdentityBoundaryHttpTests.java`
+- `services/identity/src/main/java/com/dailylanguage/identity/persistence/infrastructure/PostgreSqlUuidTypeHandler.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/LocalAccountPersistenceIntegrationTests.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/IdentityMapperIntegrationTests.java`
+- `services/identity/src/test/java/com/dailylanguage/identity/security/infrastructure/IdentityBoundaryHttpTests.java`

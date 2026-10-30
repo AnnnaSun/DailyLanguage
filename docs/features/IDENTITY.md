@@ -2,13 +2,13 @@
 
 ## 当前 Gate
 
-- Date: 2026-10-26
-- Current Slice: R1-G — HTTP 认证与 Session 生命周期；2026-10-26 用户确认实施，用户承担登录失败 handler，Codex 完成其余范围。
-- Gate: HUMAN_CORE_READY；骨架与全部测试源码编译通过，定向 15 项中 13 PASS、2 项为 handler 占位 RED；尚未完成工程验收或 Human Review。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
+- Date: 2026-10-31
+- Current Slice: R1-G — HTTP 认证与 Session 生命周期；用户明确请求完整示范后，参考 Codex 示范写入登录失败 handler，Codex 完成其余范围。
+- Gate: R1-G READY_TO_COMMIT；2026-10-31 用户接受当前实现、完整分层与 Session v2 取舍，Human Review COMPLETE。当前源码与 2026-10-30 的 18/18、77/77 两批及 package PASS 候选完全一致；本轮未重跑测试。R1-G 尚未提交，R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 当前基线：`migrate/identity` / `dc8df93a2aaf7dc4601d3e207907792db28ed611`（spring session初始化）；2026-10-26 核对提交包含 R1-F 的 13 个实现 / 测试 / 文档文件，本次同步前工作区干净。SessionConfiguration blob 与验收候选 29f0694464e57a4b20187075a58077192e6cca4e 一致。
+- 当前基线：2026-10-31 核对 `migrate/identity` / `c916addcd928159fd99dbfe1c49327af8bc0163c`（R1-G 骨架）；当前 src 全部文件 SHA-256 与最终验收摘要一致，无新增或遗漏文件。Cookie 测试修正、完整分层、获准 Session v2 与文档均未提交；旧 hash / namespace 保留为有日期的历史证据，不作为当前路径或会话合同。
 - PRIOR：R1-F 2026-10-25 的 80/80 与数据库 10/10 两批、package 与清理证据见下方记录；2026-10-26 Review 收口只核对 Git / source 并同步文档，未重跑测试。更早各 Slice 的有日期证据保留为历史。
-- 不自动 commit / push，不提高模块整体 Ownership；停在 R1-G HUMAN_CORE_READY，Codex 不代写用户登录失败 handler 或开始下一 Slice。
+- 不自动 commit / push，不提高模块整体 Ownership；R1-G 工程验收与 scoped Human Review 已收口，等待用户 Commit Decision，不开始新的业务 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -64,7 +64,7 @@ C31 工程和补丁已按用户要求删除，本 slice 不恢复它们；未来
 
 ## Human Core：用户实现边界
 
-文件：`services/identity/src/main/java/com/dailylanguage/identity/account/LocalAccountPersistence.java`
+文件：`services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalAccountPersistence.java`
 
 方法：`createAccountWithLanguageAccess(String normalizedEmail, String encodedPasswordHash)`。
 
@@ -189,7 +189,7 @@ IdentityPasswordHashingIntegrationTests；文档仅同步本合同与 PROJECT_ST
 
 ### Human Core 与分工
 
-入口：[PasswordHashConcurrencyGate.runWithAvailableSlot](../../services/identity/src/main/java/com/dailylanguage/identity/credential/PasswordHashConcurrencyGate.java)。
+入口：[PasswordHashConcurrencyGate.runWithAvailableSlot](../../services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/PasswordHashConcurrencyGate.java)。
 用户只实现该方法的并发控制并移除占位异常；保留已有 null 检查、构造器和配置边界，不需要修改密码算法或其他生产文件。
 
 验收条件：仅成功取得名额后执行 Supplier；满额立即抛 PasswordHashCapacityExceededException；结果原样返回，
@@ -284,8 +284,8 @@ Production 新增仅三项：
 
 | 文件 | 作者与职责 |
 |---|---|
-| `services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordPolicy.java` | Codex 准备常量、构造器、enum 与字符 / 邮箱比较 helper；用户实现 validate |
-| `services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordBlocklist.java` | Codex；迁入已有固定资源校验与精确查询 |
+| `services/identity/src/main/java/com/dailylanguage/identity/credential/domain/LocalPasswordPolicy.java` | Codex 准备常量、构造器、enum 与字符 / 邮箱比较 helper；用户实现 validate |
+| `services/identity/src/main/java/com/dailylanguage/identity/credential/domain/LocalPasswordBlocklist.java` | Codex；迁入已有固定资源校验与精确查询 |
 | `services/identity/src/main/resources/security/local-password-blocklist-v1.bin` | Codex；原样复制旧模块的已固定资源 |
 
 骨架两份 Java 共 191 行，Human Core 完成后共 204 行，仍在 250 行预算内；无新 POM / runtime 配置。
@@ -298,7 +298,7 @@ ADR / Phase Plan 中的 2,065 是 SecLists 过滤后的 baseline；现有生成�
 
 ### Human Core 与验收
 
-用户入口：[LocalPasswordPolicy.validate](../../services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordPolicy.java)。
+用户入口：[LocalPasswordPolicy.validate](../../services/identity/src/main/java/com/dailylanguage/identity/credential/domain/LocalPasswordPolicy.java)。
 只实现该方法并移除 TODO / UnsupportedOperationException；构造器、enum、helper、blocklist 与测试由 Codex 准备，不要求修改其他 production 文件。
 
 可使用的现有成员：`MINIMUM_LENGTH`、`MAXIMUM_LENGTH`、`containsOnlyPrintableAscii`、`matchesLoginIdentity` 和 `passwordBlocklist.contains`。
@@ -767,4 +767,143 @@ $env:IDENTITY_REDIS_UNAVAILABLE_TESTS='true'
 - NOT_RUN：新真实 HTTP / PostgreSQL / Redis 成功闭环、Session ID 轮换 / 当前会话 logout / Cookie 实际行为、真实凭据到 Session 组合、其余组件回归、package / 独立 JAR、浏览器 / 跨服务 / 生产。R1-E / F 历史 PASS 为 PRIOR，不替代本 Slice 验收。
 - 当前仅骨架自查，不能称工程验收 PASS。完整认证 Session Flow 待核心实现与真实链验证后再新增；既有 Flow 只保留其已验收行为并标明 R1-G 骨架边界。
 
-Current Gate: HUMAN_CORE_READY。Next Action：用户实现登录失败 handler，随后进行增量 Review / 定向测试；候选稳定后再做必要整体工程验收与 Flow。
+2026-10-26 历史 Gate: HUMAN_CORE_READY；当时等待用户实现 handler，当前状态见下方增量 Review。
+
+### Human Core 示范与增量 Review — 2026-10-30
+
+- 用户明确请求 Codex 完整示范，随后写入实现；分工调整仅限失败 handler，记录为参考完整示范后写入，不记独立实现或自动提高 Ownership。
+- 实际 Diff 仅 SecurityConfiguration 的 import 与 failureHandler：AuthenticationServiceException 映射固定 503，其余认证拒绝映射固定 401；没有异常正文 / cause 输出、重试、密码修改或 Session 操作。增量 Review 无阻塞问题，Scope MATCH；Codex 未修改用户 production / 测试。
+- FRESH：IdentityBoundaryHttpTests 11/11 PASS，0 failures / errors / skipped，退出 0；包括原占位 RED 的 401 / 503 两项及既有 CSRF / 匿名身份 / 端点拒绝边界；diff whitespace PASS。
+- 首次定向运行因 SocketException: Operation not permitted 无法启动 Tomcat（11 errors），随后获准正常权限重跑通过；未改测试或配置。命令：`mvn -q -o -pl services/identity -am test -Dtest=IdentityBoundaryHttpTests -Dsurefire.failIfNoSpecifiedTests=false`。
+- 证据：`services/identity/target/surefire-reports/TEST-com.dailylanguage.identity.security.IdentityBoundaryHttpTests.xml`；本轮日志 `/tmp/dailylanguage-r1g-user-handler-review.log` 为临时文件。
+- NOT_RUN：真实 HTTP / PostgreSQL / Redis 成功闭环、Session 轮换 / 恢复 / logout、其余组件回归、package / 独立 JAR、浏览器 / 跨服务 / 生产；Redis 故障与 JSON 骨架通过证据仍为 PRIOR。完整认证 Flow 待真实链验证后补，不能称 R1-G 整体验收 PASS。
+
+2026-10-30 增量 Review 历史 Gate: REVIEW_PENDING；随后用户批准闭环验收，当前结果见下方。
+
+### 闭环验收、Cookie 定位与获准修正 — 2026-10-30
+
+用户明确要求“继续下一步，闭环验收”；本轮验证仅覆盖已批准 R1-G 与 Identity 回归，不运行旧 server / 前端 / 跨服务。
+
+#### 失败、Evidence 与修正决定
+
+- 首批 focused HTTP / Session 共 17 项：16 PASS、1 failure、0 errors / skipped，退出 1；真实登录返回 204，但成功链测试在“新 Session ID 不等于旧 ID”处失败，后续 logout 断言当时未执行。停止扩大测试并定位。
+- 测试通过 `new HttpCookie` 手造匿名 Session Cookie：domain=null、version=1；服务器响应经 CookieManager 解析为 domain=127.0.0.1、version=0。独立 Java 小实验确认 Cookie 容器保留两个同名 Cookie，findFirst 返回旧值，后续请求携带两者。
+- 真实服务诊断第一轮：服务器返回的新 ID 与旧 ID 不同，新 Redis Session 存在、携带新 Cookie 的 me=200，但手造 Cookie 未恢复预设匿名 Session，旧 ID 仍存在；不能据新 Cookie 单独宣称旧 Session 已正确轮换。
+- 第二轮只在临时诊断客户端按 Set-Cookie 格式解析匿名 Cookie：同一生产代码下 rotated=true、旧 Redis ID 消失、新 Redis ID 存在、同名 Cookie 数量=1、findFirst 不再指向旧值、me=200。根因确认在测试输入，不在生产 Session 配置；诊断不是正式测试 PASS 的替代证据。
+- 用户选择参与判断，并明确批准“允许修正测试并继续验收”。Codex 仅修正 IdentityAuthenticationHttpIntegrationTests 的匿名 Cookie 构造为 CookieManager.put 解析 Set-Cookie；保留全部原有断言，新增 SESSION Cookie 唯一性断言。生产、用户 handler、其他测试与环境配置未改。
+
+#### 最终验证与环境
+
+| 独立批次 | FRESH 结果与证据范围 |
+|---|---|
+| 其余 Identity regression（在测试修正前独立运行） | 77/77 PASS，0 failures / errors / skipped，退出 0：normalizer 8、policy 7、blocklist 8、hasher 14、capacity 8、注册 Service 11、Provider 11、Mapper 3、账户事务 4、密码组合 2、注册组合 1；其中数据库 10 项真实运行 |
+| 修正后 focused HTTP / Session | 17/17 PASS，0 failures / errors / skipped，退出 0：真实 HTTP 成功链 1、HTTP 边界 11、真实 Redis Session 1、不可用 Redis 2、JSON serializer 2 |
+| package / JAR | 两批各执行 `package -DskipTests`，均退出 0；不重复运行已完成测试。JAR 包含四个 R1-G 组件及 Session / Data Redis 4.1.1、Lettuce 7.5.2.RELEASE；未启动独立 JAR JVM |
+| source / 清理 | 用户 handler blob 始终为 8a5122fd15ae10ff9c2a3d1c2427492074cecb6d，生产源码未改；每批运行前后 source snapshot 一致；无测试 trigger / Redis key 遗留，本轮全部容器及 tmpfs 已清理，diff whitespace PASS |
+
+上述是两批独立通过的 77 项与 17 项，共覆盖 94 项，不描述为一次 94 项命令。
+本次仅测试 fixture 有变，不重跑已通过且不依赖该 fixture 的 77 项；此前 16 PASS / 1 failure 及两次诊断结果保留。
+
+隔离环境：Docker Engine 29.9.1；PostgreSQL 18.6、Redis 7.2.16；仅绑定 127.0.0.1 的动态端口，数据为 tmpfs，无既有业务库 / 卷操作，无 FLUSHDB / FLUSHALL。
+每批新建空 public schema，使用既有 init-databases.sql 初始化隔离标识及 identity_app，显式开启环境开关，密码计算容量保持 1；凭据随机且仅在运行时使用，未打印或持久保存。
+PostgreSQL 镜像 digest：`sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280`；Redis 镜像 digest：`sha256:ee061d86c25773048211e99f00d63b47b9ecfe28560113e16cce2c962d5bec1c`。
+
+- regression 批结束：app_user / auth_identity / local_password_credential 各 5，app_access_grant 4（认证组合有意撤销一条），Flyway 成功 1、测试 trigger 0、Redis key 0。
+- focused 批结束：四张账户表各 1，Flyway 成功 1、测试 trigger 0、Redis key 0。
+- 证据目录（均在忽略的 target 下）：`r1g-20261030-verification/`（原失败）、`r1g-20261030-cookie-diagnostic/`、`r1g-20261030-cookie-normalized-diagnostic/`、`r1g-20261030-remaining-regression/`、`r1g-20261030-focused-fixed/`；包含运行日志、JUnit XML 或诊断日志与脱敏 summary.json。
+
+在上述随机隔离环境中，显式设置 IDENTITY_DATABASE_TESTS / IDENTITY_REDIS_TESTS / IDENTITY_REDIS_UNAVAILABLE_TESTS / IDENTITY_HTTP_AUTH_TESTS=true，执行：
+
+```sh
+mvn -q -o -pl services/identity -am test -Dtest=IdentityMapperIntegrationTests,IdentityPasswordHashingIntegrationTests,LocalAccountPersistenceIntegrationTests,LocalEmailNormalizerTests,LocalPasswordAuthenticationProviderTests,LocalPasswordBlocklistTests,LocalPasswordHasherTests,LocalPasswordPolicyTests,LocalRegistrationIntegrationTests,LocalRegistrationServiceTests,PasswordHashConcurrencyGateTests -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -o -pl services/identity -am test -Dtest=IdentityAuthenticationHttpIntegrationTests,IdentityBoundaryHttpTests,RedisSessionIntegrationTests,RedisSessionUnavailableIntegrationTests,SessionSerializationTests -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -o -pl services/identity -am package -DskipTests
+```
+
+#### 自查与 Human Review 边界
+
+- Code 自查：无 blocking finding，Scope MATCH；测试修正未降低 rotation / Redis 旧 ID 失效 / principal / logout / Cookie 断言。该自查不冒充独立作者 Review。
+- [HTTP 认证与 Session Flow](../flow/identity-http-authentication.md) 已按源码及本次验证建立并加入索引；Provider / Session 存储 Flow 与本地 README 已同步当前边界，Review Sync Status: CURRENT。
+- Human Review Focus：failureHandler 的异常分类；框架 changeSessionId、保存 SecurityContext 与设置 204 的职责；外层 SessionStorageFailureFilter 的顺序、已提交响应与已知故障范围；me 的 principal authority；logout 仅当前会话失效；测试 Cookie 样本为何必须模拟真实服务器格式。
+- NOT_RUN：浏览器、Hosted HTTPS、独立 JAR JVM、跨服务、真实多设备分别登录、24h 等待过期、QueryTimeout / SerializationException / 已提交响应逐项故障注入、生产容量及提交确认丢失；不能据本机测试扩展为上述结论。
+- Human Core 保持“参考 Codex 完整示范后写入”；用户愿意参与 Cookie 根因判断，不等于已经完成设计判断 / Ownership，待结合真实代码讨论，不自动提高模块等级。
+
+### Human Review 进行中 — 2026-10-30
+
+- 用户在 SecurityFilterChain 导读中逐步追问 handler 的 204、Filter 顺序与异常捕获范围、changeSessionId、响应提交，以及 Filter 经 writer 设置 503 的实际代码位置；在该段源码追踪后表示理解，并明确要求将学习写入文档。
+- 已追加 [LEARN-003](../ownership/LEARNING_LOG.md#learn-003--登录认证session-持久化与-http-响应提交的失败边界)，保留 PROVISIONAL 与真实分工：handler 参考完整示范后写入，框架核对 / 测试由 Codex 执行；不据此推断模块独立掌握或整个 R1-G Human Review 完成。
+- 后续 Review 聚焦 me 的 Session / SecurityContext / principal 来源与 Header 无 authority，再看 logout 的当前会话失效及其他会话保留；本轮文档记录未重跑测试，沿用同日 PRIOR 验收。
+
+上述导读后，用户提出恢复旧 server 的功能内分层，并确认先整理 security 五个 production 文件；当前增量与 Gate 见下方。
+
+### security 分层整理 — 已批准范围与验收，2026-10-30
+
+- 用户确认按旧项目“功能模块 → 职责分层”整理；本轮只迁移 security 的五个 production 文件，测试同步引用。account、credential 与公共 persistence 后续另行定范围；不新增抽象 / 依赖，不改 HTTP、数据库、认证规则、Filter 顺序、Session 生命周期或异常合同。
+- 文件映射：CurrentAccountController → security/api；IdentitySecurityConfiguration、SessionConfiguration → security/config；SessionStorageFailureFilter、AuthenticationHttpResponseWriter → security/infrastructure。测试 IdentityBoundaryHttpTests 增加显式 import；SessionSerializationTests 随配置迁入 security/config，以保留 bean 方法的 package-private 可见性。其他跨层集成测试留在 security 父包，不调整测试类 / 方法可见性。
+- AuthenticatedAccount 的全限定名与 serializer 类型许可不变，避免本次目录整理同时改变 Redis Session 中的业务身份类型；Mapper XML、扫描配置、application.yml 与账号 / 密码代码均未修改。
+- 范围自查：相对本轮源码快照，逐文件排除 package / import 与空行后，所有 production / test 方法正文完全一致；用户 handler 的原始判断保持不变。Scope MATCH，无逻辑修复或断言降低。
+- FRESH：`mvn -q -o -pl services/identity -am clean test-compile` 退出 0；在 clean 前将既有 target 日志 / 摘要 / 验收目录备份到临时目录，随后恢复历史证据目录。当前 surefire-reports 由新测试生成，避免混入旧 package 报告或编译类。
+- FRESH：新目录下 IdentityAuthenticationHttpIntegrationTests 1、IdentityBoundaryHttpTests 11、RedisSessionIntegrationTests 1、RedisSessionUnavailableIntegrationTests 2、SessionSerializationTests 2，共 17/17 PASS，0 failures / errors / skipped，退出 0；package（跳过已完成测试）退出 0。沿用本节前次 focused 命令，不重跑不依赖本次迁移的其余 77 项；后者为同日 PRIOR，不写成当前全 94 项 fresh。
+- 环境：一次性 PostgreSQL 18.6 / Redis 7.2.16、loopback 动态端口 / tmpfs、既有隔离标识与独立账号、空 schema Flyway V1、密码容量 1；测试 trigger / Redis key 遗留 0，两容器均已删除；未操作既有业务库 / 卷。
+- JAR 检查：五个类均在新路径，旧 security 根包类不存在，AuthenticatedAccount 仍位于 account 原路径；Session / Data Redis 依赖版本未变。证据：忽略的 `services/identity/target/r1g-20261030-security-layout/` 中日志、JUnit XML 与 summary.json；clean 编译日志备份在 `/tmp/dailylanguage-security-layout-20261030/clean-test-compile.log`。
+- 受影响 Flow 与 LEARN-003 的源码链接已迁移，Flow 的行为合同不变；本次没有新增学习掌握或独立作者 Review 结论。
+
+上述五文件边界随后被用户明确扩大为全部剩余功能；先完成完整分层再继续 Review，当前决定与验收见下方。
+
+### Identity 完整分层与 Session v2 — 已批准范围与验收，2026-10-30
+
+#### 用户决定与兼容性
+
+- 用户澄清所有功能的新增与存量代码都应遵循项目既有职责分层，并要求其他功能一并迁移后继续 Review。本轮据此完成 account、credential、persistence 及测试；这是获准的集中目录迁移，不将它解释为新增业务能力或重写既有逻辑。规则已保存至全局 / 项目 AGENTS，后续按实际职责归层，不创建空层或额外抽象。
+- 实测当前 serializer 会把 AuthenticatedAccount 的完整类名写进 Redis JSON，因此仅改变 import 不足以保证旧会话兼容。用户在影响说明后明确选择“接受迁移并使旧 Identity 会话失效”：AuthenticatedAccount 从 account 移到 account/domain，Session namespace 从 `daily-language:identity:session:v1` 改为 `daily-language:identity:session:v2`。
+- 当前版本不恢复 v1 会话，用户需要重新登录；账户 / 密码 / 应用准入数据不变，不批量删除旧 Redis key，旧会话依原 TTL 过期。未实现旧类名 alias、会话数据转换或跨版本会话兼容，不保留一个未分层的旧身份类冒充完成迁移。
+
+#### 当前职责与文件边界
+
+| 路径 | 职责 / 类型 |
+|---|---|
+| account/application | LocalRegistrationService、LocalRegistrationException |
+| account/domain | LocalEmailNormalizer、AuthenticatedAccount |
+| account/infrastructure | LocalAccountPersistence、LocalAccountMapper、LocalPasswordCredential、LocalPasswordAuthenticationProvider |
+| credential/domain | LocalPasswordPolicy、LocalPasswordBlocklist；沿用旧 server 的规则归属 |
+| credential/infrastructure | LocalPasswordHasher、PasswordHashConcurrencyGate、PasswordHashCapacityExceededException |
+| persistence/infrastructure | PostgreSqlUuidTypeHandler |
+| security/api、config、infrastructure | 保留前一轮已整理的五文件结构；Controller / Session 配置同步 principal import |
+
+本轮迁移剩余 14 个 production 文件、16 个测试 / helper 文件；测试随职责归层，跨层 HTTP / 数据库 / Redis 组合放 infrastructure，SessionSerializationTests 保留 config。IdentityApplication 保留服务根包，其余功能根包不再平铺 Java 类。
+Mapper XML 的 namespace / resultMap 类型与 application.yml 的 type-handlers-package 同步更新。Mapper、凭据 record、Provider 构造器及测试 helper 仍保持原可见性；未为跨包调用扩大访问范围、添加 Interface、改变事务、密码规则或失败分类。
+
+#### Verification 与自查
+
+- FRESH：`clean test-compile` 与补充测试后的 `test-compile` 均退出 0；clean 前备份历史 target 日志、报告与验收目录，随后恢复历史证据目录，当前报告由新包下的测试重新生成，旧编译类无残留。
+- FRESH：focused HTTP / Session 18/18 PASS（HTTP 成功链 1、HTTP 边界 11、真实 Redis 2、不可用 Redis 2、JSON 2）；其余 Identity regression 77/77 PASS（其中真实数据库 10 项），两批均 0 failures / errors / skipped、退出 0。共覆盖当前 Identity 全部 16 个测试类的 95 项，不描述成一次 95 项命令。
+- 新增 1 个真实 Redis 回归 `ignoresPreviousNamespaceWithoutDeletingItsStoredSession`：在 v1 namespace 保存含旧 principal 类名的合成 Session，确认 v2 查不到它、旧键内容与 TTL 仍在，并在 finally 清理；JSON 往返断言增强为精确的新 domain 类名。原有 94 项保留，其他断言未削弱。
+- package（跳过已完成测试）退出 0；JAR 包含全部新分层类、没有旧根包类，Mapper / type-handler / Session v2 配置正确；未启动独立 JAR JVM。依赖、数据库 schema / migration、Cookie 与密码计算容量未变。
+- 相对本轮源码快照，排除 package / import / 空行后，所有既有 production 方法正文完全一致；只有上述两个测试的正文发生获准变化。唯一持久化 / 会话行为变化为用户确认的新 principal 类型与 namespace v2；不能笼统称为全部行为不变。
+- 本轮使用一次性 PostgreSQL 18.6 / Redis 7.2.16，loopback 动态端口、tmpfs、独立随机凭据、空 schema Flyway V1 与既有隔离标识，密码容量保持 1；全部运行前后源码快照一致。结束时 app_user / auth_identity / local_password_credential 各 6、app_access_grant 5（认证组合有意撤销一条），Flyway 成功 1、测试 trigger 0、Redis key 0；两个容器均已删除，无既有业务库 / 卷操作，无 FLUSHDB / FLUSHALL。
+- 证据：忽略的 `services/identity/target/r1g-20261030-full-layout/` 内两批日志、JUnit XML、package.log 与 summary.json；迁移前快照 / 映射与编译日志在 `/tmp/dailylanguage-identity-layout-20261030/`。命令沿用前述 focused / regression / package 命令的测试类简单名；实际 XML 包名已对应新位置。
+- Code 自查无阻塞问题，Scope MATCH；目录变更及 principal 迁移之外没有顺手重构。Flow、有效源码链接与本地运行说明已同步当前结构和 namespace v2。Codex 自查不是独立作者 Review，也不提高模块 Ownership。
+- 本轮模块回归属于新目录 / namespace v2 的 fresh 证据；前一轮 17/17 与 77/77 保留原有日期和范围，不混写。旧 server、前端 / 浏览器、Hosted HTTPS、跨服务、生产容量与未约定的故障注入仍 NOT_RUN；不扩大为整个仓库 / 公网验收 PASS。
+
+#### Human Review 继续 — 2026-10-30
+
+- 用户在 logout 配置、当前会话失效 / 其他会话保留及 CSRF 导读后表示“logout 这部分看懂了”；记录为该段反馈，不据单句反馈认定整个 R1-G Human Review 完成或提高模块掌握等级。
+- 认证身份与应用准入讨论中，用户追问 authorities 是否表示应用列表、未来校验结果的含义；解释后反馈“大概懂了，继续”。记录为初步学习反馈，不自动认定完整权限设计已掌握。当前 Provider 返回空 authorities，me 仅要求 authenticated；未来在线准入核验仍属对应 Slice，不新增授权实现。
+- 继续导读已批准的 principal 类名迁移与 Session v2：隔离旧会话、避免按已移动的旧类名还原；重新登录建立 v2 会话，账户数据不变。实现、验证与关键调用链导读已覆盖，当前等待整批 Human Review 判断，不追加固定考试或自动认定 Ownership 完成。本轮仅同步进展，未重跑测试，沿用同日 PRIOR 18/18 与 77/77。
+
+#### Session 兼容性理解复核 — 2026-10-31
+
+- 用户在追踪 Redis Hash 属性、认证 JSON 的 @class 与实际 serializer 配置后，自行说明：保留 v1 时，新生成的会话仍会写入新类名；风险是读到迁移前已有旧会话并尝试按旧类名还原。该判断正确，用户随后表示“那我就懂了”；具体 evidence 已补入 LEARN-003。
+- namespace 切换属于用户已批准的隔离策略，不是移动目录的必然要求，也不负责转换 JSON 类型；Codex 将早前“找到已有旧会话”误读为“key 随机冲突”的解释已更正。不将该误读归为用户知识错误，不据局部正确推理提高模块等级或自动收口整批 Review。
+- 本轮未改 production / 测试、未重跑验证；18/18 与 77/77 两批及 package 均为 2026-10-30 PRIOR。
+
+上述为 Review 过程中的待确认状态，用户整批结论见下方收口记录。
+
+### Human Review 收口 — R1-G，2026-10-31
+
+- 在当前 R1-G 实现、完整分层与 Session v2 取舍已导读和讨论后，用户对“是否接受整批实现与范围”明确回复“接受”。本次 scoped Human Review COMPLETE，不将其解释为 commit / push 授权或下一业务 Slice 的批准。
+- Review evidence 包括：用户参考完整示范后写入 handler，追踪 204 / 响应提交 / 外层 Filter 与 writer 的真实调用关系；要求恢复并扩展项目分层；明确接受旧会话失效方案；自行正确说明 v1 下新会话仍写入新类名、风险来自读取已有旧会话。logout 已反馈理解，应用准入讨论保留初步理解的实际范围，不补造独立实现、生产操作或完整框架掌握。
+- FRESH 仅限 Git / source 核对：分支 migrate/identity、HEAD c916addcd928159fd99dbfe1c49327af8bc0163c；当前 services/identity/src 全部文件与最终验收 summary.json 中的 SHA-256 / 文件集合一致。2026-10-30 的 HTTP / Session 18/18、其余 Identity 77/77 与 package PASS 均为 PRIOR，本轮未重跑。
+- 无待修 blocking finding，Flow / 源码引用与当前结构一致。Codex 自查与用户 Review 分开记录，OWNERSHIP_MATRIX 等级不变；LEARN-003 保留具体 reasoning evidence，不自动改为整条 CONFIRMED / OPERATED。
+
+Current Gate: READY_TO_COMMIT。Next Action：用户决定提交范围与时机；不自动 commit / push / merge，不开始下一业务 Slice。

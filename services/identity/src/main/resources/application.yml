@@ -21,7 +21,7 @@ spring:
     timeout: 24h
     data:
       redis:
-        namespace: daily-language:identity:session:v1
+        namespace: daily-language:identity:session:v2
         repository-type: default
 
 app:
@@ -54,7 +54,7 @@ management:
 
 mybatis-plus:
   mapper-locations: classpath:/mapper/*.xml
-  type-handlers-package: com.dailylanguage.identity.persistence
+  type-handlers-package: com.dailylanguage.identity.persistence.infrastructure
   configuration:
     default-statement-timeout: 5
   global-config:

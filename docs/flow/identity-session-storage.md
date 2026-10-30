@@ -2,17 +2,18 @@
 
 - Document Status: `IMPLEMENTED`
 - Feature / Slice: `R1-F`
-- Last Verified: `2026-10-25`
+- Last Verified: `2026-10-30`
 - Entry: Spring Session 自动配置的 RedisSessionRepository；当前真实存取调用方为工程测试。
 
 ## 1. Behavior Boundary
 
 为 Identity 提供 Redis-backed Session 存取基础，使用 Boot 管理的 Spring Session / Spring Data Redis 4.1.1。
-R1-F 验收时 HTTP 仍为 STATELESS，没有生产登录入口。2026-10-26 的 R1-G 已准备 IF_REQUIRED / formLogin / logout 骨架，
-用户失败 handler 尚未实现、真实成功链未运行；本 Flow 保留已验收的 repository 存取边界。
-HTTP 保存、读取、Cookie 发送、Session ID 轮换、退出与跨服务核验不能混为本 Flow 已验收行为；完整 HTTP Flow 待 R1-G 验证后另建。
+R1-F 验收时 HTTP 仍为 STATELESS，没有生产登录入口。2026-10-30 R1-G 已完成本地 HTTP / Session 工程验收，
+详见 [HTTP 认证 Flow](identity-http-authentication.md)；本 Flow 保留 repository 存取边界与 R1-F 历史证据。
+HTTP 保存、恢复、Cookie、Session ID 轮换及退出见新 Flow；跨服务身份核验尚未实现。
 
-配置固定 namespace `daily-language:identity:session:v1`、default 非索引 repository、24h idle TTL，连接 / 操作超时均为 1s。
+当前 namespace 为 `daily-language:identity:session:v2`，default 非索引 repository、24h idle TTL，连接 / 操作超时均为 1s。
+R1-F 原始 namespace 是 v1；2026-10-30 完整分层将 principal 移入 account/domain，用户明确批准切换 v2 使旧 Identity 会话重新登录。旧键不批量删除，依原 TTL 过期；不实现旧类型 alias 或会话数据转换。
 Identity Redis host 必须显式提供，不回退到旧 Language 地址或 namespace。
 
 ## 2. Main Call Chain
@@ -62,7 +63,7 @@ sequenceDiagram
 | JSON 还原未知业务类型 | 抛 SerializationException，不放宽许可或退回 Java native serialization |
 | Redis 连接不可用，repository.save | 抛 DataAccessException；上下文仅有 RedisSessionRepository，无内存 repository fallback |
 | Session 不存在或过期 | 由框架 repository 处理；本 Slice 未等待 24h 或执行浏览器过期链路，不据配置和 TTL 读值宣称完整 expiry 验收 |
-| 未来登录写 Session 失败 | HTTP 错误映射与成功响应提交边界待后续 Slice；当前没有登录 handler，不声称已返回 503 或完成 Session rotation |
+| 登录写 Session 失败 | R1-G 已验证 Redis 不可用时返回固定 503；完整 HTTP 边界与未验证部分见 HTTP 认证 Flow，不追记为 R1-F 的历史证据 |
 
 ## 5. Verification Evidence
 
@@ -84,8 +85,10 @@ PostgreSQL 18.6 使用既有隔离标识、identity_app 与空 schema Flyway V1�
 
 ## 6. Source References
 
-- [SessionConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/SessionConfiguration.java)：固定 serializer bean 与精确业务类型许可。
+2026-10-30 完整分层后，当前 principal 为 `com.dailylanguage.identity.account.domain.AuthenticatedAccount`；新一批 HTTP / Session 18/18 与其余 Identity 77/77 均通过，package PASS。RedisSessionIntegrationTests 新增真实旧 namespace 隔离用例，确认 v2 不恢复含旧类型名的 v1 样本、旧键内容 / TTL 不被改写；本轮测试样本在 finally 删除。上节 R1-F 表格保留其历史范围，不追记为该批已验证行为。
+
+- [SessionConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/config/SessionConfiguration.java)：固定 serializer bean 与精确业务类型许可。
 - [application.yml](../../services/identity/src/main/resources/application.yml)：独立 Redis / namespace、timeout、TTL 与 Cookie 配置。
 - [POM](../../services/identity/pom.xml)：Boot-managed Session Redis starter；JAR 核对 Session / Data Redis 4.1.1、Lettuce 7.5.2.RELEASE。
-- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/IdentitySecurityConfiguration.java)：R1-F 原为 STATELESS；当前 R1-G HTTP 骨架边界见上文，完整链待验证。
-- [SessionSerializationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/SessionSerializationTests.java)、[RedisSessionIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/RedisSessionIntegrationTests.java)、[RedisSessionUnavailableIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/RedisSessionUnavailableIntegrationTests.java)：三组代表性证据。
+- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/config/IdentitySecurityConfiguration.java)：R1-F 原为 STATELESS；当前 R1-G 的 IF_REQUIRED / HTTP 生命周期见独立认证 Flow。
+- [SessionSerializationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/config/SessionSerializationTests.java)、[RedisSessionIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/infrastructure/RedisSessionIntegrationTests.java)、[RedisSessionUnavailableIntegrationTests](../../services/identity/src/test/java/com/dailylanguage/identity/security/infrastructure/RedisSessionUnavailableIntegrationTests.java)：三组代表性证据。

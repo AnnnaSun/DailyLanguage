@@ -2,7 +2,7 @@
 
 - Document Status: `IMPLEMENTED`
 - Feature / Slice: `R1-E`
-- Last Verified: `2026-10-25`
+- Last Verified: `2026-10-30`
 - Entry: Identity 内部 Spring bean `LocalPasswordAuthenticationProvider.authenticate(authenticationRequest)`。
 
 ## 1. Behavior Boundary
@@ -11,9 +11,9 @@
 Provider 读取 LOCAL_EMAIL credential，校验密码后返回认证 token；principal 仅为 AuthenticatedAccount(userId)，
 credentials 为 null、authorities 为空。凭据有效不等于获得应用准入。
 
-R1-E 验收时仅内部调用，尚无登录 HTTP / RPC 入口。2026-10-26 的 R1-G 已进入 HTTP 接入骨架阶段，
-登录失败 handler 为用户 Human Core、真实成功链尚未运行；本 Flow 只描述已验收的 Provider 行为，不把骨架视为完整 HTTP 登录验收。
-应用授权、账号启停、Rate Limit、业务消费者和前端不在本 Flow；完整 HTTP / Session 流程待 R1-G 验证后单独记录。
+R1-E 验收时仅内部调用，尚无登录 HTTP / RPC 入口。2026-10-30 R1-G 已完成本地 HTTP / Session 工程验收，
+详见 [HTTP 认证 Flow](identity-http-authentication.md)；本 Flow 仍聚焦 Provider 内部行为。
+应用授权、账号启停、Rate Limit、业务消费者和前端不在本 Flow；跨服务身份核验尚未实现。
 登录不执行注册 password policy / blocklist，不 trim 或改写有效密码。
 
 ## 2. Main Call Chain
@@ -113,10 +113,10 @@ Human Review 收口时当前 Provider blob 为 `3fc6e7749ced047c5d635889ffad2b4f
 
 ## 6. Source References
 
-- [LocalPasswordAuthenticationProvider](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalPasswordAuthenticationProvider.java)：authenticate、lookupCredential、verifySubmittedPassword、dummy 初始化与 finally。
-- [LocalEmailNormalizer](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalEmailNormalizer.java)：共享邮箱规则。
-- [LocalAccountMapper](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalAccountMapper.java) 与 [SQL / constructor mapping](../../services/identity/src/main/resources/mapper/LocalAccountMapper.xml)：只读凭据查询。
-- [LocalPasswordCredential](../../services/identity/src/main/java/com/dailylanguage/identity/account/LocalPasswordCredential.java) 与 [AuthenticatedAccount](../../services/identity/src/main/java/com/dailylanguage/identity/account/AuthenticatedAccount.java)：内部凭据与对外认证身份分离。
-- [LocalPasswordHasher](../../services/identity/src/main/java/com/dailylanguage/identity/credential/LocalPasswordHasher.java) 与 [密码 Flow](identity-password-hashing.md)：固定格式、参数与共享容量。
-- [Provider tests](../../services/identity/src/test/java/com/dailylanguage/identity/account/LocalPasswordAuthenticationProviderTests.java) 与 [数据库组合 tests](../../services/identity/src/test/java/com/dailylanguage/identity/account/IdentityPasswordHashingIntegrationTests.java)：认证合同与真实组件接通。
-- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/IdentitySecurityConfiguration.java)：现有 HTTP / Session 拒绝边界。
+- [LocalPasswordAuthenticationProvider](../../services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalPasswordAuthenticationProvider.java)：authenticate、lookupCredential、verifySubmittedPassword、dummy 初始化与 finally。
+- [LocalEmailNormalizer](../../services/identity/src/main/java/com/dailylanguage/identity/account/domain/LocalEmailNormalizer.java)：共享邮箱规则。
+- [LocalAccountMapper](../../services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalAccountMapper.java) 与 [SQL / constructor mapping](../../services/identity/src/main/resources/mapper/LocalAccountMapper.xml)：只读凭据查询。
+- [LocalPasswordCredential](../../services/identity/src/main/java/com/dailylanguage/identity/account/infrastructure/LocalPasswordCredential.java) 与 [AuthenticatedAccount](../../services/identity/src/main/java/com/dailylanguage/identity/account/domain/AuthenticatedAccount.java)：内部凭据与对外认证身份分离。
+- [LocalPasswordHasher](../../services/identity/src/main/java/com/dailylanguage/identity/credential/infrastructure/LocalPasswordHasher.java) 与 [密码 Flow](identity-password-hashing.md)：固定格式、参数与共享容量。
+- [Provider tests](../../services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/LocalPasswordAuthenticationProviderTests.java) 与 [数据库组合 tests](../../services/identity/src/test/java/com/dailylanguage/identity/account/infrastructure/IdentityPasswordHashingIntegrationTests.java)：认证合同与真实组件接通。
+- [IdentitySecurityConfiguration](../../services/identity/src/main/java/com/dailylanguage/identity/security/config/IdentitySecurityConfiguration.java)：现有 HTTP / Session 拒绝边界。
