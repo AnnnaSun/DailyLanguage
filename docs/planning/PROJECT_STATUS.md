@@ -1,6 +1,6 @@
 # AI Language Tutor — Project Status
 
-> Last updated: 2026-10-31 — R1-G READY_TO_COMMIT；用户接受当前实现、完整分层与 Session v2 取舍，Human Review COMPLETE。当前源码与 2026-10-30 的 18/18、77/77 及 package PASS 候选一致；本轮未重跑测试或提高模块等级，尚未提交。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
+> Last updated: 2026-10-31 — R1-G COMPLETE / COMMITTED `162b36f`；用户自行提交，Human Review COMPLETE。HEAD 与工作区源码均匹配 2026-10-30 的 18/18、77/77 及 package PASS 候选；本轮未重跑测试或提高模块等级，仅补充提交收口记录。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
 > 当前状态入口；详细合同在 Feature / Phase / ADR，早期历史见 [历史快照](history/PROJECT_STATUS_2026-10-10.md)。
 > R1-A / R1-B / R1-C Human Core 均为用户提示后实现；R1-G handler 为用户参考完整示范后写入。本次证明本地 Identity HTTP / Session，不证明公开注册、浏览器 / Hosted / 跨服务，也不自动提高模块整体 Ownership。
 
@@ -10,12 +10,12 @@
 |---|---|
 | Product Phase | M1 — Minimum Text Practice Loop；尚未达到 S11 / S12 exit |
 | S11 | PARTIAL；A observation API、B 最小认证 UX 已实现、用户 Review 接受并提交；其余 UI 未实现 |
-| Current work | R1-G READY_TO_COMMIT；用户整批 Review 已接受，无待修阻塞问题；当前源码与 2026-10-30 PRIOR 验收候选一致，不自动视为模块独立掌握 |
+| Current work | R1-G COMPLETE / COMMITTED `162b36f`；工程验收、Human Review 与用户提交已收口，无待修阻塞问题；不自动视为模块独立掌握 |
 | C31 | PRIOR PATCHED_C31_PASS；一次性工程、临时补丁与运行产物已按用户要求删除；不证明官方原版兼容或 Identity 行为 |
-| Git baseline | 2026-10-31 核对：`migrate/identity` / `c916addcd928159fd99dbfe1c49327af8bc0163c`（R1-G 骨架）；src 文件集合与最终验收 SHA-256 全部一致，Cookie 修正、完整分层、获准 Session v2 与文档均未提交 |
+| Git baseline | 2026-10-31 核对：`migrate/identity` / `162b36f008aba732756770640eb7c8d16dc340b6`；HEAD / 工作区 src 文件集合与最终验收 SHA-256 全部一致，核对前工作区干净；本轮仅补充提交收口文档，未提交或推送 |
 | Main baseline | 迁移启动时核对的本地 main、origin/main 与远端 main 均为 `f5a729a`，即 PR #28 合并提交；本次未重新查询远端 |
 | Current scope | 用户明确扩大至 Identity 全部剩余功能与测试分层，另行批准 AuthenticatedAccount 类名迁移和 Session v2；不新增业务能力，账户 / 密码数据不变，旧 Identity 会话需重新登录 |
-| Next Action | 用户决定 R1-G 的提交范围与时机；不自动 commit / push，不提高模块等级或开始下一业务 Slice |
+| Next Action | 由用户确定下一 Slice 的 Design / Scope；不自动实现、commit / push 或提高模块等级 |
 
 旧 PROJECT_STATUS 的 S10 READY_TO_COMMIT 与已删除交接快照的 S9 Gate 均为历史状态，不据此重开已完成的 Review。
 当前迁移入口为 [Identity R1-G](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期)；恢复顺序为 AGENTS → 本文件 → 当前 Feature / Slice 合同，再核对 Git 与源码。
@@ -37,14 +37,14 @@ S11 恢复入口保留在 [S11 checkpoint](../features/M1_MINIMUM_TEXT_PRACTICE.
 | 平台迁移 / R1-D | COMPLETE / COMMITTED `c1be36d`；工程验收 PASS，Flow CURRENT，Human Review COMPLETE；Human Core 保持提示 / 局部示例后实现，不提升模块整体 Ownership | [Identity R1-D](../features/IDENTITY.md#r1-d--identity-内部-local_email-注册闭环) |
 | 平台迁移 / R1-E | COMPLETE / COMMITTED `8630e6f`；工程验收、Flow 与 Human Review 已收口，Human Core 提示 / 局部示例后实现，不提升模块 Ownership | [Identity R1-E](../features/IDENTITY.md#r1-e--内部-local_email-凭据认证) |
 | 平台迁移 / R1-F | COMPLETE / COMMITTED `dc8df93`；工程验收、Flow 与 Human Review 已收口；80/80、数据库 10/10 两批及 package 为 PRIOR，Codex 实现，不提升模块 Ownership | [Identity R1-F](../features/IDENTITY.md#r1-f--redis-session-基础) |
-| 平台迁移 / R1-G | READY_TO_COMMIT；工程验收与 Human Review 已收口，当前源码匹配 2026-10-30 PRIOR 的 18/18、77/77 / package 候选；用户 handler 保持参考完整示范后写入，不提高模块等级 | [Identity R1-G](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期) |
+| 平台迁移 / R1-G | COMPLETE / COMMITTED `162b36f`；工程验收、Human Review 与用户提交已收口，HEAD 源码匹配 2026-10-30 PRIOR 验收候选；用户 handler 保持参考完整示范后写入，不提高模块等级 | [Identity R1-G](../features/IDENTITY.md#r1-g--http-认证与-session-生命周期) |
 
 S11-A 的 Human Core 曾由用户明确转交 Codex；S11-B / C31 由 Codex 实现。不记作用户 hands-on，
 Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](../ownership/OWNERSHIP_MATRIX.md) 保持既有等级。
 
 ## Active Decisions / 迁移与恢复边界
 
-- 迁移前分支已通过 PR #28 合并，R1-A / R1-B / R1-C 已纳入 PR #29；R1-D 已提交 c1be36d，R1-E 已提交 8630e6f，R1-F 已提交 dc8df93。2026-10-26 用户确认 R1-G 范围与 Human Core 分工；不自动 commit / push。
+- 迁移前分支已通过 PR #28 合并，R1-A / R1-B / R1-C 已纳入 PR #29；R1-D 已提交 c1be36d，R1-E 已提交 8630e6f，R1-F 已提交 dc8df93，R1-G 已由用户提交 162b36f。2026-10-26 用户确认 R1-G 范围与 Human Core 分工，后续整批 Review 与提交证据见 Identity 合同；不自动 commit / push。
 - R1-B 仅在 Identity 增加受限密码散列 / 校验和 bcprov-jdk18on:1.86；进程限额本地默认 1，散列与校验共享，容量不足立即拒绝。用户 Human Core 不由 Codex 代写，旧 server 及其依赖保持原样。
 - R1-C 只迁入既有注册密码 policy 与固定 blocklist，用户实现 validate；helper / 资源 / 测试由 Codex 准备。原始密码不改写，保持 12–64 printable ASCII 与 exact matching；不进入现有 matches 登录校验链，不启用注册 / Session，不新增 dependency 或数据库行为。
 - 已确认 C25：共同版本／基础合同 → Identity → PersonalNote 最小只读认证接入 → Language 身份／本地引用切换 → 扩大迁移。各步仍需小 slice 合同；完整设计、命名、身份接口和数据操作未整体获批。
@@ -91,6 +91,7 @@ Review 接受与 commit 不自动提高模块掌握等级。[Ownership Matrix](.
 | 2026-10-30 / FRESH，security 分层整理 | clean test-compile、HTTP / Session 17/17、package 退出 0，0 failures / errors / skipped；JAR 五个类已迁移、旧路径无残留，Flow 链接同步 | 仅 package / import / 文件位置变化，所有方法正文与断言不变，AuthenticatedAccount 全限定名保留；其余 77 项未重跑，两个新容器已删除、Redis key / 测试 trigger 遗留 0 |
 | 2026-10-30 / FRESH，Identity 完整分层与 Session v2 | clean test-compile / test-compile、HTTP / Session 18/18、其余 Identity 77/77 两批与 package PASS，0 failures / errors / skipped；JAR 类型 / Mapper / 扫描 / namespace 引用核对通过 | 用户明确扩大范围并批准旧会话失效；新增 v1 namespace 隔离回归，增强新 principal JSON 类型断言。方法正文不变，账户数据不变；测试 trigger / Redis key 遗留 0，两个新容器已删除；非旧 server / 浏览器 / Hosted / 跨服务验收 |
 | 2026-10-31 / R1-G Human Review 收口 | 用户明确接受整批实现、分层与 Session v2 取舍；fresh Git / src 文件集合及 SHA-256 核对与最终验收候选一致，diff whitespace PASS | 未重跑测试或修改 production / 测试；沿用 2026-10-30 PRIOR 18/18、77/77 与 package，不记独立实现 / 生产操作或模块升级，不自动提交 |
+| 2026-10-31 / R1-G 用户提交确认 | HEAD 162b36f 与工作区 src 文件集合 / SHA-256 均匹配最终验收候选；核对前工作区干净，50 个文件提交，diff whitespace PASS | 本轮只更新提交收口文档，未重跑测试、未执行 commit / push 或查询远端；18/18、77/77 与 package 为 PRIOR，不提高模块等级 |
 | 本轮 / NOT_RUN | 独立 JAR JVM / 双启动摘要、JAR blocklist 单独完整性校验、公开注册、旧 Java / Vue / 浏览器回归、Hosted HTTPS、跨服务认证、真实 C31 重跑、live Provider、SAA、K3s / Tekton、生产部署、数据库崩溃恢复和提交确认丢失 | 本地 HTTP / Session 已验证；不扩大为公开部署、浏览器、跨服务或用户 Ownership 结论 |
 
 完整 S11 批次、失败与局限见 Feature §18–19；C31 仅保留平台方案 §9.3 的脱敏摘要。
@@ -106,7 +107,7 @@ C31 一次性验证源码及本机诊断日志／构建产物已按用户 2026-1
 - R1-D COMPLETE / COMMITTED `c1be36d`；65/65 与数据库 9/9 两批、package / Flow / Human Review 已收口，提示 / 局部示例后实现记录保留，不自动提高模块 Ownership。
 - R1-E COMPLETE / COMMITTED `8630e6f`；工程验收、自查、认证 Flow 与本 Slice Human Review 已收口，不重新打开，无公开登录 / 跨服务验收结论，不提升模块 Ownership。
 - R1-F COMPLETE / COMMITTED `dc8df93`；工程验收、Session Flow 与本 Slice Human Review 已收口，不重新打开；Codex 实现，不记用户 hands-on 或升级模块 Ownership。
-- R1-G READY_TO_COMMIT；用户整批 Human Review 已接受，当前源码与最终验收候选一致；等待 Commit Decision，不自动提交或提高模块等级，不新增业务 Slice；跨服务未实施。
+- R1-G COMPLETE / COMMITTED `162b36f`；用户提交与最终验收候选一致，无待补 Human Review / Commit Decision；本轮收口文档未自动提交，不提高模块等级或新增业务 Slice；跨服务未实施。
 - 2026-10-24 已按用户要求在 Identity POM 补回 `bcprov-jdk18on:1.86`，解决实际复现的 3 项缺类错误；此前声明缺失来源仍 UNKNOWN，未据此确认 Maven / IDE 根因。
 - 平台完整 ADR、跨服务认证／故障、前端迁出与仓库命名仍待后续决策；本轮没有批准这些后续实现。
 - S11 整体 PARTIAL，迁移后重新定义下一 slice；没有 S11 全页面端到端验收或 S12 closeout PASS。

@@ -4,11 +4,11 @@
 
 - Date: 2026-10-31
 - Current Slice: R1-G — HTTP 认证与 Session 生命周期；用户明确请求完整示范后，参考 Codex 示范写入登录失败 handler，Codex 完成其余范围。
-- Gate: R1-G READY_TO_COMMIT；2026-10-31 用户接受当前实现、完整分层与 Session v2 取舍，Human Review COMPLETE。当前源码与 2026-10-30 的 18/18、77/77 两批及 package PASS 候选完全一致；本轮未重跑测试。R1-G 尚未提交，R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
+- Gate: R1-G COMPLETE / COMMITTED `162b36f`；2026-10-31 用户接受整批实现后自行提交，Human Review COMPLETE。提交中的源码与 2026-10-30 的 18/18、77/77 两批及 package PASS 候选完全一致，本轮未重跑测试。R1-F COMPLETE / COMMITTED `dc8df93`，不重新打开。
 - R1-A 已提交 `9b3ef1a`，R1-B COMPLETE / COMMITTED `3f0d36f`；R1-B 收口文档已提交 `0d69221`。R1-C 从 `architecture/microservices-migration` / `0d69221` 的干净工作区开始。
-- 当前基线：2026-10-31 核对 `migrate/identity` / `c916addcd928159fd99dbfe1c49327af8bc0163c`（R1-G 骨架）；当前 src 全部文件 SHA-256 与最终验收摘要一致，无新增或遗漏文件。Cookie 测试修正、完整分层、获准 Session v2 与文档均未提交；旧 hash / namespace 保留为有日期的历史证据，不作为当前路径或会话合同。
+- 当前基线：2026-10-31 核对 `migrate/identity` / `162b36f008aba732756770640eb7c8d16dc340b6`；HEAD 与工作区 src 全部文件 SHA-256 / 文件集合均匹配最终验收摘要。提交已包含 R1-G 实现、Cookie 测试修正、完整分层、获准 Session v2 与此前文档；本轮开始工作区干净，仅补充提交收口记录。旧 hash / namespace 保留为有日期的历史证据。
 - PRIOR：R1-F 2026-10-25 的 80/80 与数据库 10/10 两批、package 与清理证据见下方记录；2026-10-26 Review 收口只核对 Git / source 并同步文档，未重跑测试。更早各 Slice 的有日期证据保留为历史。
-- 不自动 commit / push，不提高模块整体 Ownership；R1-G 工程验收与 scoped Human Review 已收口，等待用户 Commit Decision，不开始新的业务 Slice。
+- 不自动 commit / push，不提高模块整体 Ownership；R1-G 工程验收、scoped Human Review 与用户本地提交已收口，不开始新的业务 Slice。
 
 ## R1-A 决定与交付记录
 
@@ -906,4 +906,12 @@ Mapper XML 的 namespace / resultMap 类型与 application.yml 的 type-handlers
 - FRESH 仅限 Git / source 核对：分支 migrate/identity、HEAD c916addcd928159fd99dbfe1c49327af8bc0163c；当前 services/identity/src 全部文件与最终验收 summary.json 中的 SHA-256 / 文件集合一致。2026-10-30 的 HTTP / Session 18/18、其余 Identity 77/77 与 package PASS 均为 PRIOR，本轮未重跑。
 - 无待修 blocking finding，Flow / 源码引用与当前结构一致。Codex 自查与用户 Review 分开记录，OWNERSHIP_MATRIX 等级不变；LEARN-003 保留具体 reasoning evidence，不自动改为整条 CONFIRMED / OPERATED。
 
-Current Gate: READY_TO_COMMIT。Next Action：用户决定提交范围与时机；不自动 commit / push / merge，不开始下一业务 Slice。
+2026-10-31 Review 收口时曾进入 READY_TO_COMMIT；用户后续提交结果见下方。
+
+### 用户提交确认 — R1-G，2026-10-31
+
+- 用户报告代码已提交；实际核对分支 migrate/identity、HEAD `162b36f008aba732756770640eb7c8d16dc340b6`，提交说明为“代码架构修改，登录生成 session 并且change session id，登出清除”，50 个文件变更。核对前工作区干净，未执行 commit / push 或查询远端。
+- 提交中的 services/identity/src 文件集合与每个文件 SHA-256 均匹配最终验收摘要，工作区源码也一致，无遗漏或额外源码；用户已提交所接受的候选。18/18、77/77 与 package 为 2026-10-30 PRIOR PASS，本轮仅核对 Git / source，未重跑测试。
+- Human Review 保持 COMPLETE、模块等级不变，不重开此前已收口讨论。本轮只同步提交收口文档，不自动追加提交，也不据此认定 Identity 整体阶段或跨服务迁移已完成。
+
+Current Gate: COMPLETE / COMMITTED `162b36f`。Next Action：由用户确定下一 Slice 的 Design / Scope；不自动实现、提交、推送或开始下一业务 Slice。
